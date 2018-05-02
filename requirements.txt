@@ -1,0 +1,23 @@
+# #############################################################################
+# requirements.txt
+# ================
+# Author : Sepand KASHANI [sep@zurich.ibm.com]
+# Revision : 0.1
+# Last updated : 2018-05-01 07:56:45 UTC
+# #############################################################################
+
+# This file contains the complete list of Pypeline's Python dependencies.
+# It is preferable to install packages having non-Python dependencies using
+# the `conda` environment manager if available.
+#
+# When modifying dependencies, don't forget to update both `requirements.txt`
+# and `conda_requirements.txt`.
+
+flake8 == 3.5.*
+ipython == 6.3.*
+mypy == 0.*
+numpy == 1.14.*
+pytest == 3.5.*
+sphinx == 1.7.*
+sphinx_rtd_theme == 0.3.*
+tox == 3.0.*
