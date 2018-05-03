@@ -6,12 +6,11 @@
 # Last updated : 2018-05-01 07:56:45 UTC
 # #############################################################################
 
-from typing import Mapping
-
 import configparser
 import datetime
 import pathlib
 import re
+from typing import Mapping
 
 
 def setup_config() -> configparser.ConfigParser:
@@ -56,7 +55,6 @@ copyright = (f'{datetime.date.today().year}, '
 author = cfg.get('metadata', 'author')
 version = release = info['version']
 
-
 # -- General configuration ---------------------------------------------------
 extensions = [
     'sphinx.ext.autodoc',
@@ -72,15 +70,12 @@ master_doc = 'index'
 exclude_patterns = []
 pygments_style = 'sphinx'
 
-
 # -- Options for HTML output -------------------------------------------------
 html_theme = 'sphinx_rtd_theme'
 html_static_path = ['_static']
 
-
 # -- Options for HTMLHelp output ---------------------------------------------
 htmlhelp_basename = 'pypelinedoc'
-
 
 # -- Extension configuration -------------------------------------------------
 # -- Options for intersphinx extension ---------------------------------------
