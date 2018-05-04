@@ -13,16 +13,14 @@ from pypeline.core import Block
 
 class TestBlock:
     """
-    Test Block class.
+    Test :py:class:`~pypeline.core.Block`.
     """
 
     def test_fail_abstract_instantiation(self):
         """
         Abstract blocks cannot be instantiated.
         """
-
         class B(Block):
-            """Abstract block"""
             pass
 
         with pytest.raises(TypeError):
@@ -30,12 +28,10 @@ class TestBlock:
 
     def test_concrete_instantiation(self):
         """
-        Blocks overloading ``__call__`` can be instantiated.
+        Blocks overloading :py:meth:`~pypeline.core.Block.__call__` can be
+        instantiated.
         """
-
         class A(Block):
-            """Concrete block"""
-
             def __call__(self):
                 return 5
 

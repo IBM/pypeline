@@ -7,6 +7,8 @@
 # #############################################################################
 
 """
+Foundational constructs.
+
 Pypeline is structured around the concept of :py:class:`~pypeline.core.Block`:
 callable objects that perform certain actions given their optional inputs.
 """
@@ -27,29 +29,31 @@ class Block(ABC):
     Blocks are allowed to extend this interface with public attributes and
     methods.
 
-    :Example:
-
     .. testsetup::
 
-        from pypeline.core import Block
+       from pypeline.core import Block
 
     .. doctest::
 
-        >>> class A(Block):
-        ...     def __call__(self):
-        ...         return 5
-        >>> blk = A()
-        >>> blk()  # invoke A.__call__()
-        5
+       >>> class A(Block):
+       ...     def __call__(self):
+       ...         return 5
 
-    >>> class B(Block):
-    ...     pass
-    >>> B()
-    Traceback (most recent call last):
-        ...
-    TypeError: Can't instantiate abstract class B with abstract methods
-        __call__
-    """
+       >>> blk = A()
+       >>> blk()  # invoke A.__call__()
+       5
+
+    .. doctest::
+
+       >>> class B(Block):
+       ...     pass
+
+       >>> B()
+       Traceback (most recent call last):
+           ...
+       TypeError: Can't instantiate abstract class B with abstract methods
+           __call__
+        """
 
     def __init__(self):
         super().__init__()

@@ -18,27 +18,12 @@ callable objects that implement specific actions.
 
 
 .. toctree::
-   :glob:
-   :maxdepth: 1
-   :caption: General
+   :caption: Contents
+   :hidden:
 
-   general/**
-
-
-.. toctree::
-   :glob:
-   :maxdepth: 1
-   :caption: Notes
-
-   notes/**
-
-
-.. toctree::
-   :glob:
-   :maxdepth: 2
-   :caption: API Reference
-
-   api/**
+   general/index
+   notes/index
+   api/index
 
 
 Indices and tables

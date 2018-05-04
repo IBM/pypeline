@@ -79,4 +79,8 @@ htmlhelp_basename = 'pypelinedoc'
 
 # -- Extension configuration -------------------------------------------------
 # -- Options for intersphinx extension ---------------------------------------
-intersphinx_mapping = {'https://docs.python.org/': None}
+intersphinx_mapping = {
+    'python': ('https://docs.python.org/3', None),
+    'NumPy [latest]': ('https://docs.scipy.org/doc/numpy/', None),
+    'SciPy [latest]': ('https://docs.scipy.org/doc/scipy/reference', None),
+    'matplotlib [latest]': ('https://matplotlib.org', None)}
