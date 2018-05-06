@@ -1,24 +1,21 @@
 .. ############################################################################
-.. index.rst
-.. =========
+.. func.rst
+.. ========
 .. Author : Imaging of Things Team (IBM ZRL)
 .. Revision : 0.0
 .. Last updated : 2018-05-01 07:56:45 UTC
 .. ############################################################################
 
 
-util
-====
+math.func
+=========
 
-.. toctree::
-   :hidden:
-
-   argcheck
-   math/func
-
-
-.. currentmodule:: pypeline.util
+.. currentmodule:: pypeline.util.math.func
 .. autosummary::
 
-   argcheck
-   math.func
+   tukey
+
+
+.. automodule:: pypeline.util.math.func
+   :show-inheritance:
+   :members:
