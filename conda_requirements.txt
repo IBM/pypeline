@@ -19,5 +19,6 @@ ipython == 6.3.*
 mypy == 0.*
 numpy == 1.14.*
 pytest == 3.5.*
+scipy == 1.0.*
 sphinx == 1.7.*
 sphinx_rtd_theme == 0.3.*

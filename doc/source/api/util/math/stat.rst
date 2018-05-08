@@ -1,26 +1,21 @@
 .. ############################################################################
-.. index.rst
-.. =========
+.. stat.rst
+.. ========
 .. Author : Imaging of Things Team (IBM ZRL)
 .. Revision : 0.0
 .. Last updated : 2018-05-01 07:56:45 UTC
 .. ############################################################################
 
 
-util
-====
+math.stat
+=========
 
-.. toctree::
-   :hidden:
-
-   argcheck
-   math/func
-   math/stat
-
-
-.. currentmodule:: pypeline.util
+.. currentmodule:: pypeline.util.math.stat
 .. autosummary::
 
-   argcheck
-   math.func
-   math.stat
+   wishrnd
+
+
+.. automodule:: pypeline.util.math.stat
+   :show-inheritance:
+   :members:
