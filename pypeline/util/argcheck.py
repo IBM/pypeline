@@ -18,8 +18,8 @@ from numbers import Complex, Integral, Real
 from typing import Any, Callable, Container, Mapping, Sequence, \
     Union
 
-import astropy.units as u  # type: ignore
-import numpy as np  # type: ignore
+import astropy.units as u
+import numpy as np
 
 BoolFunc = Callable[[Any], bool]
 

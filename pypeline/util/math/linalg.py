@@ -12,8 +12,8 @@ Linear algebra routines.
 
 from typing import Tuple
 
-import numpy as np  # type: ignore
-import scipy.linalg as linalg  # type: ignore
+import numpy as np
+import scipy.linalg as linalg
 
 import pypeline.util.argcheck as chk
 

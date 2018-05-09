@@ -10,9 +10,9 @@
 Statistical functions not available in :py:mod:`scipy`.
 """
 
-import numpy as np  # type: ignore
-import scipy.linalg as linalg  # type: ignore
-import scipy.stats as stats  # type: ignore
+import numpy as np
+import scipy.linalg as linalg
+import scipy.stats as stats
 
 import pypeline.util.argcheck as chk
 

@@ -10,7 +10,7 @@
 1d functions not available in :py:mod:`scipy`.
 """
 
-import numpy as np  # type: ignore
+import numpy as np
 
 import pypeline.util.argcheck as chk
 
