@@ -2,8 +2,6 @@
 # plot.py
 # =======
 # Author : Sepand KASHANI [sep@zurich.ibm.com]
-# Revision : 0.0
-# Last updated : 2018-05-10 16:23:18 UTC
 # #############################################################################
 
 """

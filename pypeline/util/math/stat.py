@@ -2,8 +2,6 @@
 # stat.py
 # =======
 # Author : Sepand KASHANI [sep@zurich.ibm.com]
-# Revision : 0.1
-# Last updated : 2018-05-10 14:07:10 UTC
 # #############################################################################
 
 """

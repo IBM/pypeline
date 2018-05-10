@@ -2,8 +2,6 @@
 # requirements.txt
 # ================
 # Author : Sepand KASHANI [sep@zurich.ibm.com]
-# Revision : 0.2
-# Last updated : 2018-05-10 16:05:37 UTC
 # #############################################################################
 
 # This file contains the complete list of Pypeline's Python dependencies.

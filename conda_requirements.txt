@@ -2,8 +2,6 @@
 # conda_requirements.txt
 # ======================
 # Author : Sepand KASHANI [sep@zurich.ibm.com]
-# Revision : 0.1
-# Last updated : 2018-05-10 16:05:37 UTC
 # #############################################################################
 
 # This file contains a subset of Pypeline's dependencies listed in

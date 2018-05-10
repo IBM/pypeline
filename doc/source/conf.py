@@ -2,8 +2,6 @@
 # conf.py
 # =======
 # Author : Sepand KASHANI [sep@zurich.ibm.com]
-# Revision : 0.0
-# Last updated : 2018-05-01 07:56:45 UTC
 # #############################################################################
 
 import configparser
