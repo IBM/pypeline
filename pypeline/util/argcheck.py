@@ -2,8 +2,8 @@
 # argcheck.py
 # ===========
 # Author : Sepand KASHANI [sep@zurich.ibm.com]
-# Revision : 0.1
-# Last updated : 2018-05-10 13:58:40 UTC
+# Revision : 0.2
+# Last updated : 2018-05-10 14:07:10 UTC
 # #############################################################################
 
 """
@@ -763,8 +763,7 @@ def is_complex(x) -> bool:
        >>> is_complex(5 + 5j), is_complex(1j * np.r_[0][0])
        (True, True)
     """
-    if (isinstance(x, Complex) and
-            (not isinstance(x, Real))):
+    if (isinstance(x, Complex) and (not isinstance(x, Real))):
         return True
 
     return False

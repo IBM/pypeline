@@ -2,8 +2,8 @@
 # stat.py
 # =======
 # Author : Sepand KASHANI [sep@zurich.ibm.com]
-# Revision : 0.0
-# Last updated : 2018-04-05 14:09:31 UTC
+# Revision : 0.1
+# Last updated : 2018-05-10 14:07:10 UTC
 # #############################################################################
 
 """
@@ -66,8 +66,7 @@ def wishrnd(S, df, normalize=True) -> np.ndarray:
     S = np.array(S, copy=False)
     p = len(S)
 
-    if not (chk.has_shape([p, p])(S) and
-            np.allclose(S, S.conj().T)):
+    if not (chk.has_shape([p, p])(S) and np.allclose(S, S.conj().T)):
         raise ValueError('Parameter[S] must be hermitian symmetric.')
     if not (df > p):
         raise ValueError(f'Parameter[df] must be greater than {p}.')

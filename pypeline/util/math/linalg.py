@@ -2,8 +2,8 @@
 # linalg.py
 # =========
 # Author : Sepand KASHANI [sep@zurich.ibm.com]
-# Revision : 0.0
-# Last updated : 2018-03-14 13:22:21 UTC
+# Revision : 0.1
+# Last updated : 2018-05-10 14:07:10 UTC
 # ##############################################################################
 
 """
@@ -21,7 +21,7 @@ import pypeline.util.argcheck as chk
 @chk.check(dict(S=lambda _: chk.has_reals(_) or chk.has_complex(_),
                 G=lambda _: chk.has_reals(_) or chk.has_complex(_),
                 tau=chk.is_real,
-                N=lambda _: (_ is None) or chk.is_integer(_)))
+                N=chk.allow_None(chk.is_integer)))
 def eigh(S, G, tau, N=None) -> Tuple[np.ndarray, np.ndarray]:
     r"""
     Solve truncated generalized eigenvalue problem.
@@ -134,11 +134,9 @@ def eigh(S, G, tau, N=None) -> Tuple[np.ndarray, np.ndarray]:
     G = np.array(G, copy=False)
     M = len(S)
 
-    if not (chk.has_shape([M, M])(S) and
-            np.allclose(S, S.conj().T)):
+    if not (chk.has_shape([M, M])(S) and np.allclose(S, S.conj().T)):
         raise ValueError('Parameter[S] must be hermitian symmetric.')
-    if not (chk.has_shape([M, M])(G) and
-            np.allclose(G, G.conj().T)):
+    if not (chk.has_shape([M, M])(G) and np.allclose(G, G.conj().T)):
         raise ValueError('Parameter[G] must be hermitian symmetric.')
     if not (0 <= tau <= 1):
         raise ValueError('Parameter[tau] must be in [0, 1].')
