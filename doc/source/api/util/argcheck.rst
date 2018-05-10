@@ -14,6 +14,7 @@ argcheck
 .. autosummary::
 
    check
+   is_instance
    is_scalar
    is_array_like
    is_array_shape

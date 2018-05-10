@@ -183,6 +183,63 @@ def _check(m: Mapping[str, Union[BoolFunc, Sequence[BoolFunc]]]) -> Callable:
     return decorator
 
 
+def is_instance(klass) -> Callable:
+    """
+    Return function to test if it's argument satisfies one of the type(s)
+    ``klass``.
+
+    :param klass: type or list of types.
+    :return: [:py:class:`function`]
+
+    .. testsetup::
+
+       import numpy as np
+       from pypeline.util.argcheck import is_instance, check
+
+    .. doctest::
+
+       >>> is_instance([str, int])('5')
+       True
+
+       >>> is_instance(np.ndarray)([])
+       False
+
+    :py:func:`~pypeline.util.argcheck.is_instance` and
+    :py:func:`~pypeline.util.argcheck.check` can be combined to validate
+    parameter types:
+
+    .. doctest::
+
+       >>> @check('x', is_instance(int))
+       ... def f(x):
+       ...     return type(x)
+
+       >>> f(5)
+       <class 'int'>
+
+       >>> f('5')
+       Traceback (most recent call last):
+           ...
+       ValueError: Parameter[x] of f() does not satisfy is_instance(int)().
+    """
+    if not (inspect.isclass(klass) or
+            (isinstance(klass, Sequence) and
+             all(inspect.isclass(_) for _ in klass))):
+        raise TypeError('Parameter[klass] must be a class or list of classes')
+
+    klass = (klass,) if inspect.isclass(klass) else tuple(klass)
+
+    def _is_instance(x):
+        if isinstance(x, klass):
+            return True
+
+        return False
+
+    _is_instance.__name__ = f'is_instance({klass})'
+
+    return _is_instance
+
+
 def is_scalar(x) -> bool:
     """
     Return :py:obj:`True` if ``x`` is a scalar object.
@@ -265,7 +322,7 @@ def is_array_shape(x) -> bool:
 def has_shape(shape) -> Callable:
     """
     Return function to test if it's array-like argument has dimensions
-        ``shape``.
+    ``shape``.
 
     :param shape: desired dimensions.
     :return: [:py:class:`function`]
