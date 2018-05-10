@@ -6,8 +6,6 @@
 # Last updated : 2018-04-05 14:09:31 UTC
 # #############################################################################
 
-import itertools
-
 import numpy as np
 import pytest
 
@@ -115,14 +113,13 @@ class TestIsArrayShape:
 
 class TestHasShape:
     def test_func(self):
-        error_x = (5, 5.0, set(), {})
-        error_shape = error_x + ((1,), [1.], (5, 3, 4), np.r_[2:5])
-        for x, shape in itertools.product(error_x, error_shape):
+        error_shape = (5, set(), dict(), [], (0,))
+        for shape in error_shape:
             with pytest.raises(ValueError):
-                has_shape(x, shape)
+                has_shape(shape)
 
         true_pairs = ((np.r_[:5], (5,)),
                       (np.ones((5, 3, 4)), (5, 3, 4)),
                       (np.zeros((1, 2, 3, 4)), (1, 2, 3, 4)))
         for x, shape in true_pairs:
-            assert has_shape(x, shape) is True
+            assert has_shape(shape)(x) is True

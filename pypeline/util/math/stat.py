@@ -66,7 +66,7 @@ def wishrnd(S, df, normalize=True) -> np.ndarray:
     S = np.array(S, copy=False)
     p = len(S)
 
-    if not (chk.has_shape(S, (p, p)) and
+    if not (chk.has_shape([p, p])(S) and
             np.allclose(S, S.conj().T)):
         raise ValueError('Parameter[S] must be hermitian symmetric.')
     if not (df > p):

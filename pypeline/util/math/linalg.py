@@ -134,10 +134,10 @@ def eigh(S, G, tau, N=None) -> Tuple[np.ndarray, np.ndarray]:
     G = np.array(G, copy=False)
     M = len(S)
 
-    if not (chk.has_shape(S, (M, M)) and
+    if not (chk.has_shape([M, M])(S) and
             np.allclose(S, S.conj().T)):
         raise ValueError('Parameter[S] must be hermitian symmetric.')
-    if not (chk.has_shape(G, (M, M)) and
+    if not (chk.has_shape([M, M])(G) and
             np.allclose(G, G.conj().T)):
         raise ValueError('Parameter[G] must be hermitian symmetric.')
     if not (0 <= tau <= 1):

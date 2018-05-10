@@ -261,34 +261,60 @@ def is_array_shape(x) -> bool:
     return False
 
 
-@check(dict(x=is_array_like,
-            shape=is_array_shape))
-def has_shape(x, shape) -> bool:
+@check('shape', is_array_shape)
+def has_shape(shape) -> Callable:
     """
-    Return :py:obj:`True` if ``x`` is dimensioned as ``shape``.
+    Return function to test if it's array-like argument has dimensions
+        ``shape``.
 
-    :param x: array-like object.
-    :param shape: desired dimensions of ``x``.
+    :param shape: desired dimensions.
+    :return: [:py:class:`function`]
 
     .. testsetup::
 
-       from pypeline.util.argcheck import has_shape
+       from pypeline.util.argcheck import has_shape, check
 
     .. doctest::
 
-       >>> has_shape([5,], (1,))
+       >>> has_shape((1,))([5,])
        True
 
-       >>> has_shape([5,], (1, 2))
+       >>> has_shape([5,])((1, 2))
        False
+
+    :py:func:`~pypeline.util.argcheck.has_shape` and
+    :py:func:`~pypeline.util.argcheck.check` can be combined to validate array
+    dimensions:
+
+    .. doctest::
+
+       >>> @check('x', has_shape([2, 2]))
+       ... def f(x):
+       ...     x = np.array(x)
+       ...     return x.shape
+
+       >>> f([5])
+       Traceback (most recent call last):
+           ...
+       ValueError: Parameter[x] of f() does not satisfy has_shape((2, 2))().
+
+       >>> f([[1, 2], [3, 4]])
+       (2, 2)
     """
-    x = np.array(x, copy=False)
     shape = tuple(shape)
 
-    if x.shape == shape:
-        return True
+    @check('x', is_array_like)
+    def _has_shape(x) -> bool:
+        x = np.array(x, copy=False)
 
-    return False
+        if x.shape == shape:
+            return True
+
+        return False
+
+    _has_shape.__name__ = f'has_shape({shape})'
+
+    return _has_shape
 
 
 @check('x', is_scalar)
