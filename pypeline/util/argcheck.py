@@ -2,8 +2,8 @@
 # argcheck.py
 # ===========
 # Author : Sepand KASHANI [sep@zurich.ibm.com]
-# Revision : 0.0
-# Last updated : 2018-04-05 14:09:31 UTC
+# Revision : 0.1
+# Last updated : 2018-05-10 13:58:40 UTC
 # #############################################################################
 
 """
@@ -15,8 +15,7 @@ import inspect
 import keyword
 import math
 from numbers import Complex, Integral, Real
-from typing import Any, Callable, Container, Mapping, Sequence, \
-    Union
+from typing import Any, Callable, Container, Mapping, Sequence, Union
 
 import astropy.units as u
 import numpy as np
@@ -181,6 +180,111 @@ def _check(m: Mapping[str, Union[BoolFunc, Sequence[BoolFunc]]]) -> Callable:
         return wrapper
 
     return decorator
+
+
+def allow_None(func) -> Callable:
+    """
+    Modify ``func`` to return :py:obj:`True` for :py:obj:`None` inputs.
+
+    This function is useful as a wrapper around boolean functions for type
+    checks. (See example below.)
+
+    :param func: [:py:class:`function`] boolean function to wrap.
+    :return: [:py:class:`function`]
+
+    .. testsetup::
+
+       from pypeline.util.argcheck import check, is_integer, allow_None
+
+    .. doctest::
+
+       >>> is_integer(5), is_integer(None)
+       (True, False)
+
+       >>> allow_None(is_integer)(None), allow_None(is_integer)(5.0)
+       (True, False)
+
+    :Example: Let ``f`` be a function taking an integer argument ``x`` that has
+        a default value set to :py:obj:`None`.
+
+    .. doctest::
+
+       >>> @check('x', is_integer)
+       ... def f(x = None):
+       ...     print(x)
+
+    Due to the non-integer default value,
+    :py:func:`~pypeline.util.argcheck.is_integer` will raise an exception when
+    called:
+
+    .. doctest::
+
+       >>> f()
+       Traceback (most recent call last):
+           ...
+       ValueError: Parameter[x] of f() does not satisfy is_integer().
+
+    The solution is to redefine ``f`` using
+    :py:func:`~pypeline.util.argcheck.allow_None`:
+
+    .. doctest::
+
+       >>> @check('x', allow_None(is_integer))
+       ... def f(x = None):
+       ...     print(x)
+
+       >>> f()
+       None
+    """
+    if not callable(func):
+        raise TypeError('Parameter[func] must be a boolean function.')
+
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        def multi_param_error(N: int):
+            e = f'allow_None() cannot decorate functions with {N} parameters.'
+            return ValueError(e)
+
+        def query_param(x):
+            if x is None:
+                return True
+
+            return func(x)
+
+        func_args = inspect.getcallargs(func, *args, *kwargs)
+
+        if len(func_args) == 0:
+            raise multi_param_error(0)
+
+        if len(func_args) == 1:
+            for v in func_args.items():  # one iteration only
+                return query_param(v)
+
+        if len(func_args) == 2:
+            # The function may have been decorated and now has the catch-all
+            # (*args, **kwargs) parameters (or similarly named).
+            #
+            # args[0] is examined for None-ness.
+            v1, v2 = func_args.values()
+
+            p = None
+            if is_instance(tuple)(v1) and is_instance(dict)(v2):
+                p = v1
+            if is_instance(tuple)(v2) and is_instance(dict)(v1):
+                p = v2
+
+            if p is not None:  # p: tuple
+                if len(p) > 0:
+                    return query_param(p[0])
+
+                raise multi_param_error(0)
+
+            raise multi_param_error(2)
+
+        # more than 2 parameters
+        raise multi_param_error(len(func_args))
+
+    return wrapper
 
 
 def is_instance(klass) -> Callable:

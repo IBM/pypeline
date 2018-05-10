@@ -14,6 +14,7 @@ argcheck
 .. autosummary::
 
    check
+   allow_None
    is_instance
    is_scalar
    is_array_like
