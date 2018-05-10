@@ -14,6 +14,7 @@ util
    :hidden:
 
    argcheck
+   plot
    math/func
    math/stat
    math/linalg
@@ -23,6 +24,7 @@ util
 .. autosummary::
 
    argcheck
+   plot
    math.func
    math.stat
    math.linalg
