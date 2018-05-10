@@ -2,8 +2,8 @@
 # requirements.txt
 # ================
 # Author : Sepand KASHANI [sep@zurich.ibm.com]
-# Revision : 0.1
-# Last updated : 2018-05-01 07:56:45 UTC
+# Revision : 0.2
+# Last updated : 2018-05-10 16:05:37 UTC
 # #############################################################################
 
 # This file contains the complete list of Pypeline's Python dependencies.
@@ -16,10 +16,12 @@
 astropy == 3.0.*
 flake8 == 3.5.*
 ipython == 6.3.*
+matplotlib == 2.2.*
 mypy == 0.*
 numpy == 1.14.*
+pandas == 0.22.*
 pytest == 3.5.*
-scipy == 1.0.*
+scipy == 1.1.*
 sphinx == 1.7.*
 sphinx_rtd_theme == 0.3.*
 tox == 3.0.*
