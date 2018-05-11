@@ -18,6 +18,8 @@ from typing import Any, Callable, Container, Mapping, Sequence, Union
 import astropy.units as u
 import numpy as np
 
+import pypeline
+
 BoolFunc = Callable[[Any], bool]
 
 
@@ -33,6 +35,9 @@ def check(*args) -> Callable:
     :py:func:`check` is a decorator that intercepts the output of such boolean
     functions and raises :py:exc:`ValueError` when the result is
     :py:obj:`False`.
+
+    This function can be completely disabled by setting the
+    ``util.argcheck.check.ignore_checks`` flag to ``False``.
 
     :param args: several invocation modes possible:
 
@@ -158,6 +163,12 @@ def _check(m: Mapping[str, Union[BoolFunc, Sequence[BoolFunc]]]) -> Callable:
                 raise TypeError(value_error(k))
 
     def decorator(func: Callable) -> Callable:
+        # Ignore checks if appropriate config flag set.
+        ignore_checks = pypeline.config.getboolean('util.argcheck.check',
+                                                   'ignore_checks')
+        if ignore_checks:
+            return func
+
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
             func_args = inspect.getcallargs(func, *args, **kwargs)
