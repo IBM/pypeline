@@ -14,6 +14,8 @@ math.linalg
 .. autosummary::
 
    eigh
+   rot
+   z_rot2angle
 
 
 .. automodule:: pypeline.util.math.linalg

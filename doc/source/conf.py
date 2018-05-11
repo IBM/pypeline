@@ -82,4 +82,5 @@ intersphinx_mapping = {
     'python': ('https://docs.python.org/3', None),
     'NumPy [latest]': ('https://docs.scipy.org/doc/numpy/', None),
     'SciPy [latest]': ('https://docs.scipy.org/doc/scipy/reference', None),
-    'matplotlib [latest]': ('https://matplotlib.org', None)}
+    'matplotlib [latest]': ('https://matplotlib.org', None),
+    'astropy [latest]': ('http://docs.astropy.org/en/latest/', None)}
