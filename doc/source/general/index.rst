@@ -11,3 +11,4 @@ General
 .. toctree::
 
    install
+   disable_checks
