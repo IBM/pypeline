@@ -1,23 +1,19 @@
 .. ############################################################################
-.. index.rst
-.. =========
+.. pypeline.rst
+.. ============
 .. Author : Sepand KASHANI [sep@zurich.ibm.com]
 .. ############################################################################
 
 
-API Reference
-=============
+pypeline
+========
 
-.. toctree::
-   :hidden:
-
-   pypeline
-   core
-   util/index
-
-
+.. currentmodule:: pypeline
 .. autosummary::
 
-   pypeline
-   pypeline.core
-   pypeline.util
+   reload_config
+
+
+.. automodule:: pypeline
+   :show-inheritance:
+   :members:
