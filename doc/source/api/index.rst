@@ -8,15 +8,8 @@
 API Reference
 =============
 
-.. toctree::
-   :hidden:
-
-   pypeline
-   core
-   util/index
-
-
 .. autosummary::
+   :toctree:
 
    pypeline
    pypeline.core

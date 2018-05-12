@@ -5,5 +5,5 @@
 # #############################################################################
 
 """
-Utility objects that are not :py:class:`~pypeline.core.Block` objects.
+General utilities and development tools.
 """

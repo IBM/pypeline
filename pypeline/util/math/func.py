@@ -5,7 +5,7 @@
 # #############################################################################
 
 """
-1d functions not available in :py:mod:`scipy`.
+1d functions not available in `SciPy <https://www.scipy.org/>`_.
 """
 
 import numpy as np
@@ -18,9 +18,46 @@ import pypeline.util.argcheck as chk
                 alpha=chk.is_real))
 def tukey(T, beta, alpha):
     r"""
-    Return function to output values of a parameterized Tukey window.
+    Parameterized Tukey function.
 
-    The Tukey window is defined as:
+    Parameters
+    ----------
+    T : float
+        Function support.
+    beta : float
+        Function mid-point.
+    alpha : float
+        Normalized decay-rate.
+
+    Returns
+    -------
+    :py:obj:`~typing.Callable`
+        Function that outputs the amplitude of the parameterized Tukey function
+        at specified locations.
+
+    Examples
+    --------
+    .. testsetup::
+
+       import numpy as np
+       from pypeline.util.math.func import tukey
+
+    .. doctest::
+
+       >>> f = tukey(T=1, beta=0.5, alpha=0.25)
+       >>> sample_points = np.linspace(0, 1, 25).reshape(5, 5)  # any shape
+
+       >>> amplitudes = f(sample_points)
+       >>> np.around(amplitudes, 2)
+       array([[0.  , 0.25, 0.75, 1.  , 1.  ],
+              [1.  , 1.  , 1.  , 1.  , 1.  ],
+              [1.  , 1.  , 1.  , 1.  , 1.  ],
+              [1.  , 1.  , 1.  , 1.  , 1.  ],
+              [1.  , 1.  , 0.75, 0.25, 0.  ]])
+
+    Notes
+    -----
+    The Tukey function is defined as:
 
     .. math::
 
@@ -43,54 +80,19 @@ def tukey(T, beta, alpha):
            0 &
            \text{otherwise.}
        \end{cases}
-
-    :param T: [:py:class:`~numbers.Real` > 0] window width.
-    :param beta: [:py:class:`~numbers.Real`] window mid-point.
-    :param alpha: [:py:class:`~numbers.Real` in [0, 1]] decay rate.
-    :return: [:py:obj:`~typing.Callable`] parameterized Tukey function.
-
-    .. testsetup::
-
-       import numpy as np
-       from pypeline.util.math.func import tukey
-
-    .. doctest::
-
-       >>> f = tukey(T=1, beta=0.5, alpha=0.25)
-       >>> sample_points = np.linspace(0, 1, 25)
-       >>> amplitudes = f(sample_points)
-       >>> np.around(amplitudes, 2)
-       array([0.  , 0.25, 0.75, 1.  , 1.  , 1.  , 1.  , 1.  , 1.  , 1.  , 1.  ,
-              1.  , 1.  , 1.  , 1.  , 1.  , 1.  , 1.  , 1.  , 1.  , 1.  , 1.  ,
-              0.75, 0.25, 0.  ])
-
-       >>> amplitudes = f(sample_points.reshape(5, 5))  # multi-dim arrays
-       >>> np.around(amplitudes, 2)
-       array([[0.  , 0.25, 0.75, 1.  , 1.  ],
-              [1.  , 1.  , 1.  , 1.  , 1.  ],
-              [1.  , 1.  , 1.  , 1.  , 1.  ],
-              [1.  , 1.  , 1.  , 1.  , 1.  ],
-              [1.  , 1.  , 0.75, 0.25, 0.  ]])
     """
     if not (T > 0):
         raise ValueError('Parameter[T] must be positive.')
     if not (0 <= alpha <= 1):
         raise ValueError('Parameter[alpha] must be in [0, 1].')
 
-    @chk.check('x', lambda _: chk.has_reals(_) or chk.is_real(_))
-    def window_func(x) -> np.ndarray:
-        """
-        Return the Tukey(T, beta, alpha) function.
-
-        :param x: [:py:class:`~numpy.ndarray`, :py:class:`~numbers.Real`]
-            sample points.
-        :return: [:py:class:`~numpy.ndarray`] Tukey(T, beta, alpha)(x).
-        """
+    @chk.check('x', chk.accept_any(chk.is_real, chk.has_reals))
+    def tukey_func(x):
         x = np.array(x, copy=False)
 
         y = x - beta + T / 2
         if np.isclose(alpha, 0):
-            left_lim = 0
+            left_lim = 0.
             right_lim = T
         else:
             left_lim = T * alpha / 2
@@ -109,4 +111,4 @@ def tukey(T, beta, alpha):
                                           (T - y[ramp_down])) ** 2
         return amplitude
 
-    return window_func
+    return tukey_func

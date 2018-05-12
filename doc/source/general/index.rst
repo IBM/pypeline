@@ -9,6 +9,7 @@ General
 =======
 
 .. toctree::
+   :maxdepth: 1
 
    install
    disable_checks

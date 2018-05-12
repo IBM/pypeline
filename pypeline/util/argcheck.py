@@ -8,131 +8,113 @@
 Helper functions to ease argument checking.
 """
 
+import collections.abc as abc
 import functools
 import inspect
 import keyword
 import math
-from numbers import Complex, Integral, Real
-from typing import Any, Callable, Container, Mapping, Sequence, Union
+import numbers
 
 import astropy.units as u
 import numpy as np
 
 import pypeline
 
-BoolFunc = Callable[[Any], bool]
 
-
-def check(*args) -> Callable:
+def check(*args):
     """
-    Function decorator: raise :py:exc:`ValueError` when parameter fails
-    boolean test(s).
+    Validate function parameters using boolean tests.
 
     It is common to check parameters for correctness before executing the
-    function/class to which they are bound using boolean functions.
-    These boolean functions typically do *not* raise :py:exc:`Exception` when
-    something goes wrong.
-    :py:func:`check` is a decorator that intercepts the output of such boolean
-    functions and raises :py:exc:`ValueError` when the result is
-    :py:obj:`False`.
+    function/class to which they are bound using boolean tests.
+    :py:func:`~pypeline.util.argcheck.check` is a decorator that intercepts the
+    output of boolean functions and raises :py:exc:`ValueError` when the result
+    is :py:obj:`False`.
 
     This function can be completely disabled by setting the
     ``util.argcheck.check.ignore_checks`` flag to ``False``.
 
-    :param args: several invocation modes possible:
+    Parameters
+    ----------
+    *args
+        2 invocations supported:
 
-        * 2-argument mode:
+        a) 2-argument mode:
 
-            * args[0]: name of decorated function's parameter to test;
-            * args[1]: (list of) boolean function(s) to apply to parameter
-              value.
+            * `args[0]`: name of the decorated functon's parameter to test.
+            * `args[1]`: boolean function to apply to the parameter value.
 
-        * 1-argument mode: (parameter name -> (list of) boolean function(s))
-          mapping.
+        b) 1-argument mode: (parameter-name -> boolean function) map.
 
-    :return: the decorated function is invoked if all tests return
-        :py:obj:`True`, otherwise :py:exc:`ValueError` is raised.
+    Returns
+    -------
+    :py:obj:`~typing.Callable`
+        Function decorator.
 
+    Raises
+    ------
+    :py:exc:`ValueError`
+        If any of the boolean functions return :py:obj:`False`.
+
+    Examples
+    --------
     .. testsetup::
 
-       from pypeline.util.argcheck import check
+       from pypeline.util.argcheck import check, require_all
 
-    Two-arg syntax:
+       def is_5(obj):
+           return obj == 5
+
+       def is_int(obj):
+           return isinstance(obj, int)
+
+       def is_str(obj):
+           return isinstance(obj, str)
+
+    Suppose we have the following boolean functions to test an object for
+    similarity to the number 5:
 
     .. doctest::
 
-       >>> def is_5(x):
-       ...     return x == 5
+       >>> def is_5(obj):
+       ...     return obj == 5
 
-       >>> class A:
-       ...     @check('a', is_5)
-       ...     def __init__(self, a):
-       ...         self.a = a
+       >>> def is_int(obj):
+       ...     return isinstance(obj, int)
 
-       >>> A(5).a
+       >>> def is_str(obj):
+       ...     return isinstance(obj, str)
+
+    When used in conjunction with :py:func:`~pypeline.util.argcheck.check`,
+    type-checking function parameters becomes possible:
+
+    .. doctest::
+
+       >>> @check('x', is_5)  # 2-argument mode
+       ... def f(x):
+       ...     return x
+
+       >>> f(5)
        5
 
-       >>> A(4)
+       >>> f(4)
        Traceback (most recent call last):
            ...
-       ValueError: Parameter[a] of A.__init__() does not satisfy is_5().
-
-    Mapping syntax:
+       ValueError: Parameter[x] of f() does not satisfy is_5().
 
     .. doctest::
 
-       >>> def is_5(x):
-       ...     return int(x) == 5
+       >>> @check(dict(x=is_str, y=is_int))  # 1-argument mode
+       ... def g(x, y):
+       ...     return x, y
 
-       >>> def is_int(x):
-       ...     return isinstance(x, int)
-
-       >>> def is_str(x):
-       ...     return isinstance(x, str)
-
-       >>> class A:
-       ...     @check(dict(a=[is_5, is_str],
-       ...                 b=is_int))
-       ...     def __init__(self, a, b):
-       ...         self.a = a
-       ...         self.b = b
-
-       >>> obj = A('5', 3)
-       >>> obj.a, obj.b
+       >>> g('5', 3)
        ('5', 3)
 
-       >>> A(5, 3)
+       >>> g(5, 3)
        Traceback (most recent call last):
            ...
-       ValueError: Parameter[a] of A.__init__() does not satisfy is_str().
-
-    Testing several boolean functions is also supported:
-
-    .. doctest::
-
-       >>> def is_5(x):
-       ...     return int(x) == 5
-
-       >>> def is_int(x):
-       ...     return isinstance(x, int)
-
-       >>> class A:
-       ...     @check('a', [is_5, is_int])
-       ...     def __init__(self, a):
-       ...         self.a = a
-
-       >>> A(5).a
-       5
-
-       >>> A(4)
-       Traceback (most recent call last):
-           ...
-       ValueError: Parameter[a] of A.__init__() does not satisfy is_5().
-
-       >>> A('5')
-       Traceback (most recent call last):
-           ...
-       ValueError: Parameter[a] of A.__init__() does not satisfy is_int().
+       ValueError: Parameter[x] of g() does not satisfy is_str().
     """
     if len(args) == 1:
         return _check(m=args[0])
@@ -142,27 +124,23 @@ def check(*args) -> Callable:
         raise ValueError('Expected 1 or 2 arguments.')
 
 
-def _check(m: Mapping[str, Union[BoolFunc, Sequence[BoolFunc]]]) -> Callable:
-    if not isinstance(m, Mapping):
-        a = _check.__annotations__['m']
-        raise TypeError(f'Expected {a}')
+def _check(m):
+    if not isinstance(m, abc.Mapping):
+        raise TypeError('Expected (str, boolean function) map')
 
     key_error = lambda k: f'Key[{k}] must be a valid string identifier.'
-    value_error = lambda k: (f'Value[Key[{k}]] must be '
-                             'Union[{BoolFunc}, Sequence[{BoolFunc}]].')
+    value_error = lambda k: f'Value[Key[{k}]] must be a boolean function.'
+
     for k, v in m.items():
         if not isinstance(k, str):
             raise TypeError(key_error(k))
         if not (k.isidentifier() and (not keyword.iskeyword(k))):
             raise ValueError(key_error(k))
 
-        if isinstance(v, Sequence) and (len(v) == 0):
-            raise ValueError(value_error(k))
-        for _ in (v if isinstance(v, Sequence) else (v,)):
-            if not callable(_):
-                raise TypeError(value_error(k))
+        if not inspect.isfunction(v):
+            raise TypeError(value_error(k))
 
-    def decorator(func: Callable) -> Callable:
+    def decorator(func):
         # Ignore checks if appropriate config flag set.
         ignore_checks = pypeline.config.getboolean('util.argcheck.check',
                                                    'ignore_checks')
@@ -173,16 +151,14 @@ def _check(m: Mapping[str, Union[BoolFunc, Sequence[BoolFunc]]]) -> Callable:
         def wrapper(*args, **kwargs):
             func_args = inspect.getcallargs(func, *args, **kwargs)
 
-            for k, v in m.items():
-                if k not in func_args.keys():
+            for k, fn in m.items():
+                if k not in func_args:
                     raise ValueError(f'Parameter[{k}] not part of '
                                      f'{func.__qualname__}() parameter list.')
 
-                for fn in (v if isinstance(v, Sequence) else (v,)):
-                    if fn(func_args[k]) is False:
-                        raise ValueError(f'Parameter[{k}] of '
-                                         f'{func.__qualname__}() does not '
-                                         f'satisfy {fn.__name__}().')
+                if fn(func_args[k]) is False:
+                    raise ValueError(f'Parameter[{k}] of {func.__qualname__}()'
+                                     f' does not satisfy {fn.__name__}().')
 
             return func(*args, **kwargs)
 
@@ -191,119 +167,251 @@ def _check(m: Mapping[str, Union[BoolFunc, Sequence[BoolFunc]]]) -> Callable:
     return decorator
 
 
-def allow_None(func) -> Callable:
+def allow_None(func):
     """
-    Modify ``func`` to return :py:obj:`True` for :py:obj:`None` inputs.
+    Relax boolean function for :py:obj:`None` input.
 
-    This function is useful as a wrapper around boolean functions for type
-    checks. (See example below.)
+    A boolean function wrapped by
+    :py:func:`~pypeline.util.argcheck.allow_None` returns :py:obj:`True` if
+    it's input is :py:obj:`None`.
 
-    :param func: [:py:class:`function`] boolean function to wrap.
-    :return: [:py:class:`function`]
+    Parameters
+    ----------
+    func : :py:obj:`~typing.Callable`
+        Boolean function.
 
+    Returns
+    -------
+    :py:obj:`~typing.Callable`
+        Boolean function.
+
+    Examples
+    --------
     .. testsetup::
 
-       from pypeline.util.argcheck import check, is_integer, allow_None
+       from pypeline.util.argcheck import allow_None, check, is_integer
 
     .. doctest::
 
-       >>> is_integer(5), is_integer(None)
+       >>> def is_5(x):
+       ...     return x == 5
+
+       >>> is_5(5), is_5(None)
        (True, False)
 
-       >>> allow_None(is_integer)(None), allow_None(is_integer)(5.0)
-       (True, False)
+       >>> allow_None(is_5)(None)
+       True
 
-    :Example: Let ``f`` be a function taking an integer argument ``x`` that has
-        a default value set to :py:obj:`None`.
+    When used in conjunction with :py:func:`~pypeline.util.argcheck.check`,
+    it is possible to type-check parameters having default arguments set to
+    :py:obj:`None`:
 
     .. doctest::
 
        >>> @check('x', is_integer)
-       ... def f(x = None):
-       ...     print(x)
+       ... def f(x: int = None):
+       ...     return print(x)
 
-    Due to the non-integer default value,
-    :py:func:`~pypeline.util.argcheck.is_integer` will raise an exception when
-    called:
-
-    .. doctest::
-
-       >>> f()
+       >>> f()  # ValueError because is_integer(None) is False.
        Traceback (most recent call last):
            ...
        ValueError: Parameter[x] of f() does not satisfy is_integer().
 
-    The solution is to redefine ``f`` using
-    :py:func:`~pypeline.util.argcheck.allow_None`:
-
     .. doctest::
 
-       >>> @check('x', allow_None(is_integer))
-       ... def f(x = None):
-       ...     print(x)
+       >>> @check('x', allow_None(is_integer))  # redefined to allow None.
+       ... def g(x: int = None):
+       ...     return print(x)
 
-       >>> f()
+       >>> g()  # Now it works.
        None
     """
-    if not callable(func):
+    if not inspect.isfunction(func):
         raise TypeError('Parameter[func] must be a boolean function.')
 
     @functools.wraps(func)
-    def wrapper(*args, **kwargs):
-        def multi_param_error(N: int):
-            e = f'allow_None() cannot decorate functions with {N} parameters.'
-            return ValueError(e)
+    def wrapper(x):
+        if x is None:
+            return True
 
-        def query_param(x):
-            if x is None:
-                return True
+        return func(x)
 
-            return func(x)
-
-        func_args = inspect.getcallargs(func, *args, *kwargs)
-
-        if len(func_args) == 0:
-            raise multi_param_error(0)
-
-        if len(func_args) == 1:
-            for v in func_args.items():  # one iteration only
-                return query_param(v)
-
-        if len(func_args) == 2:
-            # The function may have been decorated and now has the catch-all
-            # (*args, **kwargs) parameters (or similarly named).
-            #
-            # args[0] is examined for None-ness.
-            v1, v2 = func_args.values()
-
-            p = None
-            if is_instance(tuple)(v1) and is_instance(dict)(v2):
-                p = v1
-            if is_instance(tuple)(v2) and is_instance(dict)(v1):
-                p = v2
-
-            if p is not None:  # p: tuple
-                if len(p) > 0:
-                    return query_param(p[0])
-
-                raise multi_param_error(0)
-
-            raise multi_param_error(2)
-
-        # more than 2 parameters
-        raise multi_param_error(len(func_args))
+    wrapper.__name__ = f'allow_None({func.__name__})'
 
     return wrapper
 
 
-def is_instance(klass) -> Callable:
+def accept_any(*funcs):
     """
-    Return function to test if it's argument satisfies one of the type(s)
-    ``klass``.
+    Lazy union of boolean functions.
 
-    :param klass: type or list of types.
-    :return: [:py:class:`function`]
+    Parameters
+    ----------
+    *funcs : list(bool_func)
+        Boolean functions.
 
+    Returns
+    -------
+    :py:obj:`~typing.Callable`
+        Boolean function.
+
+    Examples
+    --------
+    .. testsetup::
+
+       import numpy as np
+       from pypeline.util.argcheck import accept_any, check, has_shape
+
+    .. doctest::
+
+       >>> def is_int(x):
+       ...     if isinstance(x, int):
+       ...         return True
+       ...     return False
+
+       >>> def is_5(x):
+       ...     if x == 5:
+       ...         return True
+       ...     return False
+
+       >>> accept_any(is_int, is_5)(4)  # passes is_int(), is_5() un-tested
+       True
+
+       >>> accept_any(is_int, is_5)(np.r_[5][0])  # passes is_5()
+       True
+
+       >>> accept_any(is_int, is_5)('5')  # fails both
+       False
+
+    When used with :py:func:`~pypeline.util.argcheck.check`, a parameter
+    can be verified to satisfy one of several choices.
+
+    .. doctest::
+
+       >>> @check('x', accept_any(has_shape([2, 2]), has_shape([3, 3])))
+       ... def z_rot_trace(x: np.ndarray):
+       ...     return np.trace(x)
+
+       >>> z_rot_trace(x=np.diag(np.arange(1, 3)))
+       3
+
+       >>> z_rot_trace(x=np.diag(np.arange(1, 4)))
+       6
+    """
+    if not all(inspect.isfunction(_) for _ in funcs):
+        raise TypeError('Parameter[*funcs] must contain boolean functions.')
+
+    def union(x):
+        for fn in funcs:
+            if fn(x) is True:
+                return True
+
+        return False
+
+    union.__name__ = f'accept_any({[fn.__name__ for fn in funcs]})'
+
+    return union
+
+
+def require_all(*funcs):
+    """
+    Lazy intersection of boolean functions.
+
+    Parameters
+    ----------
+    *funcs : list(bool_func)
+        Boolean functions.
+
+    Returns
+    -------
+    :py:obj:`~typing.Callable`
+        Boolean function.
+
+    Examples
+    --------
+    .. testsetup::
+
+       from pypeline.util.argcheck import require_all, check
+
+    .. doctest::
+
+       >>> def is_int(x):
+       ...     if isinstance(x, int):
+       ...         return True
+       ...     return False
+
+       >>> def is_5(x):
+       ...     if x == 5:
+       ...         return True
+       ...     return False
+
+       >>> require_all(is_int, is_5)('5')  # fails is_int()
+       False
+
+       >>> require_all(is_int, is_5)(4)  # passes is_int(), fails is_5()
+       False
+
+       >>> require_all(is_int, is_5)(5)  # both pass
+       True
+
+    When used with :py:func:`~pypeline.util.argcheck.check`, a parameter
+    can be verified to satisfy several functions simultaneously:
+
+    .. doctest::
+
+       >>> def le_5(x: int):
+       ...     if x <= 5:
+       ...         return True
+       ...     return False
+
+       >>> def gt_0(x: int):
+       ...     if x > 0:
+       ...         return True
+       ...     return False
+
+       >>> @check('x', require_all(gt_0, le_5))
+       ... def f(x):
+       ...     return x
+
+       >>> f(3)
+       3
+
+       >>> f(-1)
+       Traceback (most recent call last):
+           ...
+       ValueError: Parameter[x] of f() does not satisfy require_all(['gt_0', 'le_5'])(). # noqa: E501
+    """
+    if not all(inspect.isfunction(_) for _ in funcs):
+        raise TypeError('Parameter[*funcs] must contain boolean functions.')
+
+    def intersection(x):
+        for fn in funcs:
+            if fn(x) is False:
+                return False
+
+        return True
+
+    intersection.__name__ = f'require_all({[fn.__name__ for fn in funcs]})'
+
+    return intersection
+
+
+def is_instance(*klass):
+    """
+    Validate instance types.
+
+    Parameters
+    ----------
+    *klass : list(type)
+        Accepted classes.
+
+    Returns
+    -------
+    :py:obj:`~typing.Callable`
+        Boolean function.
+
+    Examples
+    --------
     .. testsetup::
 
        import numpy as np
@@ -311,36 +419,31 @@ def is_instance(klass) -> Callable:
 
     .. doctest::
 
-       >>> is_instance([str, int])('5')
+       >>> is_instance(str, int)('5')
        True
 
        >>> is_instance(np.ndarray)([])
        False
 
-    :py:func:`~pypeline.util.argcheck.is_instance` and
-    :py:func:`~pypeline.util.argcheck.check` can be combined to validate
-    parameter types:
+    When used with :py:func:`~pypeline.util.argcheck.check`, function
+    parameters can verified to be of a certain type:
 
     .. doctest::
 
-       >>> @check('x', is_instance(int))
+       >>> @check('x', is_instance(str))
        ... def f(x):
-       ...     return type(x)
+       ...     return x
+
+       >>> f('hello')
+       'hello'
 
        >>> f(5)
-       <class 'int'>
-
-       >>> f('5')
        Traceback (most recent call last):
            ...
-       ValueError: Parameter[x] of f() does not satisfy is_instance(int)().
+       ValueError: Parameter[x] of f() does not satisfy is_instance(['str'])().
     """
-    if not (inspect.isclass(klass) or
-            (isinstance(klass, Sequence) and
-             all(inspect.isclass(_) for _ in klass))):
-        raise TypeError('Parameter[klass] must be a class or list of classes')
-
-    klass = (klass,) if inspect.isclass(klass) else tuple(klass)
+    if not all(inspect.isclass(_) for _ in klass):
+        raise TypeError('Parameter[*klass] must contain types.')
 
     def _is_instance(x):
         if isinstance(x, klass):
@@ -348,17 +451,17 @@ def is_instance(klass) -> Callable:
 
         return False
 
-    _is_instance.__name__ = f'is_instance({klass})'
+    _is_instance.__name__ = f'is_instance({[cl.__name__ for cl in klass]})'
 
     return _is_instance
 
 
-def is_scalar(x) -> bool:
+def is_scalar(x):
     """
-    Return :py:obj:`True` if ``x`` is a scalar object.
+    Return :py:obj:`True` if `x` is a scalar object.
 
-    :param x: object to test.
-
+    Examples
+    --------
     .. testsetup::
 
        from pypeline.util.argcheck import is_scalar
@@ -371,15 +474,18 @@ def is_scalar(x) -> bool:
        >>> is_scalar([5])
        False
     """
-    return not isinstance(x, Container)
+    if not isinstance(x, abc.Container):
+        return True
+
+    return False
 
 
-def is_array_like(x) -> bool:
+def is_array_like(x):
     """
-    Return :py:obj:`True` if ``x`` is an array-like object.
+    Return :py:obj:`True` if `x` is an array-like object.
 
-    :param x: object to test.
-
+    Examples
+    --------
     .. testsetup::
 
        from pypeline.util.argcheck import is_array_like
@@ -389,25 +495,24 @@ def is_array_like(x) -> bool:
        >>> is_array_like(5)
        False
 
-       >>> [is_array_like(_) for _ in (tuple(), [], np.array([]), range(5))]
-       [True, True, True, True]
+       >>> [is_array_like(_) for _ in (tuple(), np.array([]), range(5))]
+       [True, True, True]
 
        >>> [is_array_like(_) for _ in (set(), dict())]
        [False, False]
     """
-    if isinstance(x, (np.ndarray, Sequence)):
+    if isinstance(x, (np.ndarray, abc.Sequence)):
         return True
 
     return False
 
 
-@check('x', is_array_like)
-def is_array_shape(x) -> bool:
+def is_array_shape(x):
     """
-    Return :py:obj:`True` if ``x`` is a valid array shape specifier.
+    Return :py:obj:`True` if `x` is a valid array shape specifier.
 
-    :param x: shape-like specifier.
-
+    Examples
+    --------
     .. testsetup::
 
        from pypeline.util.argcheck import is_array_shape
@@ -420,26 +525,34 @@ def is_array_shape(x) -> bool:
        >>> is_array_shape((5, 0))
        False
     """
-    x = np.array(x, copy=False)
+    if is_array_like(x):
+        x = np.array(x, copy=False)
 
-    if x.ndim == 1:
-        if ((len(x) > 0) and
-                np.issubdtype(x.dtype, np.integer) and
-                np.all(x > 0)):
-            return True
+        if x.ndim == 1:
+            if ((len(x) > 0) and
+                    np.issubdtype(x.dtype, np.integer) and
+                    np.all(x > 0)):
+                return True
 
     return False
 
 
-@check('shape', is_array_shape)
-def has_shape(shape) -> Callable:
+def has_shape(shape):
     """
-    Return function to test if it's array-like argument has dimensions
-    ``shape``.
+    Validate array shapes.
 
-    :param shape: desired dimensions.
-    :return: [:py:class:`function`]
+    Parameters
+    ----------
+    shape : list(int)
+        Desired array dimensions.
 
+    Returns
+    -------
+    :py:obj:`~typing.Callable`
+        Boolean function.
+
+    Examples
+    --------
     .. testsetup::
 
        from pypeline.util.argcheck import has_shape, check
@@ -451,49 +564,32 @@ def has_shape(shape) -> Callable:
 
        >>> has_shape([5,])((1, 2))
        False
-
-    :py:func:`~pypeline.util.argcheck.has_shape` and
-    :py:func:`~pypeline.util.argcheck.check` can be combined to validate array
-    dimensions:
-
-    .. doctest::
-
-       >>> @check('x', has_shape([2, 2]))
-       ... def f(x):
-       ...     x = np.array(x)
-       ...     return x.shape
-
-       >>> f([5])
-       Traceback (most recent call last):
-           ...
-       ValueError: Parameter[x] of f() does not satisfy has_shape((2, 2))().
-
-       >>> f([[1, 2], [3, 4]])
-       (2, 2)
     """
+    if not is_array_shape(shape):
+        raise ValueError('Parameter[shape] must be a valid shape specifier.')
+
     shape = tuple(shape)
 
-    @check('x', is_array_like)
-    def _has_shape(x) -> bool:
-        x = np.array(x, copy=False)
+    def _has_shape(x):
+        if is_array_like(x):
+            x = np.array(x, copy=False)
 
-        if x.shape == shape:
-            return True
+            if x.shape == shape:
+                return True
 
         return False
 
-    _has_shape.__name__ = f'has_shape({shape})'
+    _has_shape.__name__ = f'has_shape({list(shape)})'
 
     return _has_shape
 
 
-@check('x', is_scalar)
-def is_integer(x) -> bool:
+def is_integer(x):
     """
-    Return :py:obj:`True` if ``x`` is an integer.
+    Return :py:obj:`True` if `x` is an integer.
 
-    :param x: object to test.
-
+    Examples
+    --------
     .. testsetup::
 
        from pypeline.util.argcheck import is_integer
@@ -506,16 +602,15 @@ def is_integer(x) -> bool:
        >>> is_integer(5.0)
        False
     """
-    return isinstance(x, Integral)
+    return isinstance(x, numbers.Integral)
 
 
-@check('x', is_array_like)
-def has_integers(x) -> bool:
+def has_integers(x):
     """
-    Return :py:obj:`True` if ``x`` contains integers.
+    Return :py:obj:`True` if `x` contains integers.
 
-    :param x: array-like object.
-
+    Examples
+    --------
     .. testsetup::
 
        import numpy as np
@@ -529,21 +624,21 @@ def has_integers(x) -> bool:
        >>> has_integers([5.]), has_integers(np.ones((5, 3)))
        (False, False)
     """
-    x = np.array(x, copy=False)
+    if is_array_like(x):
+        x = np.array(x, copy=False)
 
-    if np.issubdtype(x.dtype, np.integer):
-        return True
+        if np.issubdtype(x.dtype, np.integer):
+            return True
 
     return False
 
 
-@check('x', is_scalar)
-def is_boolean(x) -> bool:
+def is_boolean(x):
     """
-    Return :py:obj:`True` if ``x`` is a boolean.
+    Return :py:obj:`True` if `x` is a boolean.
 
-    :param x: object to test.
-
+    Examples
+    --------
     .. testsetup::
 
        from pypeline.util.argcheck import is_boolean
@@ -562,13 +657,12 @@ def is_boolean(x) -> bool:
     return False
 
 
-@check('x', is_array_like)
-def has_booleans(x) -> bool:
+def has_booleans(x):
     """
-    Return :py:obj:`True` if ``x`` contains booleans.
+    Return :py:obj:`True` if `x` contains booleans.
 
-    :param x: array-like object.
-
+    Examples
+    --------
     .. testsetup::
 
        import numpy as np
@@ -582,21 +676,21 @@ def has_booleans(x) -> bool:
        >>> has_booleans(np.ones((1, 2)))
        False
     """
-    x = np.array(x, copy=False)
+    if is_array_like(x):
+        x = np.array(x, copy=False)
 
-    if np.issubdtype(x.dtype, np.bool_):
-        return True
+        if np.issubdtype(x.dtype, np.bool_):
+            return True
 
     return False
 
 
-@check('x', is_integer)
-def is_even(x) -> bool:
+def is_even(x):
     """
-    Return :py:obj:`True` if ``x`` is an even integer.
+    Return :py:obj:`True` if `x` is an even integer.
 
-    :param x: integer to test.
-
+    Examples
+    --------
     .. testsetup::
 
        from pypeline.util.argcheck import is_even
@@ -609,19 +703,19 @@ def is_even(x) -> bool:
        >>> is_even(3)
        False
     """
-    if x % 2 == 0:
-        return True
+    if is_integer(x):
+        if x % 2 == 0:
+            return True
 
     return False
 
 
-@check('x', has_integers)
-def has_evens(x) -> bool:
+def has_evens(x):
     """
-    Return :py:obj:`True` if ``x`` contains even integers.
+    Return :py:obj:`True` if `x` contains even integers.
 
-    :param x: array-like of integers.
-
+    Examples
+    --------
     .. testsetup::
 
        import numpy as np
@@ -635,21 +729,21 @@ def has_evens(x) -> bool:
        >>> has_evens(np.arange(0, 6, 2))
        True
     """
-    x = np.array(x, copy=False)
+    if has_integers(x):
+        x = np.array(x, copy=False)
 
-    if np.all(x % 2 == 0):
-        return True
+        if np.all(x % 2 == 0):
+            return True
 
     return False
 
 
-@check('x', is_integer)
-def is_odd(x) -> bool:
+def is_odd(x):
     """
-    Return :py:obj:`True` if ``x`` is an odd integer.
+    Return :py:obj:`True` if `x` is an odd integer.
 
-    :param x: integer to test.
-
+    Examples
+    --------
     .. testsetup::
 
        from pypeline.util.argcheck import is_odd
@@ -662,19 +756,19 @@ def is_odd(x) -> bool:
        >>> is_odd(3)
        True
     """
-    if x % 2 == 1:
-        return True
+    if is_integer(x):
+        if x % 2 == 1:
+            return True
 
     return False
 
 
-@check('x', has_integers)
-def has_odds(x) -> bool:
+def has_odds(x):
     """
-    Return :py:obj:`True` if ``x`` contains odd integers.
+    Return :py:obj:`True` if `x` contains odd integers.
 
-    :param x: array-like of integers.
-
+    Examples
+    --------
     .. testsetup::
 
        import numpy as np
@@ -688,21 +782,21 @@ def has_odds(x) -> bool:
        >>> has_odds(np.arange(1, 7, 2))
        True
     """
-    x = np.array(x, copy=False)
+    if has_integers(x):
+        x = np.array(x, copy=False)
 
-    if np.all(x % 2 == 1):
-        return True
+        if np.all(x % 2 == 1):
+            return True
 
     return False
 
 
-@check('x', is_integer)
-def is_pow2(x) -> bool:
+def is_pow2(x):
     """
-    Return :py:obj:`True` if ``x`` is a power of 2.
+    Return :py:obj:`True` if `x` is a power of 2.
 
-    :param x: integer to test.
-
+    Examples
+    --------
     .. testsetup::
 
        from pypeline.util.argcheck import is_pow2
@@ -715,21 +809,21 @@ def is_pow2(x) -> bool:
        >>> is_pow2(9)
        False
     """
-    if x > 0:
-        exp = math.log2(x)
-        if math.isclose(exp, math.floor(exp)):
-            return True
+    if is_integer(x):
+        if x > 0:
+            exp = math.log2(x)
+            if math.isclose(exp, math.floor(exp)):
+                return True
 
     return False
 
 
-@check('x', has_integers)
-def has_pow2s(x) -> bool:
+def has_pow2s(x):
     """
-    Return :py:obj:`True` if ``x`` contains powers of 2.
+    Return :py:obj:`True` if `x` contains powers of 2.
 
-    :param x: array-like of integers.
-
+    Examples
+    --------
     .. testsetup::
 
        import numpy as np
@@ -743,23 +837,23 @@ def has_pow2s(x) -> bool:
        >>> has_pow2s(np.arange(10))
        False
     """
-    x = np.array(x, copy=False)
+    if has_integers(x):
+        x = np.array(x, copy=False)
 
-    if np.all(x > 0):
-        exp = np.log2(x)
-        if np.allclose(exp, np.floor(exp)):
-            return True
+        if np.all(x > 0):
+            exp = np.log2(x)
+            if np.allclose(exp, np.floor(exp)):
+                return True
 
     return False
 
 
-@check('x', is_scalar)
-def is_complex(x) -> bool:
+def is_complex(x):
     """
-    Return :py:obj:`True` if ``x`` is a complex number.
+    Return :py:obj:`True` if `x` is a complex number.
 
-    :param x: object to test.
-
+    Examples
+    --------
     .. testsetup::
 
        from pypeline.util.argcheck import is_complex
@@ -772,19 +866,18 @@ def is_complex(x) -> bool:
        >>> is_complex(5 + 5j), is_complex(1j * np.r_[0][0])
        (True, True)
     """
-    if (isinstance(x, Complex) and (not isinstance(x, Real))):
+    if (isinstance(x, numbers.Complex) and (not isinstance(x, numbers.Real))):
         return True
 
     return False
 
 
-@check('x', is_array_like)
-def has_complex(x) -> bool:
+def has_complex(x):
     """
-    Return :py:obj:`True` if ``x`` contains complex numbers.
+    Return :py:obj:`True` if `x` contains complex numbers.
 
-    :param x: array-like object.
-
+    Examples
+    --------
     .. testsetup::
 
        from pypeline.util.argcheck import has_complex
@@ -797,21 +890,21 @@ def has_complex(x) -> bool:
        >>> has_complex(1j * np.ones((5, 3)))
        True
     """
-    x = np.array(x, copy=False)
+    if is_array_like(x):
+        x = np.array(x, copy=False)
 
-    if np.issubdtype(x.dtype, np.complexfloating):
-        return True
+        if np.issubdtype(x.dtype, np.complexfloating):
+            return True
 
     return False
 
 
-@check('x', is_scalar)
-def is_real(x) -> bool:
+def is_real(x):
     """
-    Return :py:obj:`True` if ``x`` is a real number.
+    Return :py:obj:`True` if `x` is a real number.
 
-    :param x: object to test.
-
+    Examples
+    --------
     .. testsetup::
 
        from pypeline.util.argcheck import is_real
@@ -824,16 +917,15 @@ def is_real(x) -> bool:
        >>> is_real(1j)
        False
     """
-    return isinstance(x, Real)
+    return isinstance(x, numbers.Real)
 
 
-@check('x', is_array_like)
-def has_reals(x) -> bool:
+def has_reals(x):
     """
-    Return :py:obj:`True` if ``x`` contains real numbers.
+    Return :py:obj:`True` if `x` contains real numbers.
 
-    :param x: array-like object.
-
+    Examples
+    --------
     .. testsetup::
 
        from pypeline.util.argcheck import has_reals
@@ -846,22 +938,22 @@ def has_reals(x) -> bool:
        >>> has_reals(1j * np.ones(5))
        False
     """
-    x = np.array(x, copy=False)
+    if is_array_like(x):
+        x = np.array(x, copy=False)
 
-    if (np.issubdtype(x.dtype, np.integer) or
-            np.issubdtype(x.dtype, np.floating)):
-        return True
+        if (np.issubdtype(x.dtype, np.integer) or
+                np.issubdtype(x.dtype, np.floating)):
+            return True
 
     return False
 
 
-@check('x', lambda _: isinstance(_, u.Quantity))
-def is_frequency(x: u.Quantity) -> bool:
+def is_frequency(x):
     """
-    Return :py:obj:`True` if ``x`` is a (positive) frequency.
+    Return :py:obj:`True` if `x` is a (positive) frequency.
 
-    :param x: quantity to test.
-
+    Examples
+    --------
     .. testsetup::
 
        import astropy.units as u
@@ -872,23 +964,25 @@ def is_frequency(x: u.Quantity) -> bool:
        >>> is_frequency(5 * u.MHz)
        True
 
-       >>> is_frequency(-5 * u.Hz)  # negative frequencies not allowed.
+       >>> is_frequency(-5 * u.Hz)  # negative frequencies not allowed
        False
 
        >>> is_frequency(1 * u.s)
        False
     """
-    f = check('x', lambda _: _.shape == tuple())(_is_frequency)
-    return f(x)
+    if isinstance(x, u.Quantity):
+        if x.shape == tuple():
+            return _is_frequency(x)
+
+    return False
 
 
-@check('x', lambda _: isinstance(_, u.Quantity))
-def has_frequencies(x: u.Quantity) -> bool:
+def has_frequencies(x):
     """
-    Return :py:obj:`True` if ``x`` contains (positive) frequencies.
+    Return :py:obj:`True` if `x` contains (positive) frequencies.
 
-    :param x: quantities to test.
-
+    Examples
+    --------
     .. testsetup::
 
        from pypeline.util.argcheck import has_frequencies
@@ -898,13 +992,15 @@ def has_frequencies(x: u.Quantity) -> bool:
        >>> has_frequencies(np.r_[0] * u.Hz)
        True
     """
-    f = check('x', lambda _: is_array_shape(_.shape))(_is_frequency)
-    return f(x)
+    if isinstance(x, u.Quantity):
+        return _is_frequency(x)
+
+    return False
 
 
-def _is_frequency(x: u.Quantity) -> bool:
+def _is_frequency(x):
     """
-    Return :py:obj:`True` if ``x`` represents positive frequenc(y/ies).
+    Return :py:obj:`True` if `x` represents positive frequenc(y/ies).
 
     :param x: u.Quantity objects to test.
     """
@@ -915,13 +1011,12 @@ def _is_frequency(x: u.Quantity) -> bool:
     return False
 
 
-@check('x', lambda _: isinstance(_, u.Quantity))
-def is_angle(x: u.Quantity) -> bool:
+def is_angle(x):
     """
-    Return :py:obj:`True` if ``x`` is an angle.
+    Return :py:obj:`True` if `x` is an angle.
 
-    :param x: quantity to test.
-
+    Examples
+    --------
     .. testsetup::
 
        import astropy.units as u
@@ -935,17 +1030,19 @@ def is_angle(x: u.Quantity) -> bool:
        >>> is_angle(1 * u.s)
        False
     """
-    f = check('x', lambda _: _.shape == tuple())(_is_angle)
-    return f(x)
+    if isinstance(x, u.Quantity):
+        if x.shape == tuple():
+            return _is_angle(x)
+
+    return False
 
 
-@check('x', lambda _: isinstance(_, u.Quantity))
-def has_angles(x: u.Quantity) -> bool:
+def has_angles(x):
     """
-    Return :py:obj:`True` if ``x`` contains angles.
+    Return :py:obj:`True` if `x` contains angles.
 
-    :param x: quantities to test.
-
+    Examples
+    --------
     .. testsetup::
 
        from pypeline.util.argcheck import has_angles
@@ -955,13 +1052,15 @@ def has_angles(x: u.Quantity) -> bool:
        >>> has_angles(np.r_[0] * u.deg)
        True
     """
-    f = check('x', lambda _: is_array_shape(_.shape))(_is_angle)
-    return f(x)
+    if isinstance(x, u.Quantity):
+        return _is_angle(x)
+
+    return False
 
 
-def _is_angle(x: u.Quantity) -> bool:
+def _is_angle(x):
     """
-    Return :py:obj:`True` if ``x`` represents angles.
+    Return :py:obj:`True` if `x` represents angles.
 
     :param x: u.Quantity objects to test.
     """

@@ -8,8 +8,6 @@
 Linear algebra routines.
 """
 
-from typing import Tuple
-
 import astropy.units as u
 import numpy as np
 import scipy.linalg as linalg
@@ -17,44 +15,54 @@ import scipy.linalg as linalg
 import pypeline.util.argcheck as chk
 
 
-@chk.check(dict(S=lambda _: chk.has_reals(_) or chk.has_complex(_),
-                G=lambda _: chk.has_reals(_) or chk.has_complex(_),
+@chk.check(dict(A=chk.accept_any(chk.has_reals, chk.has_complex),
+                B=chk.allow_None(chk.accept_any(chk.has_reals,
+                                                chk.has_complex)),
                 tau=chk.is_real,
                 N=chk.allow_None(chk.is_integer)))
-def eigh(S, G, tau, N=None) -> Tuple[np.ndarray, np.ndarray]:
-    r"""
-    Solve truncated generalized eigenvalue problem.
+def eigh(A, B=None, tau=1, N=None):
+    """
+    Solve a generalized eigenvalue problem.
 
-    Find :math:`(D, V)`, solution of the generalized eigenvalue problem
+    Finds :math:`(D, V)`, solution of the generalized eigenvalue problem
 
-    .. math:: S V = G V D.
+    .. math::
 
-    :param S: [:py:class:`~numpy.ndarray`] (M, M) hermitian matrix.
-    :param G: [:py:class:`~numpy.ndarray`] (M, M) PSD matrix.
-    :param tau: [:py:class:`~numbers.Real` in [0, 1]] energy ratio.
-    :param N: [:py:class:`~numbers.Integral` in {1, ..., M}] output shape.
-    :return: Tuple (D, V) where:
+       A V = B V D.
 
-        * D: [:py:class:`~numpy.ndarray`] (Q,) real-valued (positive)
-          eigenvalues;
-        * V: [:py:class:`~numpy.ndarray`] (M, Q) complex-valued eigenvectors.
+    This function is a wrapper around :py:func:`scipy.linalg.eigh` that adds
+    energy truncation and extra output formats.
 
-         The Q eigenpairs are sorted in descending order.
+    Parameters
+    ----------
+    A : array-like(float or complex)
+        (M, M) hermitian matrix.
+        If `A` is not positive-semidefinite (PSD), its negative spectrum is
+        discarded.
+    B : array-like(float or complex), optional
+        (M, M) PSD hermitian matrix.
+        If unspecified, `B` is assumed to be the identity matrix.
+    tau : float, optional
+        Normalized energy ratio. (Default: 1)
+    N : int, optional
+        Number of eigenpairs to output. (Default: K, the minimum number of
+        leading eigenpairs that account for `tau` percent of the total energy.)
 
-        Q is determined as follows: let K be the minimum number of leading
-        eigenpairs required to represent ``tau`` percent of the total energy.
-        Then:
+        * If `N` is smaller than K, then the trailing eigenpairs are dropped.
+        * If `N` is greater that K, then the trailing eigenpairs are set to 0.
 
-        * :math:`N = \text{None} \to Q = K`;
+    Returns
+    -------
+        D : :py:class:`~numpy.ndarray`
+            (N,) positive real-valued eigenvalues.
 
-        * :math:`N \le K \to Q = N`, with the :math:`K - N` trailing
-          eigenpairs being discarded;
+        V : :py:class:`~numpy.ndarray`
+            (M, N) complex-valued eigenvectors.
 
-        * :math:`N \gt K \to Q = N`, with the :math:`N - K` trailing
-          eigenpairs set to 0.
+            The N eigenpairs are sorted in decreasing eigenvalue order.
 
-    If ``S`` is not PSD, it's negative spectrum is discarded.
-
+    Examples
+    --------
     .. testsetup::
 
        import numpy as np
@@ -73,26 +81,26 @@ def eigh(S, G, tau, N=None) -> Tuple[np.ndarray, np.ndarray]:
            return A
 
        M = 4
-       S = hermitian_array(M)
-       G = hermitian_array(M) + 100 * np.eye(M)  # To guarantee PSD
+       A = hermitian_array(M)
+       B = hermitian_array(M) + 100 * np.eye(M)  # To guarantee PSD
 
-    :Example: Let ``S`` and ``G`` be defined as below:
+    Let `A` and `B` be defined as below:
 
     .. doctest::
 
        M = 4
-       S = hermitian_array(M)
-       G = hermitian_array(M) + 100 * np.eye(M)  # To guarantee PSD
+       A = hermitian_array(M)
+       B = hermitian_array(M) + 100 * np.eye(M)  # To guarantee PSD
 
-    Then different calls to :py:func:`~pypeline.util.math.linalg.eigh` produce
-    different results:
+    Then different calls to :py:func:`~pypeline.util.math.linalg.eigh`
+    produce different results:
 
     * Get all positive eigenpairs:
 
     .. doctest::
 
-       >>> D, V = eigh(S, G, tau=1)
-       >>> print(np.around(D, 4))  # The last term is positive but very small.
+       >>> D, V = eigh(A, B)
+       >>> print(np.around(D, 4))  # The last term is small but positive.
        [0.0574 0.0397 0.002  0.    ]
 
        >>> print(np.around(V, 4))
@@ -105,7 +113,7 @@ def eigh(S, G, tau, N=None) -> Tuple[np.ndarray, np.ndarray]:
 
     .. doctest::
 
-       >>> D, V = eigh(S, G, tau=0.8)
+       >>> D, V = eigh(A, B, tau=0.8)
        >>> print(np.around(D, 4))
        [0.0574]
 
@@ -119,7 +127,7 @@ def eigh(S, G, tau, N=None) -> Tuple[np.ndarray, np.ndarray]:
 
     .. doctest::
 
-       >>> D, V = eigh(S, G, tau=0.8, N=3)
+       >>> D, V = eigh(A, B, tau=0.8, N=3)
        >>> print(np.around(D, 4))
        [0.0574 0.     0.    ]
 
@@ -129,29 +137,30 @@ def eigh(S, G, tau, N=None) -> Tuple[np.ndarray, np.ndarray]:
         [-0.0043+0.0047j  0.    +0.j      0.    +0.j    ]
         [-0.0313+0.021j   0.    +0.j      0.    +0.j    ]]
     """
-    S = np.array(S, copy=False)
-    G = np.array(G, copy=False)
-    M = len(S)
+    A = np.array(A, copy=False)
+    M = len(A)
+    if not (chk.has_shape([M, M])(A) and np.allclose(A, A.conj().T)):
+        raise ValueError('Parameter[A] must be hermitian symmetric.')
 
-    if not (chk.has_shape([M, M])(S) and np.allclose(S, S.conj().T)):
-        raise ValueError('Parameter[S] must be hermitian symmetric.')
-    if not (chk.has_shape([M, M])(G) and np.allclose(G, G.conj().T)):
-        raise ValueError('Parameter[G] must be hermitian symmetric.')
-    if not (0 <= tau <= 1):
+    B = np.eye(M) if (B is None) else np.array(B, copy=False)
+    if not (chk.has_shape([M, M])(B) and np.allclose(B, B.conj().T)):
+        raise ValueError('Parameter[B] must be hermitian symmetric.')
+
+    if not (0 < tau <= 1):
         raise ValueError('Parameter[tau] must be in [0, 1].')
-    if N is not None:
-        if not (1 <= N <= M):
-            raise ValueError(f'Parameter[N] must be in {{1, ..., {M}}}.')
 
-    # S: drop negative spectrum.
-    Ds, Vs = linalg.eigh(S)
+    if (N is not None) and (N <= 0):
+        raise ValueError(f'Parameter[N] must be a non-zero positive integer.')
+
+    # A: drop negative spectrum.
+    Ds, Vs = linalg.eigh(A)
     idx = Ds > 0
     Ds, Vs = Ds[idx], Vs[:, idx]
-    S = (Vs * Ds) @ Vs.conj().T
+    A = (Vs * Ds) @ Vs.conj().T
 
-    # S, G: generalized eigenvalue-decomposition.
+    # A, B: generalized eigenvalue-decomposition.
     try:
-        D, V = linalg.eigh(S, G)
+        D, V = linalg.eigh(A, B)
 
         # Discard near-zero D due to numerical precision.
         idx = D > 0
@@ -159,13 +168,13 @@ def eigh(S, G, tau, N=None) -> Tuple[np.ndarray, np.ndarray]:
         idx = np.argsort(D)[::-1]
         D, V = D[idx], V[:, idx]
     except linalg.LinAlgError:
-        raise ValueError('Parameter[G] is not PSD.')
+        raise ValueError('Parameter[B] is not PSD.')
 
     # Energy selection / padding
     idx = np.clip(np.cumsum(D) / np.sum(D), 0, 1) <= tau
     D, V = D[idx], V[:, idx]
     if N is not None:
-        M, K = len(V), np.sum(idx)
+        M, K = V.shape
         if N - K <= 0:
             D, V = D[:N], V[:, :N]
         else:
@@ -175,17 +184,26 @@ def eigh(S, G, tau, N=None) -> Tuple[np.ndarray, np.ndarray]:
     return D, V
 
 
-@chk.check(dict(axis=(chk.has_reals, chk.has_shape((3,))),
+@chk.check(dict(axis=chk.require_all(chk.has_reals, chk.has_shape((3,))),
                 angle=chk.is_angle))
-def rot(axis, angle) -> np.ndarray:
+def rot(axis, angle):
     """
-    Return 3D rotation matrix.
+    3D rotation matrix.
 
-    :param axis: [:py:class:`~numpy.ndarray`] (3,) rotation axis.
-    :param angle: [:py:class:`~astropy.units.Quantity`] signed rotation angle
-        around ``axis``.
-    :return: [:py:class:`~numpy.ndarray`] (3, 3) rotation matrix.
+    Parameters
+    ----------
+    axis : array-like(float)
+        (3,) rotation axis.
+    angle : :py:class:`~astropy.units.Quantity`
+        signed rotation angle.
 
+    Returns
+    -------
+    :py:class:`~numpy.ndarray`
+        (3, 3) rotation matrix.
+
+    Examples
+    --------
     .. testsetup::
 
        import astropy.units as u
@@ -227,14 +245,23 @@ def rot(axis, angle) -> np.ndarray:
     return R
 
 
-@chk.check('R', (chk.has_reals, chk.has_shape((3, 3))))
-def z_rot2angle(R) -> u.Quantity:
+@chk.check('R', chk.require_all(chk.has_reals, chk.has_shape((3, 3))))
+def z_rot2angle(R):
     """
-    Determine rotation angle from matrix ``R``.
+    Determine rotation angle from Z-axis rotation matrix.
 
-    :param R: [:py:class:`~numpy.ndarray`] (3, 3) Z-axis rotation matrix.
-    :return: [:py:class:`~astropy.units.Quantity`] angle.
+    Parameters
+    ----------
+    R : array-like(float)
+        (3, 3) rotation matrix around the Z-axis.
 
+    Returns
+    -------
+    :py:class:`~astropy.units.Quantity`
+        signed rotation angle.
+
+    Examples
+    --------
     .. testsetup::
 
        import numpy as np
@@ -258,7 +285,8 @@ def z_rot2angle(R) -> u.Quantity:
 
     if not np.allclose(R[[0, 1, 2, 2, 2], [2, 2, 2, 0, 1]],
                        np.r_[0, 0, 1, 0, 0]):
-        raise ValueError('Parameter[R] is not a Z-axis rotation matrix.')
+        raise ValueError('Parameter[R] is not a rotation matrix '
+                         'around the Z-axis.')
 
     ct, st = np.clip([R[0, 0], R[1, 0]], -1, 1)
     if st >= 0:  # In quadrants I or II

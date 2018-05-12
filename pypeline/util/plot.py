@@ -5,14 +5,13 @@
 # #############################################################################
 
 """
-:py:mod:`matplotlib` tools.
+`Matplotlib <https://matplotlib.org/>`_ helpers.
 """
 
 import pathlib
 
 import matplotlib.axes as axes
 import matplotlib.cm as cm
-import matplotlib.colorbar as cb
 import matplotlib.colors as col
 import mpl_toolkits.axes_grid1 as ax_grid
 import pandas as pd
@@ -23,16 +22,24 @@ import pypeline.util.argcheck as chk
 
 @chk.check(dict(scm=chk.is_instance(cm.ScalarMappable),
                 ax=chk.is_instance(axes.Axes)))
-def colorbar(scm, ax) -> cb.Colorbar:
+def colorbar(scm, ax):
     """
-    Stick a colorbar to the side of an :py:class:`~matplotlib.axes.Axes`
-    instance.
+    Attach colorbar to side of a plot.
 
-    :param scm: [:py:class:`~matplotlib.cm.ScalarMappable`] intensity scale.
-    :param ax: [:py:class:`~matplotlib.axes.Axes`] frame to which the colorbar
-        is attached.
-    :return: [:py:class:`~matplotlib.colorbar.Colorbar`]
+    Parameters
+    ----------
+    scm : :py:class:`~matplotlib.cm.ScalarMappable`
+        Intensity scale.
+    ax : :py:class:`~matplotlib.axes.Axes`
+        Plot next to which the colorbar is placed.
 
+    Returns
+    -------
+    :py:class:`~matplotlib.colorbar.Colorbar`
+        Attached colorbar.
+
+    Examples
+    --------
     .. doctest::
 
        import numpy as np
@@ -47,7 +54,7 @@ def colorbar(scm, ax) -> cb.Colorbar:
 
        fig.show()
 
-    .. image:: _plot/colorbar_example.png
+    .. image:: _img/colorbar_example.png
     """
     fig = ax.get_figure()
     divider = ax_grid.make_axes_locatable(ax)
@@ -59,18 +66,29 @@ def colorbar(scm, ax) -> cb.Colorbar:
 
 @chk.check(dict(name=chk.is_instance(str),
                 N=chk.allow_None(chk.is_integer)))
-def cmap(name, N=None) -> col.ListedColormap:
+def cmap(name, N=None):
     """
-    Return one of Pypeline's custom colormaps.
+    Load one of Pypeline's custom colormaps.
 
     All maps are defined under ``<pypeline_dir>/data/colormap/``.
 
-    :param name: [:py:class:`str`] name of the colormap.
-    :param N: [:py:class:`int` > 0] number of levels to choose. (Default: all.)
-        If ``N`` is smaller than the number of levels in the colormap, then the
-        last ``N`` colors will be used.
-    :return: [:py:class:`matplotlib.colors.ListedColormap`] colormap.
+    Parameters
+    ----------
+    name : str
+        colormap name.
+    N : int, optional
+        Number of color levels. (Default: all).
 
+        If `N` is smaller than the number of levels available in the colormap,
+        then the last `N` colors will be used.
+
+    Returns
+    -------
+    :py:class:`~matplotlib.colors.ListedColormap`
+        `Matplotlib <https://matplotlib.org/>`_ colormap.
+
+    Examples
+    --------
     .. doctest::
 
        import numpy as np
@@ -88,7 +106,7 @@ def cmap(name, N=None) -> col.ListedColormap:
 
        fig.show()
 
-    .. image:: _plot/cmap_example.png
+    .. image:: _img/cmap_example.png
     """
     if (N is not None) and (N <= 0):
         raise ValueError('Parameter[N] must be a positive integer.')

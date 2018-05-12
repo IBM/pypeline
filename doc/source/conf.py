@@ -60,6 +60,7 @@ extensions = [
     'sphinx.ext.doctest',
     'sphinx.ext.intersphinx',
     'sphinx.ext.mathjax',
+    'sphinx.ext.napoleon',
     'sphinx.ext.todo',
     'sphinx.ext.viewcode',
 ]
@@ -77,6 +78,18 @@ html_static_path = ['_static']
 htmlhelp_basename = 'pypelinedoc'
 
 # -- Extension configuration -------------------------------------------------
+# -- Options for autosummary extension ---------------------------------------
+autosummary_generate = True
+
+# -- Options for autodoc extension -------------------------------------------
+autodoc_member_order = 'groupwise'
+autodoc_default_flags = [
+    'members',
+    'inherited-members',
+    'show-inheritance',
+]
+autodoc_inherit_docstrings = True
+
 # -- Options for intersphinx extension ---------------------------------------
 intersphinx_mapping = {
     'python': ('https://docs.python.org/3', None),
@@ -84,3 +97,7 @@ intersphinx_mapping = {
     'SciPy [latest]': ('https://docs.scipy.org/doc/scipy/reference', None),
     'matplotlib [latest]': ('https://matplotlib.org', None),
     'astropy [latest]': ('http://docs.astropy.org/en/latest/', None)}
+
+# -- Options for napoleon extension ------------------------------------------
+napoleon_google_docstring = False
+napoleon_numpy_docstring = True

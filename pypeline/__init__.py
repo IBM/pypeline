@@ -6,6 +6,11 @@
 
 """
 Top-level Pypeline module.
+
+Attributes
+----------
+config : :py:class:`~configparser.ConfigParser`
+    Pypeline configuration data.
 """
 
 import configparser
@@ -14,7 +19,7 @@ import pathlib
 import pkg_resources as pkg
 
 
-def ___load_config() -> configparser.ConfigParser:
+def ___load_config():
     cfg = configparser.ConfigParser()
 
     # Load default configuration
@@ -34,7 +39,7 @@ def ___load_config() -> configparser.ConfigParser:
 config = ___load_config()
 
 
-def reload_config() -> None:
+def reload_config():
     """
     Reload Pypeline's configuration file(s).
     """

@@ -11,11 +11,10 @@ Pypeline is structured around the concept of :py:class:`~pypeline.core.Block`:
 callable objects that perform certain actions given their optional inputs.
 """
 
-from abc import ABC, abstractmethod
-from typing import Any
+import abc
 
 
-class Block(ABC):
+class Block(abc.ABC):
     """
     Abstract Block interface.
 
@@ -27,6 +26,8 @@ class Block(ABC):
     Blocks are allowed to extend this interface with public attributes and
     methods.
 
+    Examples
+    --------
     .. testsetup::
 
        from pypeline.core import Block
@@ -40,34 +41,28 @@ class Block(ABC):
        >>> blk = A()
        >>> blk()  # invoke A.__call__()
        5
-
-    .. doctest::
-
-       >>> class B(Block):
-       ...     pass
-
-       >>> B()
-       Traceback (most recent call last):
-           ...
-       TypeError: Can't instantiate abstract class B with abstract methods
-           __call__
-        """
+    """
 
     def __init__(self):
         super().__init__()
 
-    @abstractmethod
-    def __call__(self, *args, **kwargs) -> Any:
+    @abc.abstractmethod
+    def __call__(self, *args, **kwargs):
         """
-        Perform block's task given input parameters.
+        Perform action and return result.
 
-        As blocks encode a data-flow view on computation,
-        :py:meth:`~pypeline.core.Block.__call__` is *forbidden* from mutating
-        its parameters in any way.
+        Internal state can also be modified.
 
-        :param args: positional arguments
-        :param kwargs: keyword arguments
-        :return: output value, if any.
-                 A block's internal state can also be modified.
+        Parameters
+        ----------
+        *args
+            Positional arguments.
+        **kwargs
+            Keyword arguments.
+
+        Returns
+        -------
+        :py:obj:`~typing.Any`
+            Result of action.
         """
         raise NotImplementedError
