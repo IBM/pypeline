@@ -9,3 +9,4 @@ pypeline.util.math
    pypeline.util.math.func
    pypeline.util.math.stat
    pypeline.util.math.linalg
+   pypeline.util.math.fourier

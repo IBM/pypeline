@@ -73,7 +73,10 @@ def wishrnd(S, df, normalize=True):
 
     Notes
     -----
-    The Wishart estimate is obtained using the `Bartlett decomposition <https://en.wikipedia.org/wiki/Wishart_distribution#Bartlett_decomposition>`_.
+    The Wishart estimate is obtained using the `Bartlett Decomposition`_.
+
+    .. _Bartlett Decomposition: https://en.wikipedia.org/wiki/\
+       Wishart_distribution#Bartlett_decomposition
     """
     S = np.array(S, copy=False)
     p = len(S)

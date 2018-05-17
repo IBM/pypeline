@@ -14,7 +14,7 @@ required to achieve high performance, we highly recommend the use of
 `conda <https://conda.io/docs/>`_ packages when available.
 
 Pypeline is developed and tested on x86_64 systems running Linux.
-Aside from ``pypeline.phased_array.io``, Pypeline should also run correctly on
+Aside from :py:mod:`pypeline.phased_array.io`, Pypeline should also run correctly on
 ppc64le Linux platforms and OSX, but we provide no support for this.
 
 
