@@ -213,7 +213,9 @@ def ffs(x, T, T_c, N_FS, axis=-1):
     sh[axis] = N_s
     C_1 = np.reshape(B_1 ** (- E_1), sh)
     C_2 = np.reshape(B_2 ** (- N * E_2), sh)
-    X_FS = fftpack.fft(x * C_2, axis=axis) * (C_1 / N_s)
+
+    X_FS = fftpack.fft(x * C_2, axis=axis)
+    X_FS *= C_1 / N_s
     return X_FS
 
 
@@ -285,7 +287,9 @@ def iffs(x_FS, T, T_c, N_FS, axis=-1):
     sh[axis] = N_s
     C_1 = np.reshape(B_1 ** (E_1), sh)
     C_2 = np.reshape(B_2 ** (N * E_2), sh)
-    X = fftpack.ifft(x_FS * C_1, axis=axis) * (C_2 * N_s)
+
+    X = fftpack.ifft(x_FS * C_1, axis=axis)
+    X *= C_2 * N_s
     return X
 
 
@@ -435,37 +439,34 @@ def czt(x, A, W, M, axis=-1):
 
     # Shape Parameters
     N = x.shape[axis]
-    L = fftpack.next_fast_len(N + M - 1)
-    sh_N_1 = [1] * x.ndim
-    sh_N_1[axis] = N - 1
-
     sh_N = [1] * x.ndim
     sh_N[axis] = N
-
     sh_M = [1] * x.ndim
     sh_M[axis] = M
 
+    L = fftpack.next_fast_len(N + M - 1)
     sh_L = [1] * x.ndim
     sh_L[axis] = L
-
     sh_Y = list(x.shape)
     sh_Y[axis] = L
 
-    # Modulation Parameters
     n = np.arange(L)
-    y_modulation = (A ** -n[:N]) * np.float_power(W, (n[:N] ** 2) / 2)
+    y = np.zeros(sh_Y, dtype=complex)
+    y_mod = (A ** -n[:N]) * np.float_power(W, (n[:N] ** 2) / 2)
+    y[_index(y, axis, slice(N))] = x
+    y[_index(y, axis, slice(N))] *= y_mod.reshape(sh_N)
+    Y = fftpack.fft(y, axis=axis)
+
     v = np.zeros(L, dtype=complex)
     v[:M] = np.float_power(W, - (n[:M] ** 2) / 2)
     v[L - N + 1:] = np.float_power(W, - ((L - n[L - N + 1:]) ** 2) / 2)
-    g_modulation = np.float_power(W, (n[:M] ** 2) / 2)
+    V = fftpack.fft(v).reshape(sh_L)
 
-    y = np.zeros(sh_Y, dtype=complex)
-    y[_index(y, axis, slice(N))] = x
-    y[_index(y, axis, slice(N))] *= y_modulation.reshape(sh_N)
-    G = fftpack.fft(y, axis=axis)
-    G *= fftpack.fft(v).reshape(sh_L)
+    G = Y
+    G *= V
     g = fftpack.ifft(G, axis=axis)
-    g[_index(g, axis, slice(M))] *= g_modulation.reshape(sh_M)
+    g_mod = np.float_power(W, (n[:M] ** 2) / 2)
+    g[_index(g, axis, slice(M))] *= g_mod.reshape(sh_M)
 
     X = g[_index(g, axis, slice(M))]
     return X
@@ -625,25 +626,29 @@ def fs_interp(x_FS, T, a, b, M, axis=-1, real_x=False):
     if not (-x_FS.ndim <= axis < x_FS.ndim):
         raise ValueError('Parameter[axis] is out-of-bounds.')
 
+    # Shape Parameters
     N_FS = x_FS.shape[axis]
     N = (N_FS - 1) // 2
+    sh = [1] * x_FS.ndim
+    sh[axis] = M
+
     A = np.exp(-1j * 2 * np.pi / T * a)
     W = np.exp(1j * (2 * np.pi / T) * (b - a) / (M - 1))
     E = np.arange(M)
-    sh = [1] * x_FS.ndim
-    sh[axis] = M
 
     if real_x:  # Real-valued functions.
         x0_FS = x_FS[_index(x_FS, axis, slice(N, N + 1))]
         xp_FS = x_FS[_index(x_FS, axis, slice(N + 1, N_FS))]
-        C_1 = 1 / A
-        C_2 = np.reshape(W ** E, sh)
+        C = np.reshape(W ** E, sh) / A
 
-        x = czt(xp_FS, A, W, M, axis=axis) * (C_1 * C_2)
-        x = (x0_FS + 2 * x).real
+        x = czt(xp_FS, A, W, M, axis=axis)
+        x *= 2 * C
+        x += x0_FS
+        x = x.real
+
     else:  # Complex-valued functions.
-        C_1 = A ** N
-        C_2 = np.reshape(W ** (-N * E), sh)
-        x = czt(x_FS, A, W, M, axis=axis) * (C_1 * C_2)
+        C = np.reshape(W ** (-N * E), sh) * (A ** N)
+        x = czt(x_FS, A, W, M, axis=axis)
+        x *= C
 
     return x
