@@ -111,4 +111,17 @@ def tukey(T, beta, alpha):
                                           (T - y[ramp_down])) ** 2
         return amplitude
 
+    tukey_func.__doc__ = (rf"""
+        Tukey(T={T}, beta={beta}, alpha={alpha}) function.
+
+        Parameters
+        ----------
+        x : float or array-like(float)
+            Values at which to compute Tukey({T}, {beta}, {alpha})(x).
+
+        Returns
+        -------
+        :py:class:`~numpy.ndarray`
+        """)
+
     return tukey_func
