@@ -9,6 +9,7 @@
 """
 
 import numpy as np
+import scipy.special as sp
 
 import pypeline.util.argcheck as chk
 
@@ -125,3 +126,86 @@ def tukey(T, beta, alpha):
         """)
 
     return tukey_func
+
+
+@chk.check('N', chk.is_integer)
+def sph_dirichlet(N):
+    r"""
+    Parameterized spherical Dirichlet kernel.
+
+    Parameters
+    ----------
+    N : int
+        Kernel order.
+
+    Returns
+    -------
+    :py:obj:`~typing.Callable`
+        Function that outputs the amplitude of the parameterized spherical
+        Dirichlet function at specified locations.
+
+    Examples
+    --------
+    .. testsetup::
+
+       import numpy as np
+       from pypeline.util.math.func import sph_dirichlet
+
+    .. doctest::
+
+       >>> N = 4
+       >>> f = sph_dirichlet(N)
+       >>> sample_points = np.linspace(-1, 1, 25).reshape(5, 5)  # any shape
+
+       >>> amplitudes = f(sample_points)
+       >>> np.around(amplitudes, 2)
+       array([[ 1.  ,  0.2 , -0.25, -0.44, -0.44],
+              [-0.32, -0.13,  0.07,  0.26,  0.4 ],
+              [ 0.47,  0.46,  0.38,  0.22,  0.  ],
+              [-0.24, -0.48, -0.67, -0.76, -0.68],
+              [-0.37,  0.27,  1.3 ,  2.84,  5.  ]])
+
+    Notes
+    -----
+    The spherical Dirichlet function :math:`K_{N}(t): [-1, 1] \to \mathbb{R}`
+    is defined as:
+
+    .. math:: K_{N}(t) = \frac{P_{N+1}(t) - P_{N}(t)}{t - 1},
+
+    where :math:`P_{N}(t)` is the `Legendre polynomial
+    <https://en.wikipedia.org/wiki/Legendre_polynomials>`_ of order :math:`N`.
+    """
+    if N < 0:
+        raise ValueError("Parameter[N] must be non-negative.")
+
+    @chk.check('x', chk.accept_any(chk.is_real, chk.has_reals))
+    def sph_dirichlet_func(x):
+        x = np.array(x, copy=False, dtype=float)
+
+        if not np.all((-1 <= x) & (x <= 1)):
+            raise ValueError("Parameter[x] must lie in [-1, 1]")
+
+        amplitude = np.zeros_like(x)
+        _1_mask = np.isclose(x, 1)
+
+        amplitude[_1_mask] = N + 1
+        amplitude[~_1_mask] = (sp.eval_legendre(N + 1, x[~_1_mask]) -
+                               sp.eval_legendre(N, x[~_1_mask]))
+        amplitude[~_1_mask] /= x[~_1_mask] - 1
+
+        return amplitude
+
+    sph_dirichlet_func.__doc__ = (rf"""
+        Order-{N} spherical Dirichlet kernel.
+
+        Parameters
+        ----------
+        x : float or array-like(float)
+            Values at which to compute :math:`K_{{{N}}}(x)`.
+
+        Returns
+        -------
+        :py:class:`~numpy.ndarray`
+        """)
+
+    return sph_dirichlet_func
