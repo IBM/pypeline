@@ -101,3 +101,6 @@ intersphinx_mapping = {
 # -- Options for napoleon extension ------------------------------------------
 napoleon_google_docstring = False
 napoleon_numpy_docstring = True
+
+# -- Options for todo extension ----------------------------------------------
+todo_include_todos = True

@@ -17,6 +17,7 @@ ipython == 6.3.*
 matplotlib == 2.2.*
 numpy == 1.14.*
 pandas == 0.22.*
+plotly == 2.6.*
 pytest == 3.5.*
 scipy == 1.1.*
 sphinx == 1.7.*

@@ -13,4 +13,5 @@ API Reference
 
    pypeline
    pypeline.core
+   pypeline.phased_array
    pypeline.util
