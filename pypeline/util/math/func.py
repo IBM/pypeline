@@ -9,6 +9,7 @@
 """
 
 import numpy as np
+import scipy.interpolate as interpolate
 import scipy.special as sp
 
 import pypeline.util.argcheck as chk
@@ -128,8 +129,9 @@ def tukey(T, beta, alpha):
     return tukey_func
 
 
-@chk.check('N', chk.is_integer)
-def sph_dirichlet(N):
+@chk.check(dict(N=chk.is_integer,
+                interp=chk.is_boolean))
+def sph_dirichlet(N, interp=False):
     r"""
     Parameterized spherical Dirichlet kernel.
 
@@ -137,6 +139,10 @@ def sph_dirichlet(N):
     ----------
     N : int
         Kernel order.
+    interp : bool
+        Use a cubic-spline to compute kernel values. This method can only be
+        used if `N` is greater that 50, but is orders-of-magnitude faster than
+        the exact computation while retaining high accuracy.
 
     Returns
     -------
@@ -179,11 +185,11 @@ def sph_dirichlet(N):
         raise ValueError("Parameter[N] must be non-negative.")
 
     @chk.check('x', chk.accept_any(chk.is_real, chk.has_reals))
-    def sph_dirichlet_func(x):
+    def exact_func(x):
         x = np.array(x, copy=False, dtype=float)
 
         if not np.all((-1 <= x) & (x <= 1)):
-            raise ValueError("Parameter[x] must lie in [-1, 1]")
+            raise ValueError('Parameter[x] must lie in [-1, 1].')
 
         amplitude = np.zeros_like(x)
         _1_mask = np.isclose(x, 1)
@@ -194,6 +200,38 @@ def sph_dirichlet(N):
         amplitude[~_1_mask] /= x[~_1_mask] - 1
 
         return amplitude
+
+    sph_dirichlet_func = exact_func
+    if interp:
+        if N < 50:
+            raise ValueError('Cannot use interpolation method if '
+                             'Parameter[N] < 50.')
+
+        x_boundary = 1 - 10 / N
+        x_l = np.linspace(-1, -x_boundary, 10 * N, endpoint=False)
+        x_m = np.linspace(-x_boundary, x_boundary, 10 * N, endpoint=False)
+        x_r = np.linspace(x_boundary, 1, 50 * N)
+        x_all = np.unique(np.r_[x_l, x_m, x_r])
+        x_all = x_all[~np.isclose(x_all, 1)]
+        y = exact_func(x_all)
+
+        f = interpolate.interp1d(x_all, y,
+                                 kind='cubic',
+                                 bounds_error=False,
+                                 fill_value=N + 1)
+
+        @chk.check('x', chk.accept_any(chk.is_real, chk.has_reals))
+        def interp_func(x):
+            x = np.array(x, copy=False, dtype=float)
+
+            if not np.all((-1 <= x) & (x <= 1)):
+                raise ValueError('Parameter[x] must lie in [-1, 1].')
+
+            amplitude = f(x)
+
+            return amplitude
+
+        sph_dirichlet_func = interp_func
 
     sph_dirichlet_func.__doc__ = (rf"""
         Order-{N} spherical Dirichlet kernel.

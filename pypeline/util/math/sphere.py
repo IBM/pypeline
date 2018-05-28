@@ -210,7 +210,11 @@ def ea_interp(q, l, f, N):
     alpha = (np.sin(theta_sph) / _2N2 *
              np.sum(np.sin(_2m1 * theta_sph) / _2m1, axis=1, keepdims=True))
     weight = (f * alpha[q]).to_value(u.dimensionless_unscaled)
-    kernel_func = func.sph_dirichlet(N)
+
+    if N < 50:
+        kernel_func = func.sph_dirichlet(N)
+    else:
+        kernel_func = func.sph_dirichlet(N, interp=True)
 
     @chk.check(dict(theta=chk.accept_any(chk.is_angle, chk.has_angles),
                     phi=chk.accept_any(chk.is_angle, chk.has_angles)))
