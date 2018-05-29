@@ -7,3 +7,4 @@ pypeline.phased_array
    :toctree:
 
    pypeline.phased_array.instrument
+   pypeline.phased_array.beamforming
