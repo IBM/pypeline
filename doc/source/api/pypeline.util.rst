@@ -9,3 +9,4 @@ pypeline.util
    pypeline.util.argcheck
    pypeline.util.plot
    pypeline.util.math
+   pypeline.util.array
