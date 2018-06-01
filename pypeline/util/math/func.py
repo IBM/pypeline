@@ -8,6 +8,7 @@
 1d functions not available in `SciPy <https://www.scipy.org/>`_.
 """
 
+import astropy.units as u
 import numpy as np
 import scipy.interpolate as interpolate
 import scipy.special as sp
@@ -129,8 +130,8 @@ def tukey(T, beta, alpha):
 
 
 @chk.check(dict(N=chk.is_integer,
-                interp=chk.is_boolean))
-def sph_dirichlet(N, interp=False):
+                approx=chk.is_boolean))
+def sph_dirichlet(N, approx=False):
     r"""
     Parameterized spherical Dirichlet kernel.
 
@@ -138,9 +139,13 @@ def sph_dirichlet(N, interp=False):
     ----------
     N : int
         Kernel order.
-    interp : bool
-        Use a cubic-spline to compute kernel values.
-        This method can only be used if `N` is greater that 50, but is orders-of-magnitude faster than the exact computation while retaining high accuracy.
+    approx : bool
+        Approximate kernel using cubic-splines.
+
+        This method provides extremely reliable estimates of :math:`K_{N}(t)` in the vicinity of 1 where the function's main sidelobes are found.
+        Values outside the vicinity smoothly converge to 0.
+
+        Only works for `N` greater than 10.
 
     Returns
     -------
@@ -168,6 +173,33 @@ def sph_dirichlet(N, interp=False):
               [-0.24, -0.48, -0.67, -0.76, -0.68],
               [-0.37,  0.27,  1.3 ,  2.84,  5.  ]])
 
+    When only interested in kernel values close to 1, the approximation method provides significant speedups, at the cost of approximation error in values far from 1:
+
+    .. doctest::
+
+       N = 11
+       f_exact = func.sph_dirichlet(N)
+       f_approx = func.sph_dirichlet(N, approx=True)
+
+       x = np.linspace(-1, 1, 2000)
+       e_y = f_exact(x)
+       a_y = f_approx(x)
+       rel_err = np.abs((e_y - a_y) / e_y)
+
+       fig, ax = plt.subplots(nrows=2)
+       ax[0].plot(x, e_y, 'r')
+       ax[0].plot(x, a_y, 'b')
+       ax[0].legend(['exact', 'approx'])
+       ax[0].set_title('Dirichlet Kernel')
+
+       ax[1].plot(x, rel_err)
+       ax[1].set_title('Relative Error (Exact vs. Approx)')
+
+       fig.show()
+
+    .. image:: _img/sph_dirichlet_example.png
+
+
     Notes
     -----
     The spherical Dirichlet function :math:`K_{N}(t): [-1, 1] \to \mathbb{R}` is defined as:
@@ -186,34 +218,45 @@ def sph_dirichlet(N, interp=False):
         if not np.all((-1 <= x) & (x <= 1)):
             raise ValueError('Parameter[x] must lie in [-1, 1].')
 
-        amplitude = np.zeros_like(x)
-        _1_mask = np.isclose(x, 1)
-
-        amplitude[_1_mask] = N + 1
-        amplitude[~_1_mask] = (sp.eval_legendre(N + 1, x[~_1_mask]) -
-                               sp.eval_legendre(N, x[~_1_mask]))
-        amplitude[~_1_mask] /= x[~_1_mask] - 1
+        amplitude = (sp.eval_legendre(N + 1, x) - sp.eval_legendre(N, x))
+        amplitude /= x - 1
+        amplitude[np.isnan(amplitude)] = N + 1
 
         return amplitude
 
     sph_dirichlet_func = exact_func
-    if interp:
-        if N < 50:
-            raise ValueError('Cannot use interpolation method if '
-                             'Parameter[N] < 50.')
+    if approx:
+        if N <= 10:
+            raise ValueError('Cannot use approximation method if '
+                             'Parameter[N] <= 10.')
 
-        x_boundary = 1 - 10 / N
-        x_l = np.linspace(-1, -x_boundary, 10 * N, endpoint=False)
-        x_m = np.linspace(-x_boundary, x_boundary, 10 * N, endpoint=False)
-        x_r = np.linspace(x_boundary, 1, 50 * N)
-        x_all = np.unique(np.r_[x_l, x_m, x_r])
-        x_all = x_all[~np.isclose(x_all, 1)]
-        y = exact_func(x_all)
+        N_samples = 10 ** 3
 
-        f = interpolate.interp1d(x_all, y,
+        theta_max = 180 * u.deg
+        while True:
+            x = np.linspace(0, theta_max, N_samples)
+            cx = np.cos(x)
+            cy = exact_func(cx)
+            zero_cross = np.diff(np.sign(cy))
+            N_cross = np.abs(np.sign(zero_cross)).sum()
+
+            if N_cross > 10:
+                theta_max /= 2
+            else:
+                break
+
+        window = tukey(T=2 - 2 * np.cos(2 * theta_max.to_value(u.rad)),
+                       beta=1,
+                       alpha=0.5)
+
+        x = np.r_[np.linspace(np.cos(theta_max * 2), np.cos(theta_max),
+                              N_samples, endpoint=False),
+                  np.linspace(np.cos(theta_max), 1, N_samples)]
+        y = exact_func(x) * window(x)
+        f = interpolate.interp1d(x, y,
                                  kind='cubic',
                                  bounds_error=False,
-                                 fill_value=N + 1)
+                                 fill_value=0)
 
         @chk.check('x', chk.accept_any(chk.is_real, chk.has_reals))
         def interp_func(x):
