@@ -16,9 +16,8 @@ import pypeline.util.argcheck as chk
 
 
 @chk.check(dict(S=chk.accept_any(chk.has_reals, chk.has_complex),
-                df=chk.is_integer,
-                normalize=chk.is_boolean))
-def wishrnd(S, df, normalize=True):
+                df=chk.is_integer))
+def wishrnd(S, df):
     """
     Wishart random variable.
 
@@ -28,8 +27,6 @@ def wishrnd(S, df, normalize=True):
         (p, p) positive-semidefinite scale matrix.
     df : int
         Degrees of freedom.
-    normalize : bool
-        If True, normalize estimate by `df`. (Default: True)
 
     Returns
     -------
@@ -66,17 +63,16 @@ def wishrnd(S, df, normalize=True):
 
        >>> B = wishrnd(A, df=7)
        >>> print(np.around(B, 2))
-       [[0.56+0.j   0.94+0.1j  0.42-0.05j 0.55-0.21j]
-        [0.94-0.1j  6.18+0.j   0.54-0.32j 1.08+0.26j]
-        [0.42+0.05j 0.54+0.32j 2.67+0.j   0.66-2.36j]
-        [0.55+0.21j 1.08-0.26j 0.66+2.36j 2.96+0.j  ]]
+       [[ 3.92 +0.j    6.55 +0.68j  2.95 -0.33j  3.87 -1.47j]
+        [ 6.55 -0.68j 43.29 +0.j    3.8  -2.26j  7.59 +1.84j]
+        [ 2.95 +0.33j  3.8  +2.26j 18.7  +0.j    4.63-16.52j]
+        [ 3.87 +1.47j  7.59 -1.84j  4.63+16.52j 20.74 +0.j  ]]
 
     Notes
     -----
     The Wishart estimate is obtained using the `Bartlett Decomposition`_.
 
-    .. _Bartlett Decomposition: https://en.wikipedia.org/wiki/\
-       Wishart_distribution#Bartlett_decomposition
+    .. _Bartlett Decomposition: https://en.wikipedia.org/wiki/Wishart_distribution#Bartlett_decomposition
     """
     S = np.array(S, copy=False)
     p = len(S)
@@ -95,5 +91,5 @@ def wishrnd(S, df, normalize=True):
     A[np.tril_indices(p, k=-1)] = stats.norm.rvs(size=p * (p - 1) // 2)
 
     W = L @ A
-    X = W @ W.conj().T / (df if normalize else 1)
+    X = W @ W.conj().T
     return X

@@ -34,8 +34,7 @@ def tukey(T, beta, alpha):
     Returns
     -------
     :py:obj:`~typing.Callable`
-        Function that outputs the amplitude of the parameterized Tukey function
-        at specified locations.
+        Function that outputs the amplitude of the parameterized Tukey function at specified locations.
 
     Examples
     --------
@@ -140,15 +139,13 @@ def sph_dirichlet(N, interp=False):
     N : int
         Kernel order.
     interp : bool
-        Use a cubic-spline to compute kernel values. This method can only be
-        used if `N` is greater that 50, but is orders-of-magnitude faster than
-        the exact computation while retaining high accuracy.
+        Use a cubic-spline to compute kernel values.
+        This method can only be used if `N` is greater that 50, but is orders-of-magnitude faster than the exact computation while retaining high accuracy.
 
     Returns
     -------
     :py:obj:`~typing.Callable`
-        Function that outputs the amplitude of the parameterized spherical
-        Dirichlet function at specified locations.
+        Function that outputs the amplitude of the parameterized spherical Dirichlet function at specified locations.
 
     Examples
     --------
@@ -173,13 +170,11 @@ def sph_dirichlet(N, interp=False):
 
     Notes
     -----
-    The spherical Dirichlet function :math:`K_{N}(t): [-1, 1] \to \mathbb{R}`
-    is defined as:
+    The spherical Dirichlet function :math:`K_{N}(t): [-1, 1] \to \mathbb{R}` is defined as:
 
     .. math:: K_{N}(t) = \frac{P_{N+1}(t) - P_{N}(t)}{t - 1},
 
-    where :math:`P_{N}(t)` is the `Legendre polynomial
-    <https://en.wikipedia.org/wiki/Legendre_polynomials>`_ of order :math:`N`.
+    where :math:`P_{N}(t)` is the `Legendre polynomial <https://en.wikipedia.org/wiki/Legendre_polynomials>`_ of order :math:`N`.
     """
     if N < 0:
         raise ValueError("Parameter[N] must be non-negative.")

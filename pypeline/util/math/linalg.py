@@ -30,23 +30,20 @@ def eigh(A, B=None, tau=1, N=None):
 
        A V = B V D.
 
-    This function is a wrapper around :py:func:`scipy.linalg.eigh` that adds
-    energy truncation and extra output formats.
+    This function is a wrapper around :py:func:`scipy.linalg.eigh` that adds energy truncation and extra output formats.
 
     Parameters
     ----------
     A : array-like(float or complex)
         (M, M) hermitian matrix.
-        If `A` is not positive-semidefinite (PSD), its negative spectrum is
-        discarded.
+        If `A` is not positive-semidefinite (PSD), its negative spectrum is discarded.
     B : array-like(float or complex), optional
         (M, M) PSD hermitian matrix.
         If unspecified, `B` is assumed to be the identity matrix.
     tau : float, optional
         Normalized energy ratio. (Default: 1)
     N : int, optional
-        Number of eigenpairs to output. (Default: K, the minimum number of
-        leading eigenpairs that account for `tau` percent of the total energy.)
+        Number of eigenpairs to output. (Default: K, the minimum number of leading eigenpairs that account for `tau` percent of the total energy.)
 
         * If `N` is smaller than K, then the trailing eigenpairs are dropped.
         * If `N` is greater that K, then the trailing eigenpairs are set to 0.
@@ -92,8 +89,7 @@ def eigh(A, B=None, tau=1, N=None):
        A = hermitian_array(M)
        B = hermitian_array(M) + 100 * np.eye(M)  # To guarantee PSD
 
-    Then different calls to :py:func:`~pypeline.util.math.linalg.eigh`
-    produce different results:
+    Then different calls to :py:func:`~pypeline.util.math.linalg.eigh` produce different results:
 
     * Get all positive eigenpairs:
 

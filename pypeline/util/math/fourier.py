@@ -24,8 +24,7 @@ def ffs_sample(T, N_FS, T_c, N_s):
     r"""
     Signal sample positions for :py:func:`~pypeline.util.math.fourier.ffs`.
 
-    Return the coordinates at which a signal must be sampled to use
-    :py:func:`~pypeline.util.math.fourier.ffs`.
+    Return the coordinates at which a signal must be sampled to use :py:func:`~pypeline.util.math.fourier.ffs`.
 
     Parameters
     ----------
@@ -45,13 +44,8 @@ def ffs_sample(T, N_FS, T_c, N_s):
 
     Examples
     --------
-    Let :math:`\phi: \mathbb{R} \to \mathbb{C}` be a bandlimited periodic
-    function of period :math:`T = 1`, bandwidth :math:`N_{FS} = 5`, and
-    with one period centered at :math:`T_{c} = \pi`.
-    The sampling points :math:`t[n] \in \mathbb{R}` at which :math:`\phi`
-    must be evaluated to compute the Fourier Series coefficients
-    :math:`\left\{ \phi_{k}^{FS}, k = -2, \ldots, 2 \right\}` with
-    :py:func:`~pypeline.util.math.fourier.ffs` are obtained as follows:
+    Let :math:`\phi: \mathbb{R} \to \mathbb{C}` be a bandlimited periodic function of period :math:`T = 1`, bandwidth :math:`N_{FS} = 5`, and with one period centered at :math:`T_{c} = \pi`.
+    The sampling points :math:`t[n] \in \mathbb{R}` at which :math:`\phi` must be evaluated to compute the Fourier Series coefficients :math:`\left\{ \phi_{k}^{FS}, k = -2, \ldots, 2 \right\}` with :py:func:`~pypeline.util.math.fourier.ffs` are obtained as follows:
 
     .. testsetup::
 
@@ -101,8 +95,7 @@ def ffs(x, T, T_c, N_FS, axis=-1):
     Parameters
     ----------
     x : array-like(complex)
-        (..., N_s, ...) function values at sampling points specified by
-        :py:func:`~pypeline.util.math.fourier.ffs_sample`.
+        (..., N_s, ...) function values at sampling points specified by :py:func:`~pypeline.util.math.fourier.ffs_sample`.
     T : float
         Function period.
     T_c : float
@@ -115,24 +108,18 @@ def ffs(x, T, T_c, N_FS, axis=-1):
     Returns
     -------
     :py:class:`~numpy.ndarray`
-        (..., N_s, ...) vectors containing entries
-        :math:`\left[ x_{-N}^{FS}, \ldots, x_{N}^{FS}, 0, \ldots, 0 \right]`
-        :math:`\in \mathbb{C}^{N_{s}}`.
+        (..., N_s, ...) vectors containing entries :math:`\left[ x_{-N}^{FS}, \ldots, x_{N}^{FS}, 0, \ldots, 0 \right] \in \mathbb{C}^{N_{s}}`.
 
     Examples
     --------
-    Let :math:`\phi(t)` be a shifted Dirichlet kernel of period :math:`T` and
-    bandwidth :math:`N_{FS} = 2 N + 1`:
+    Let :math:`\phi(t)` be a shifted Dirichlet kernel of period :math:`T` and bandwidth :math:`N_{FS} = 2 N + 1`:
 
     .. math::
 
-       \phi(t) = \sum_{k = -N}^{N} \exp\left(
-                                   j \frac{2 \pi}{T} k (t - T_{c}) \right)
-               = \frac{\sin\left( N_{FS} \pi [t - T_{c}] / T \right)}
-                      {\sin\left( \pi [t - T_{c}] / T \right)}.
+       \phi(t) = \sum_{k = -N}^{N} \exp\left( j \frac{2 \pi}{T} k (t - T_{c}) \right)
+               = \frac{\sin\left( N_{FS} \pi [t - T_{c}] / T \right)}{\sin\left( \pi [t - T_{c}] / T \right)}.
 
-    It's Fourier Series (FS) coefficients :math:`\phi_{k}^{FS}` can be
-    analytically evaluated using the shift-modulation theorem:
+    It's Fourier Series (FS) coefficients :math:`\phi_{k}^{FS}` can be analytically evaluated using the shift-modulation theorem:
 
     .. math::
 
@@ -142,8 +129,7 @@ def ffs(x, T, T_c, N_FS, axis=-1):
            0 & \text{otherwise}.
        \end{cases}
 
-    Being bandlimited, we can use :py:func:`~pypeline.util.math.fourier.ffs` to
-    numerically evaluate :math:`\{\phi_{k}^{FS}, k = -N, \ldots, N\}`:
+    Being bandlimited, we can use :py:func:`~pypeline.util.math.fourier.ffs` to numerically evaluate :math:`\{\phi_{k}^{FS}, k = -N, \ldots, N\}`:
 
     .. testsetup::
 
@@ -228,15 +214,12 @@ def iffs(x_FS, T, T_c, N_FS, axis=-1):
     r"""
     Signal samples from Fourier Series coefficients.
 
-    :py:func:`~pypeline.util.math.fourier.iffs` is basically the inverse of
-    :py:func:`~pypeline.util.math.fourier.ffs`.
+    :py:func:`~pypeline.util.math.fourier.iffs` is basically the inverse of :py:func:`~pypeline.util.math.fourier.ffs`.
 
     Parameters
     ----------
     x_FS : array-like(complex)
-        (..., N_s, ...) FS coefficients in the order
-        :math:`\left[ x_{-N}^{FS}, \ldots, x_{N}^{FS}, 0, \ldots, 0 \right]`
-        :math:`\in \mathbb{C}^{N_{s}}`.
+        (..., N_s, ...) FS coefficients in the order :math:`\left[ x_{-N}^{FS}, \ldots, x_{N}^{FS}, 0, \ldots, 0 \right] \in \mathbb{C}^{N_{s}}`.
     T : float
         Function period.
     T_c : float
@@ -249,8 +232,7 @@ def iffs(x_FS, T, T_c, N_FS, axis=-1):
     Returns
     -------
     :py:class:`~numpy.ndarray`
-        (..., N_s, ...) vectors containing original function samples given to
-        :py:func:`~pypeline.util.math.fourier.ffs`.
+        (..., N_s, ...) vectors containing original function samples given to :py:func:`~pypeline.util.math.fourier.ffs`.
 
         In short: :math:`(\text{iFFS} \circ \text{FFS})\{ X \} = X`.
 
@@ -301,8 +283,7 @@ def _index(x, axis, index_spec):
     """
     Form indexing tuple for NumPy arrays.
 
-    Given an array `x`, generates the indexing tuple that has :py:class:`slice`
-    in each axis except `axis`, where `index_spec` is used instead.
+    Given an array `x`, generates the indexing tuple that has :py:class:`slice` in each axis except `axis`, where `index_spec` is used instead.
 
     Parameters
     ----------
@@ -387,8 +368,7 @@ def czt(x, A, W, M, axis=-1):
 
     Notes
     -----
-    Due to numerical instability when using large `M`, this implementation only
-    supports transforms where `A` and `W` have unit norm.
+    Due to numerical instability when using large `M`, this implementation only supports transforms where `A` and `W` have unit norm.
 
     Examples
     --------
@@ -483,17 +463,12 @@ def fs_interp(x_FS, T, a, b, M, axis=-1, real_x=False):
     r"""
     Interpolate bandlimited periodic signal.
 
-    If `x_FS` holds the Fourier Series coefficients of a bandlimited periodic
-    function :math:`x(t): \mathbb{R} \to \mathbb{C}`, then
-    :py:func:`~pypeline.util.math.fourier.fs_interp` computes the values of
-    :math:`x(t)` at points
-    :math:`t[k] = (a + \frac{b - a}{M - 1} k) 1_{[0,\ldots,M-1]}[k]`.
+    If `x_FS` holds the Fourier Series coefficients of a bandlimited periodic function :math:`x(t): \mathbb{R} \to \mathbb{C}`, then :py:func:`~pypeline.util.math.fourier.fs_interp` computes the values of :math:`x(t)` at points :math:`t[k] = (a + \frac{b - a}{M - 1} k) 1_{[0,\ldots,M-1]}[k]`.
 
     Parameters
     ----------
     x_FS : array-like (float or complex)
-        (..., N_FS, ...) FS coefficients in the order
-        :math:`\left[ x_{-N}^{FS}, \ldots, x_{N}^{FS}\right]`.
+        (..., N_FS, ...) FS coefficients in the order :math:`\left[ x_{-N}^{FS}, \ldots, x_{N}^{FS}\right]`.
     T : float
         Function period.
     a : float
@@ -505,18 +480,14 @@ def fs_interp(x_FS, T, a, b, M, axis=-1, real_x=False):
     axis : int
         Dimension of `x_FS` along which the FS coefficients are stored.
     real_x : bool
-        If True, assume that `x_FS` is conjugate symmetric and use a more
-        efficient algorithm. In this case, the FS coefficients corresponding to
-        negative frequencies are not used.
+        If True, assume that `x_FS` is conjugate symmetric and use a more efficient algorithm.
+        In this case, the FS coefficients corresponding to negative frequencies are not used.
 
     Returns
     -------
     :py:class:`~numpy.ndarray`
-        (..., M, ...) interpolated values
-        :math:`\left[ x(t[0]), \ldots, x(t[M-1]) \right]` along the axis
-        indicated by `axis`.
-        If `real_x` is :py:obj:`True`, the output is real-valued, otherwise it
-        is complex-valued.
+        (..., M, ...) interpolated values :math:`\left[ x(t[0]), \ldots, x(t[M-1]) \right]` along the axis indicated by `axis`.
+        If `real_x` is :py:obj:`True`, the output is real-valued, otherwise it is complex-valued.
 
     Examples
     --------
@@ -548,8 +519,7 @@ def fs_interp(x_FS, T, a, b, M, axis=-1, real_x=False):
        diric_FS = np.exp(-1j * (2 * np.pi / T) * T_c * np.r_[-N:N+1])
 
 
-    Let :math:`\{\phi_{k}^{FS}, k = -N, \ldots, N\}` be the Fourier Series (FS)
-    coefficients of a shifted Dirichlet kernel of period :math:`T`:
+    Let :math:`\{\phi_{k}^{FS}, k = -N, \ldots, N\}` be the Fourier Series (FS) coefficients of a shifted Dirichlet kernel of period :math:`T`:
 
     .. math::
 
@@ -569,10 +539,7 @@ def fs_interp(x_FS, T, a, b, M, axis=-1, real_x=False):
        >>> diric_FS = np.exp(-1j * (2 * np.pi / T) * T_c * np.r_[-N:N+1])
 
 
-    Being bandlimited, we can use
-    :py:func:`~pypeline.util.math.fourier.fs_interp` to numerically evaluate
-    :math:`\phi(t)` on the interval
-    :math:`\left[ T_{c} - \frac{T}{2}, T_{c} + \frac{T}{2} \right]`.
+    Being bandlimited, we can use :py:func:`~pypeline.util.math.fourier.fs_interp` to numerically evaluate :math:`\phi(t)` on the interval :math:`\left[ T_{c} - \frac{T}{2}, T_{c} + \frac{T}{2} \right]`.
 
     .. doctest::
 
@@ -589,8 +556,7 @@ def fs_interp(x_FS, T, a, b, M, axis=-1, real_x=False):
        True
 
 
-    The Dirichlet kernel is real-valued, so we can set `real_x` to use the
-    accelerated algorithm instead:
+    The Dirichlet kernel is real-valued, so we can set `real_x` to use the accelerated algorithm instead:
 
     .. doctest::
 

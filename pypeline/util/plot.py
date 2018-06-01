@@ -79,8 +79,7 @@ def cmap(name, N=None):
     N : int, optional
         Number of color levels. (Default: all).
 
-        If `N` is smaller than the number of levels available in the colormap,
-        then the last `N` colors will be used.
+        If `N` is smaller than the number of levels available in the colormap, then the last `N` colors will be used.
 
     Returns
     -------

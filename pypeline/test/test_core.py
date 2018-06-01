@@ -28,8 +28,7 @@ class TestBlock:
 
     def test_concrete_instantiation(self):
         """
-        Blocks overloading :py:meth:`~pypeline.core.Block.__call__` can be
-        instantiated.
+        Blocks overloading :py:meth:`~pypeline.core.Block.__call__` can be instantiated.
         """
         class A(Block):
             def __call__(self):

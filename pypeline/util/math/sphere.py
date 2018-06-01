@@ -24,8 +24,7 @@ def ea_sample(N):
     Parameters
     ----------
     N : int
-        Order of the grid, i.e. there will be :math:`4 (N + 1)^{2}` points on
-        the sphere.
+        Order of the grid, i.e. there will be :math:`4 (N + 1)^{2}` points on the sphere.
 
     Returns
     -------
@@ -37,8 +36,7 @@ def ea_sample(N):
 
     Examples
     --------
-    Sampling a zonal function :math:`f(r): \mathbb{S}^{2} \to \mathbb{C}` of
-    order :math:`N` on the sphere:
+    Sampling a zonal function :math:`f(r): \mathbb{S}^{2} \to \mathbb{C}` of order :math:`N` on the sphere:
 
     .. testsetup::
 
@@ -70,15 +68,12 @@ def ea_sample(N):
 
     .. math::
 
-       \theta_{q} & = \frac{\pi}{2 N + 2} \left( q + \frac{1}{2} \right),
-       \qquad & q \in \{ 0, \ldots, 2 N + 1 \},
+       \theta_{q} & = \frac{\pi}{2 N + 2} \left( q + \frac{1}{2} \right), \qquad & q \in \{ 0, \ldots, 2 N + 1 \},
 
-       \phi_{l} & = \frac{2 \pi}{2N + 2} l,
-       \qquad & l \in \{ 0, \ldots, 2 N + 1 \}.
+       \phi_{l} & = \frac{2 \pi}{2N + 2} l, \qquad & l \in \{ 0, \ldots, 2 N + 1 \}.
 
 
-    .. [1] B. Rafaely, "Fundamentals of Spherical Array Processing",
-       Springer 2015
+    .. [1] B. Rafaely, "Fundamentals of Spherical Array Processing", Springer 2015
     """
     if N <= 0:
         raise ValueError('Parameter[N] must be non-negative.')
@@ -100,11 +95,7 @@ def ea_interp(q, l, f, N):
     r"""
     Interpolate an order-limited zonal function from Equal-Angle samples.
 
-    Computes :math:`f(r) = \sum_{q, l} \alpha_{q} f(r_{q, l}) K_{N}(\langle r,`
-    :math:`r_{q, l} \rangle)`, where :math:`r_{q, l} \in \mathbb{S}^{2}` are
-    points from an Equal-Angle sampling scheme, :math:`K_{N}(\cdot)` is the
-    spherical Dirichlet kernel of order :math:`N`, and the :math:`\alpha_{q}`
-    are scaling factors tailored to an Equal-Angle sampling scheme.
+    Computes :math:`f(r) = \sum_{q, l} \alpha_{q} f(r_{q, l}) K_{N}(\langle r, r_{q, l} \rangle)`, where :math:`r_{q, l} \in \mathbb{S}^{2}` are points from an Equal-Angle sampling scheme, :math:`K_{N}(\cdot)` is the spherical Dirichlet kernel of order :math:`N`, and the :math:`\alpha_{q}` are scaling factors tailored to an Equal-Angle sampling scheme.
 
     Parameters
     ----------
@@ -114,31 +105,24 @@ def ea_interp(q, l, f, N):
         (N_s,) azimuthal indices of an order-`N` Equal-Angle grid.
     f : array-like(float or complex)
         (N_s,) samples of the zonal function at data-points.
-        :math:`L`-dimensional zonal functions are also supported by supplying
-        an (N_s, L) array instead.
+        :math:`L`-dimensional zonal functions are also supported by supplying an (N_s, L) array instead.
     N : int
         Order of the reconstructed zonal function.
 
     Returns
     -------
     :py:obj:`~typing.Callable`
-        Function that outputs the value of :math:`f` at specified polar
-        coordinates :math:`\theta, \phi`.
+        Function that outputs the value of :math:`f` at specified polar coordinates :math:`\theta, \phi`.
 
     Examples
     --------
-    Let :math:`\gamma_{N}(r): \mathbb{S}^{2} \to \mathbb{R}` be the order-
-    :math:`N` approximation of :math:`\gamma(r) = \delta(r - r_{0})`:
+    Let :math:`\gamma_{N}(r): \mathbb{S}^{2} \to \mathbb{R}` be the order-:math:`N` approximation of :math:`\gamma(r) = \delta(r - r_{0})`:
 
     .. math::
 
-       \gamma_{N}(r) = \frac{N + 1}{4 \pi}
-                       \frac{P_{N + 1}(\langle r, r_{0} \rangle) -
-                             P_{N}(\langle r, r_{0} \rangle)}
-                            {\langle r, r_{0} \rangle -1}.
+       \gamma_{N}(r) = \frac{N + 1}{4 \pi} \frac{P_{N + 1}(\langle r, r_{0} \rangle) - P_{N}(\langle r, r_{0} \rangle)}{\langle r, r_{0} \rangle -1}.
 
-    As :math:`\gamma_{N}` is order-limited, it can be exactly reconstructed
-    from it's samples on an order-:math:`N` Equal-Angle grid:
+    As :math:`\gamma_{N}` is order-limited, it can be exactly reconstructed from it's samples on an order-:math:`N` Equal-Angle grid:
 
     .. testsetup::
 
@@ -178,11 +162,7 @@ def ea_interp(q, l, f, N):
 
     Notes
     -----
-    If :math:`f(r)` only takes non-negligeable values when :math:`r \in`
-    :math:`\mathcal{S} \subset \mathbb{S}^{2}`, then the runtime of
-    :py:func:`~pypeline.util.math.sphere.ea_interp` can be significantly
-    reduced by only supplying the triplets (`q`, `l`, `f`) that belong to
-    :math:`\mathcal{S}`.
+    If :math:`f(r)` only takes non-negligeable values when :math:`r \in \mathcal{S} \subset \mathbb{S}^{2}`, then the runtime of :py:func:`~pypeline.util.math.sphere.ea_interp` can be significantly reduced by only supplying the triplets (`q`, `l`, `f`) that belong to :math:`\mathcal{S}`.
     """
     theta_sph, phi_sph = ea_sample(N)
     _2N2 = theta_sph.size

@@ -25,14 +25,10 @@ def check(*args):
     """
     Validate function parameters using boolean tests.
 
-    It is common to check parameters for correctness before executing the
-    function/class to which they are bound using boolean tests.
-    :py:func:`~pypeline.util.argcheck.check` is a decorator that intercepts the
-    output of boolean functions and raises :py:exc:`ValueError` when the result
-    is :py:obj:`False`.
+    It is common to check parameters for correctness before executing the function/class to which they are bound using boolean tests.
+    :py:func:`~pypeline.util.argcheck.check` is a decorator that intercepts the output of boolean functions and raises :py:exc:`ValueError` when the result is :py:obj:`False`.
 
-    This function can be completely disabled by setting the
-    ``util.argcheck.check.ignore_checks`` flag to ``False``.
+    This function can be completely disabled by setting the ``util.argcheck.check.ignore_checks`` flag to ``False``.
 
     Parameters
     ----------
@@ -71,8 +67,7 @@ def check(*args):
        def is_str(obj):
            return isinstance(obj, str)
 
-    Suppose we have the following boolean functions to test an object for
-    similarity to the number 5:
+    Suppose we have the following boolean functions to test an object for similarity to the number 5:
 
     .. doctest::
 
@@ -85,8 +80,7 @@ def check(*args):
        >>> def is_str(obj):
        ...     return isinstance(obj, str)
 
-    When used in conjunction with :py:func:`~pypeline.util.argcheck.check`,
-    type-checking function parameters becomes possible:
+    When used in conjunction with :py:func:`~pypeline.util.argcheck.check`, type-checking function parameters becomes possible:
 
     .. doctest::
 
@@ -171,9 +165,7 @@ def allow_None(func):
     """
     Relax boolean function for :py:obj:`None` input.
 
-    A boolean function wrapped by
-    :py:func:`~pypeline.util.argcheck.allow_None` returns :py:obj:`True` if
-    it's input is :py:obj:`None`.
+    A boolean function wrapped by :py:func:`~pypeline.util.argcheck.allow_None` returns :py:obj:`True` if it's input is :py:obj:`None`.
 
     Parameters
     ----------
@@ -202,9 +194,7 @@ def allow_None(func):
        >>> allow_None(is_5)(None)
        True
 
-    When used in conjunction with :py:func:`~pypeline.util.argcheck.check`,
-    it is possible to type-check parameters having default arguments set to
-    :py:obj:`None`:
+    When used in conjunction with :py:func:`~pypeline.util.argcheck.check`, it is possible to type-check parameters having default arguments set to :py:obj:`None`:
 
     .. doctest::
 
@@ -283,8 +273,7 @@ def accept_any(*funcs):
        >>> accept_any(is_int, is_5)('5')  # fails both
        False
 
-    When used with :py:func:`~pypeline.util.argcheck.check`, a parameter
-    can be verified to satisfy one of several choices.
+    When used with :py:func:`~pypeline.util.argcheck.check`, a parameter  can be verified to satisfy one of several choices.
 
     .. doctest::
 
@@ -354,8 +343,7 @@ def require_all(*funcs):
        >>> require_all(is_int, is_5)(5)  # both pass
        True
 
-    When used with :py:func:`~pypeline.util.argcheck.check`, a parameter
-    can be verified to satisfy several functions simultaneously:
+    When used with :py:func:`~pypeline.util.argcheck.check`, a parameter can be verified to satisfy several functions simultaneously:
 
     .. doctest::
 
@@ -425,8 +413,7 @@ def is_instance(*klass):
        >>> is_instance(np.ndarray)([])
        False
 
-    When used with :py:func:`~pypeline.util.argcheck.check`, function
-    parameters can verified to be of a certain type:
+    When used with :py:func:`~pypeline.util.argcheck.check`, function parameters can verified to be of a certain type:
 
     .. doctest::
 
