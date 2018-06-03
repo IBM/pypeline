@@ -8,6 +8,8 @@
 1d functions not available in `SciPy <https://www.scipy.org/>`_.
 """
 
+import warnings
+
 import astropy.units as u
 import numpy as np
 import scipy.interpolate as interpolate
@@ -213,13 +215,18 @@ def sph_dirichlet(N, approx=False):
 
     @chk.check('x', chk.accept_any(chk.is_real, chk.has_reals))
     def exact_func(x):
-        x = np.array(x, copy=False, dtype=float)
+        if chk.is_scalar(x):
+            x = np.array([x], dtype=float)
+        else:
+            x = np.array(x, copy=False, dtype=float)
 
         if not np.all((-1 <= x) & (x <= 1)):
             raise ValueError('Parameter[x] must lie in [-1, 1].')
 
         amplitude = (sp.eval_legendre(N + 1, x) - sp.eval_legendre(N, x))
-        amplitude /= x - 1
+        with warnings.catch_warnings():
+            warnings.simplefilter(action='ignore', category=RuntimeWarning)
+            amplitude /= x - 1
         amplitude[np.isnan(amplitude)] = N + 1
 
         return amplitude
