@@ -5,7 +5,7 @@
 # #############################################################################
 
 """
-`NumPy <http://www.numpy.org/>`_-based objects for carrying datasets.
+Array-like objects for carrying datasets.
 """
 
 import numpy as np
@@ -15,9 +15,9 @@ import scipy.sparse as sparse
 import pypeline.util.argcheck as chk
 
 
-class LabeledArray:
+class LabeledMatrix:
     """
-    NumPy n-dimensional arrays with additional indexing data attached to each axis.
+    2D arrays with additional indexing data attached to each axis.
 
     Examples
     ---------
@@ -25,93 +25,83 @@ class LabeledArray:
 
        import numpy as np
        import pandas as pd
-       from pypeline.util.array import LabeledArray
+       from pypeline.util.array import LabeledMatrix
 
     .. doctest::
 
-       >>> A = LabeledArray(np.arange(5 * 3 * 4).reshape(5, 3, 4),
-       ...                  pd.Index(range(1, 6), name='speed'),
-       ...                  pd.Index(range(6, 9), name='force'),
-       ...                  pd.MultiIndex.from_arrays([np.arange(4), np.arange(1, 5)],
-       ...                                            names=('B', 'C')))
+       >>> A = LabeledMatrix(np.arange(5 * 3).reshape(5, 3),
+       ...                   pd.Index(range(0, 5), name='speed'),
+       ...                   pd.MultiIndex.from_arrays([np.arange(0, 3), np.arange(4, 7)],
+       ...                                             names=('B', 'C')))
 
-       >>> print(A.data)
-      [[[ 0  1  2  3]
-        [ 4  5  6  7]
-        [ 8  9 10 11]]
+       >>> A.data
+       array([[ 0,  1,  2],
+              [ 3,  4,  5],
+              [ 6,  7,  8],
+              [ 9, 10, 11],
+              [12, 13, 14]])
 
-       [[12 13 14 15]
-        [16 17 18 19]
-        [20 21 22 23]]
-
-       [[24 25 26 27]
-        [28 29 30 31]
-        [32 33 34 35]]
-
-       [[36 37 38 39]
-        [40 41 42 43]
-        [44 45 46 47]]
-
-       [[48 49 50 51]
-        [52 53 54 55]
-        [56 57 58 59]]]
-
-       >>> A.index[1]
-       RangeIndex(start=6, stop=9, step=1, name='force')
+       >>> A.index[0]
+       RangeIndex(start=0, stop=5, step=1, name='speed')
     """
 
-    @chk.check('data', chk.accept_any(chk.is_array_like,
-                                      chk.is_instance(sparse.spmatrix)))
-    def __init__(self, data, *args):
+    @chk.check(dict(data=chk.accept_any(chk.is_array_like,
+                                        chk.is_instance(sparse.spmatrix)),
+                    row_idx=chk.is_instance(pd.Index),
+                    col_idx=chk.is_instance(pd.Index)))
+    def __init__(self, data, row_idx, col_idx):
         """
         Parameters
         ----------
         data : array-like
-            (N, M, ...) dataset (any type).
-        *args : tuple(:py:class:`~pandas.Index` or :py:class:`~pandas.MultiIndex`)
-            Index for each dimension of `data`.
+            (N, M) dataset (any type). Sparse CSR/CSC matrices are also accepted.
+        row_idx : :py:class:`~pandas.Index`
+            Row index.
+        col_idx : :py:class:`~pandas.Index`
+            Column index.
         """
-        if chk.is_instance(sparse.spmatrix):
-            self._data = data
+        if chk.is_instance(sparse.spmatrix)(data):
+            self.__data = data
+
+            if not (sparse.isspmatrix_csc(self.__data) or
+                    sparse.isspmatrix_csr(self.__data)):
+                raise ValueError('Parameter[data] must be CSC/CSR-ordered.')
         else:
-            self._data = np.array(data)
-            self._data.setflags(write=False)
+            self.__data = np.array(data)
+            self.__data.setflags(write=False)
 
-        sh_data = self._data.shape
-        N_dim = len(sh_data)
+            if self.__data.ndim != 2:
+                raise ValueError('Parameter[data] must be 2D.')
 
-        if len(args) != N_dim:
-            raise ValueError(f'Parameter[data] is {N_dim}-dimensional, but '
-                             f'{len(args)} indices were provided.')
-
-        for i, index in enumerate(args):
-            if not chk.is_instance(pd.Index):
-                raise ValueError(f'The {i}-th element in Parameter[*args] '
-                                 f'is not an index.')
-
-            if len(index) != sh_data[i]:
-                raise ValueError(f'The {i}-th index in Parameter[*args] has '
-                                 f'{len(index)} elements, but '
-                                 f'{sh_data[i]} were expected.')
-
-        self._index = args
+        N, M = self.__data.shape
+        N_row, N_col = len(row_idx), len(col_idx)
+        if N_row != N:
+            raise ValueError(f'Parameter[row_idx] contains {N_row} entries, '
+                             f'but Parameter[data] expected {N}.')
+        if N_col != M:
+            raise ValueError(f'Parameter[col_idx] contains {N_col} entries, '
+                             f'but Parameter[data] expected {M}.')
+        self.__index = (row_idx.copy(), col_idx.copy())
 
     @property
     def data(self):
         """
         Returns
         -------
-        :py:class:`~numpy.ndarray`
-            (N, M, ...) dataset.
+        :py:class:`~numpy.ndarray` or :py:class:`~scipy.sparse.spmatrix`
+            (N, M) dataset.
         """
-        return self._data
+        return self.__data
 
     @property
     def index(self):
         """
         Returns
         -------
-        tuple(:py:class:`~pandas.Index` or :py:class:`~pandas.MultiIndex`)
-            Indexing structures per dimension of `data`.
+            row_idx : :py:class:`~pandas.Index`
+                (N,) row index.
+
+            col_idx : :py:class:`~pandas.Index`
+                (M,) column index.
         """
-        return self._index
+        return self.__index

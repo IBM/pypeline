@@ -13,7 +13,7 @@ pypeline.util.array
 
    .. autosummary::
    
-      LabeledArray
+      LabeledMatrix
    
    
 
