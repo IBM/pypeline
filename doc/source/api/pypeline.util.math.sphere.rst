@@ -13,6 +13,8 @@ pypeline.util.math.sphere
       cart2pol
       eq2cart
       pol2cart
+      eq2pol
+      pol2cart
       ea_interp
       ea_sample
 

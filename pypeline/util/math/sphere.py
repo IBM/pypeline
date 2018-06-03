@@ -241,6 +241,68 @@ def ea_interp(q, l, f, N):
 @chk.check(dict(r=chk.accept_any(chk.is_real, chk.has_reals),
                 theta=chk.accept_any(chk.is_angle, chk.has_angles),
                 phi=chk.accept_any(chk.is_angle, chk.has_angles)))
+def pol2eq(r, theta, phi):
+    """
+    Polar coordinates to Equatorial coordinates.
+
+    Parameters
+    ----------
+    r : float or array-like(float)
+        Radius.
+    theta : :py:class:`~astropy.units.Quantity`
+        Polar/Zenith angle.
+    phi : :py:class:`~astropy.units.Quantity`
+        Longitude angle.
+
+    Returns
+    -------
+    r : :py:class:`~numpy.ndarray`
+        Radius.
+
+    theta : :py:class:`~astropy.units.Quantity`
+        Elevation angle.
+
+    phi : :py:class:`~astropy.units.Quantity`
+        Longitude angle.
+    """
+    theta_eq = (90 * u.deg) - theta
+    return r, theta_eq, phi
+
+
+@chk.check(dict(r=chk.accept_any(chk.is_real, chk.has_reals),
+                theta=chk.accept_any(chk.is_angle, chk.has_angles),
+                phi=chk.accept_any(chk.is_angle, chk.has_angles)))
+def eq2pol(r, theta, phi):
+    """
+    Equatorial coordinates to Polar coordinates.
+
+    Parameters
+    ----------
+    r : float or array-like(float)
+        Radius.
+    theta : :py:class:`~astropy.units.Quantity`
+        Elevation angle.
+    phi : :py:class:`~astropy.units.Quantity`
+        Longitude angle.
+
+    Returns
+    -------
+    r : :py:class:`~numpy.ndarray`
+        Radius.
+
+    theta : :py:class:`~astropy.units.Quantity`
+        Polar/Zenith angle.
+
+    phi : :py:class:`~astropy.units.Quantity`
+        Longitude angle.
+    """
+    theta_pol = (90 * u.deg) - theta
+    return r, theta_pol, phi
+
+
+@chk.check(dict(r=chk.accept_any(chk.is_real, chk.has_reals),
+                theta=chk.accept_any(chk.is_angle, chk.has_angles),
+                phi=chk.accept_any(chk.is_angle, chk.has_angles)))
 def eq2cart(r, theta, phi):
     """
     Equatorial coordinates to Cartesian coordinates.
