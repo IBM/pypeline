@@ -5,15 +5,9 @@
 # #############################################################################
 
 """
-Instrument-related operations and configuration.
-
-.. todo::
-
-   * Add examples to illustrate usage of __init__() and __call__() methods;
-   * Implement MwaBlock(), AskapBlock().
+Instrument-related operations and geometry.
 """
 
-import collections.abc as abc
 import pathlib
 
 import astropy.coordinates as coord
@@ -26,107 +20,107 @@ import scipy.linalg as linalg
 
 import pypeline.core as core
 import pypeline.util.argcheck as chk
+import pypeline.util.array as array
+import pypeline.util.math.linalg as pylinalg
+import pypeline.util.math.sphere as sph
 
 
-class StationConfig:
+def is_antenna_index(x):
     """
-    Configuration data of a single phased-array station.
+    Return :py:obj:`True` if `x` is a valid antenna index.
 
-    A phased-array station consists of a collection of antennas and provides
-    the following information:
+    A valid antenna index is a :py:class:`~pandas.MultiIndex` having columns
 
-    * Station name;
-    * Antenna identifiers;
-    * Antenna coordinates: specified w.r.t an absolute or relative reference
-      frame. (Typically specified by the object's creator.);
-    * (More stuff in the future.)
+    * STATION_ID : int
+    * ANTENNA_ID : int
+    """
+    if chk.is_instance(pd.MultiIndex)(x):
+        col_names = ('STATION_ID', 'ANTENNA_ID')
+        if tuple(x.names) == col_names:
+            for col in col_names:
+                ids = x.get_level_values(col).values
+                if not chk.has_integers(ids):
+                    return False
+            return True
+
+    return False
+
+
+def _as_InstrumentGeometry(df):
+    inst_geom = InstrumentGeometry(xyz=df.values,
+                                   ant_idx=df.index)
+    return inst_geom
+
+
+class InstrumentGeometry(array.LabeledMatrix):
+    """
+    Position of antennas in a particular reference frame.
 
     Examples
     --------
     .. testsetup::
 
-       from pypeline.phased_array.instrument import StationConfig
        import numpy as np
+       import pandas as pd
+       from pypeline.phased_array.instrument import InstrumentGeometry
+
 
     .. doctest::
 
-       >>> cfg = StationConfig(name=0,
-       ...                     antenna_ids=range(5),
-       ...                     antenna_xyz=np.arange(3 * 5).reshape(3, 5))
+       >>> geometry = InstrumentGeometry(xyz=np.arange(6 * 3).reshape(6, 3),
+       ...                               ant_idx=pd.MultiIndex.from_product(
+       ...                                   [range(3), range(2)],
+       ...                                   names=['STATION_ID', 'ANTENNA_ID']))
 
-       >>> cfg.name
-       0
+       >>> geometry.data
+       array([[ 0,  1,  2],
+              [ 3,  4,  5],
+              [ 6,  7,  8],
+              [ 9, 10, 11],
+              [12, 13, 14],
+              [15, 16, 17]])
 
-       >>> cfg.antenna_ids
-      array([0, 1, 2, 3, 4])
-
-       >>> cfg.xyz
-       array([[ 0.,  1.,  2.,  3.,  4.],
-              [ 5.,  6.,  7.,  8.,  9.],
-              [10., 11., 12., 13., 14.]])
+       >>> geometry.index[0]
+       MultiIndex(levels=[[0, 1, 2], [0, 1]],
+                  labels=[[0, 0, 1, 1, 2, 2], [0, 1, 0, 1, 0, 1]],
+                  names=['STATION_ID', 'ANTENNA_ID'])
     """
 
-    @chk.check(dict(name=chk.is_integer,
-                    antenna_ids=chk.has_integers,
-                    antenna_xyz=chk.has_reals))
-    def __init__(self, name, antenna_ids, antenna_xyz):
+    @chk.check(dict(xyz=chk.has_reals,
+                    ant_idx=is_antenna_index))
+    def __init__(self, xyz, ant_idx):
         """
         Parameters
         ----------
-        name : int
-            Name of the station.
-        antenna_ids : array-like(int)
-            (N_antenna,) names of the individual antennas.
-        antenna_xyz : array-like(float)
-            (3, N_antenna) Cartesian coordinates of antennas.
+        xyz : :py:class:`~numpy.ndarray`
+            (N_antenna, 3) Cartesian coordinates.
+        ant_idx : :py:class:`~pandas.MultiIndex`
+            (N_antenna,) index.
         """
-        self.__name = name
+        xyz = np.array(xyz, copy=False)
+        N_antenna = len(xyz)
+        if not chk.has_shape((N_antenna, 3))(xyz):
+            raise ValueError('Parameter[xyz] must be a (N_antenna, 3) array.')
 
-        antenna_ids = np.array(antenna_ids, dtype=int)
-        N_antenna = antenna_ids.size
-        if not chk.has_shape((N_antenna,))(antenna_ids):
-            raise ValueError('Parameter[antenna_ids] must be 1-dimensional.')
-        if np.unique(antenna_ids).size != N_antenna:
-            raise ValueError('Parameter[antenna_ids] does not contain unique '
-                             'names.')
-        self.__antenna_ids = antenna_ids
-        self.__antenna_ids.setflags(write=False)
+        N_idx = len(ant_idx)
+        if N_idx != N_antenna:
+            raise ValueError('Parameter[xyz] and Parameter[ant_idx] are not '
+                             'compatible.')
 
-        if not chk.has_shape((3, N_antenna))(antenna_xyz):
-            raise ValueError('Lengths of Parameter[antenna_xyz] and '
-                             'Parameter[antenna_ids] are not compatible.')
-        self.__antenna_xyz = np.array(antenna_xyz, dtype=float)
-        self.__antenna_xyz.setflags(write=False)
+        col_idx = pd.Index(['X', 'Y', 'Z'], name='COORDINATE')
+        super().__init__(xyz, ant_idx, col_idx)
 
-    @property
-    def name(self):
+    def as_frame(self):
         """
         Returns
         -------
-        str
-            Name of the station.
+        :py:class:`~pandas.DataFrame`
+            (N_antenna, 3) view of coordinates.
         """
-        return self.__name
-
-    @property
-    def antenna_ids(self):
-        """
-        Returns
-        -------
-        :py:class:`~numpy.ndarray`
-            (N_antenna,) names of the individual antennas.
-        """
-        return self.__antenna_ids
-
-    @property
-    def xyz(self):
-        """
-        Returns
-        -------
-        :py:class:`~numpy.ndarray`
-            (3, N_antenna) Cartesian coordinates of antennas.
-        """
-        return self.__antenna_xyz
+        df = pd.DataFrame(data=self.data,
+                          index=self.index[0],
+                          columns=self.index[1].values)
+        return df
 
     @chk.check('title', chk.is_instance(str))
     def draw(self, title=''):
@@ -149,233 +143,20 @@ class StationConfig:
 
            import plotly.offline as py
 
-           cfg = StationConfig(name=0,
-                               antenna_ids=range(5),
-                               antenna_xyz=np.arange(3 * 5).reshape(3, 5))
+           cfg = InstrumentGeometry(xyz=np.random.randn(6, 3),
+                                    ant_idx=pd.MultiIndex.from_product(
+                                        [range(3), range(2)],
+                                        names=['STATION_ID', 'ANTENNA_ID']))
 
-           fig = cfg.draw(title='Linear Station Geometry')
+           fig = cfg.draw(title='Random Array')
            py.plot(fig)
 
         Notes
         -----
-        For visualization purposes, the station's center of gravity is mappped
-        to the origin.
+        For visualization purposes, the instrument's center of gravity is mapped to the origin.
         """
         # Cartesian Axes
-        arm_length = np.std(self.xyz, axis=1).max()
-        frame_trace = go.Scatter3d(hoverinfo='text+name',
-                                   line={'width': 6},
-                                   marker={'color': 'rgb(0,0.5,0)'},
-                                   mode='lines+markers+text',
-                                   name='Reference Frame',
-                                   text=['X', 'O', 'Y', 'O', 'Z'],
-                                   textfont={'color': 'black'},
-                                   textposition='middle center',
-                                   x=[arm_length, 0, 0, 0, 0],
-                                   y=[0, 0, arm_length, 0, 0],
-                                   z=[0, 0, 0, 0, arm_length])
-
-        # Station Layout
-        X, Y, Z = self.xyz - self.xyz.mean(axis=1, keepdims=True)
-        labels = [f'antenna {_}' for _ in self.antenna_ids]
-        station_trace = go.Scatter3d(hoverinfo='text+name',
-                                     marker={'size': 2},
-                                     mode='markers',
-                                     name=f'station {self.name}',
-                                     text=labels,
-                                     x=X,
-                                     y=Y,
-                                     z=Z)
-
-        # Merge traces
-        data = go.Data([frame_trace, station_trace])
-        layout = go.Layout(scene={'aspectmode': 'data',
-                                  'camera': {'eye': {'x': 1.25,
-                                                     'y': 1.25,
-                                                     'z': 1.25}},
-                                  'xaxis': {'title': 'X [m]'},
-                                  'yaxis': {'title': 'Y [m]'},
-                                  'zaxis': {'title': 'Z [m]'}},
-                           title=title)
-
-        fig = go.Figure(data=data, layout=layout)
-        return fig
-
-
-class InstrumentConfig:
-    """
-    Configuration data for an entire instrument.
-
-    A phased-array instrument consists of a collection of
-    :py:class:`~pypeline.phased_array.instrument.StationConfig` objects and
-    provides the following information:
-
-    * Instrument name;
-    * Access to individual station data.
-
-    Examples
-    --------
-    .. testsetup::
-
-       from pypeline.phased_array.instrument import (StationConfig,
-                                                     InstrumentConfig)
-       import numpy as np
-
-    .. doctest::
-
-       >>> st_cfgs = []
-       >>> for i in range(5):
-       ...     name = i
-       ...     antenna_ids = np.arange(i, i + 4)
-       ...     antenna_xyz = i + np.arange(3 * 4).reshape(3, 4)
-       ...
-       ...     st_cfgs.append(StationConfig(name, antenna_ids, antenna_xyz))
-
-       >>> inst_cfg = InstrumentConfig(name='instrument',
-       ...                             station_configs=st_cfgs)
-
-       >>> inst_cfg.name
-       'instrument'
-
-       # Get the antenna identifiers of station '3'
-       >>> inst_cfg.station[3].antenna_ids
-       array([3, 4, 5, 6])
-
-       # Get the antenna coordinataes of station '3'
-       >>> inst_cfg.station[3].xyz
-       array([[ 3.,  4.,  5.,  6.],
-              [ 7.,  8.,  9., 10.],
-              [11., 12., 13., 14.]])
-
-       # Get the positions of all antennas.
-       >>> inst_cfg.xyz.T
-       array([[ 0.,  4.,  8.],
-              [ 1.,  5.,  9.],
-              [ 2.,  6., 10.],
-              [ 3.,  7., 11.],
-              [ 1.,  5.,  9.],
-              [ 2.,  6., 10.],
-              [ 3.,  7., 11.],
-              [ 4.,  8., 12.],
-              [ 2.,  6., 10.],
-              [ 3.,  7., 11.],
-              [ 4.,  8., 12.],
-              [ 5.,  9., 13.],
-              [ 3.,  7., 11.],
-              [ 4.,  8., 12.],
-              [ 5.,  9., 13.],
-              [ 6., 10., 14.],
-              [ 4.,  8., 12.],
-              [ 5.,  9., 13.],
-              [ 6., 10., 14.],
-              [ 7., 11., 15.]])
-    """
-
-    @chk.check(dict(name=chk.is_instance(str),
-                    station_configs=chk.is_instance(abc.Collection)))
-    def __init__(self, name, station_configs):
-        """
-        Parameters
-        ----------
-        name : str
-            Name of the instrument.
-        station_configs : list( :py:class:`~pypeline.phased_array.instrument.StationConfig`)
-            (N_station,) configs of the instrument's stations.
-        """
-        self.__name = name
-
-        for station in station_configs:
-            if not chk.is_instance(StationConfig)(station):
-                raise ValueError('Parameter[station_configs] must only '
-                                 'contain StationConfigs.')
-        self.__station_configs = {_.name: _ for _ in station_configs}
-
-        if len(self.__station_configs) != len(station_configs):
-            raise ValueError('All stations in Parameter[station_configs] must '
-                             'have unique names.')
-
-        # Buffered attributes
-        self.__xyz = None
-
-    @property
-    def name(self):
-        """
-        Returns
-        -------
-        str
-            Name of instrument.
-        """
-        return self.__name
-
-    @property
-    def station(self):
-        """
-        Returns
-        -------
-        dict(int, :py:class:`~pypeline.phased_array.instrument.StationConfig`)
-            Station name -> station data mapping.
-        """
-        return self.__station_configs
-
-    @property
-    def xyz(self):
-        """
-        Returns
-        -------
-        :py:class:`~numpy.ndarray`
-            (3, N_antenna) Cartesian coordinates of all antennas in the
-            instrument, sorted by ascending lexicographic station name.
-        """
-        if self.__xyz is None:
-            station_names = sorted(self.station.keys())
-            antenna_xyz = [self.station[_].xyz for _ in station_names]
-            self.__xyz = np.concatenate(antenna_xyz, axis=1)
-            self.__xyz.setflags(write=False)
-
-        return self.__xyz
-
-    @chk.check('title', chk.is_instance(str))
-    def draw(self, title=''):
-        """
-        Plot antenna coordinates from all stations in 3D.
-
-        Parameters
-        ----------
-        title : str
-            Title of the graph. (Default = '')
-
-        Returns
-        -------
-        :py:class:`plotly.graph_objs.Figure`
-            3D Figure.
-
-        Examples
-        --------
-        .. doctest::
-
-           import plotly.offline as py
-
-           st_cfgs = []
-           for i in range(5):
-               name = i
-               antenna_ids = np.arange(i, i + 4)
-               antenna_xyz = i + np.random.rand(3, 4)
-
-               st_cfgs.append(StationConfig(name, antenna_ids, antenna_xyz))
-
-           inst_cfg = InstrumentConfig(name='instrument',
-                                       station_configs=st_cfgs)
-
-           fig = inst_cfg.draw(title='Microphone Array')
-           py.plot(fig)
-
-        Notes
-        -----
-        For visualization purposes, the instrument's center of gravity is
-        mapped to the origin.
-        """
-        # Cartesian Axes
-        arm_length = np.std(self.xyz, axis=1).max()
+        arm_length = np.std(self.data, axis=0).max()
         frame_trace = go.Scatter3d(hoverinfo='text+name',
                                    line={'width': 6},
                                    marker={'color': 'rgb(0,0.5,0)'},
@@ -389,15 +170,19 @@ class InstrumentConfig:
                                    z=[0, 0, 0, 0, arm_length])
 
         # Instrument Layout
+        df = self.as_frame()
+        df = df - df.mean()
         instrument_trace = []
-        cog = np.mean(self.xyz, axis=1, keepdims=True)
-        for station in self.station.values():
-            X, Y, Z = station.xyz - cog
-            labels = [f'antenna {_}' for _ in station.antenna_ids]
+        for station_id, station in df.groupby(level='STATION_ID'):
+            X, Y, Z = station.values.T
+
+            antenna_id = station.index.get_level_values('ANTENNA_ID')
+            labels = [f'antenna {_}' for _ in antenna_id]
+
             station_trace = go.Scatter3d(hoverinfo='text+name',
                                          marker={'size': 2},
                                          mode='markers',
-                                         name=f'station {station.name}',
+                                         name=f'station {station_id}',
                                          text=labels,
                                          x=X,
                                          y=Y,
@@ -418,82 +203,37 @@ class InstrumentConfig:
         return fig
 
 
-@chk.check(dict(name=chk.is_instance(str),
-                layout=chk.is_instance(pd.DataFrame)))
-def _as_InstrumentConfig(name, layout):
-    """
-    Transform :py:class:`~pandas.DataFrame` to
-    :py:class:`~pypeline.phased_array.instrument.InstrumentConfig` format.
-
-    Parameters
-    ----------
-    name : str
-        Name of the instrument.
-    layout : :py:class:`~pandas.DataFrame`
-        Must have same format as the `__layout` attribute from
-        :py:class:`~pypeline.phased_array.instrument.CoordinateComputerBlock`.
-
-    Returns
-    -------
-    :py:class:`~pypeline.phased_array.instrument.InstrumentConfig`
-    """
-    station_cfg = []
-    for station_name, station_layout in layout.groupby(level='STATION_NAME'):
-        antenna_ids = (station_layout
-                       .index
-                       .get_level_values('ANTENNA_ID')
-                       .tolist())
-        antenna_xyz = station_layout.values.T
-        cfg = StationConfig(station_name, antenna_ids, antenna_xyz)
-
-        station_cfg.append(cfg)
-
-    inst_cfg = InstrumentConfig(name, station_cfg)
-    return inst_cfg
-
-
-class CoordinateComputerBlock(core.Block):
+class InstrumentGeometryBlock(core.Block):
     """
     Compute antenna positions.
     """
 
-    @chk.check(dict(inst_config=chk.is_instance(InstrumentConfig),
+    @chk.check(dict(inst_geom=chk.is_instance(InstrumentGeometry),
                     N_station=chk.allow_None(chk.is_integer)))
-    def __init__(self, inst_config, N_station=None):
+    def __init__(self, inst_geom, N_station=None):
         """
         Parameters
         ----------
-        inst_config : :py:class:`~pypeline.phased_array.instrument.InstrumentConfig`
+        inst_geom : :py:class:`~pypeline.phased_array.instrument.InstrumentGeometry`
             Instrument geometry.
         N_station : int
             Number of stations to use. (Default = all)
 
             Sometimes only a subset of an instrument's stations are desired.
-            Setting `N_station` limits the number of stations to those that
-            lexicographically appear first in `inst_config`.
+            Setting `N_station` limits the number of stations to those that appear first in `inst_geom` when sorted by STATION_ID.
         """
         super().__init__()
-
         if N_station is not None:
             if N_station < 1:
                 raise ValueError('Parameter[N_station] must be positive.')
 
-        if N_station is None:
-            valid_station = sorted(inst_config.station.keys())
-        else:
-            valid_station = sorted(inst_config.station.keys())[:N_station]
+        self._layout = inst_geom.as_frame()
 
-        station_xyz = {}
-        for station in inst_config.station.values():
-            if station.name in valid_station:
-                df = pd.DataFrame(data=station.xyz.T,
-                                  columns=('X', 'Y', 'Z'),
-                                  index=pd.Index(station.antenna_ids,
-                                                 name='ANTENNA_ID'))
-                station_xyz[station.name] = df
-
-        self._layout = pd.concat(station_xyz, names=('STATION_NAME',
-                                                     'ANTENNA_ID'))
+        if N_station is not None:
+            stations = np.unique(inst_geom
+                                 .index[0]
+                                 .get_level_values('STATION_ID'))[:N_station]
+            self._layout = self._layout.loc[stations]
 
     def __call__(self, *args, **kwargs):
         """
@@ -505,55 +245,50 @@ class CoordinateComputerBlock(core.Block):
             Positional arguments.
         **kwargs
             Keyword arguments.
-
         Returns
         -------
-        :py:class:`~pypeline.phased_array.instrument.InstrumentConfig`
-            Instrument configuration.
+        :py:class:`~pypeline.phased_array.instrument.InstrumentGeometry`
+            Instrument geometry.
         """
         raise NotImplementedError
 
 
-class StationaryArrayCoordinateComputerBlock(CoordinateComputerBlock):
+class StationaryInstrumentGeometryBlock(InstrumentGeometryBlock):
     """
-    Sub-class specialized in instruments that are stationary, i.e. that do not
-    move with time.
+    Sub-class specialized in instruments that are stationary, i.e. that do not move with time.
     """
 
-    @chk.check(dict(inst_config=chk.is_instance(InstrumentConfig),
+    @chk.check(dict(inst_geom=chk.is_instance(InstrumentGeometry),
                     N_station=chk.allow_None(chk.is_integer)))
-    def __init__(self, inst_config, N_station=None):
+    def __init__(self, inst_geom, N_station=None):
         """
         Parameters
         ----------
-        inst_config : :py:class:`~pypeline.phased_array.instrument.InstrumentConfig`
+        inst_geom : :py:class:`~pypeline.phased_array.instrument.InstrumentGeometry`
             Instrument geometry.
         N_station : int
             Number of stations to use. (Default = all)
 
             Sometimes only a subset of an instrument's stations are desired.
-            Setting `N_station` limits the number of stations to those that
-            lexicographically appear first in `inst_config`.
+            Setting `N_station` limits the number of stations to those that appear first in `inst_geom` when sorted by STATION_ID.
         """
-        super().__init__(inst_config, N_station)
+        super().__init__(inst_geom, N_station)
 
     def __call__(self):
         """
         Determine instrument antenna positions.
 
-        As the instrument's configuration does not change through time,
-        :py:func:`~pypeline.phased_array.instrument.StationaryArrayCoordinateComputerBlock.__call__`
-        always returns the same object.
+        As the instrument's geometry does not change through time, :py:func:`~pypeline.phased_array.instrument.StationaryInstrumentGeometryBlock.__call__` always returns the same object.
 
         Returns
         -------
-        :py:class:`~pypeline.phased_array.instrument.InstrumentConfig`
-            Instrument configuration.
+        :py:class:`~pypeline.phased_array.instrument.InstrumentGeometry`
+            Instrument geometry.
         """
-        return _as_InstrumentConfig('', self._layout)
+        return _as_InstrumentGeometry(self._layout)
 
 
-class PyramicBlock(StationaryArrayCoordinateComputerBlock):
+class PyramicBlock(StationaryInstrumentGeometryBlock):
     """
     Pyramic 48-element 3D microphone array.
     """
@@ -562,16 +297,16 @@ class PyramicBlock(StationaryArrayCoordinateComputerBlock):
         """
 
         """
-        inst_config = self._get_config()
-        super().__init__(inst_config)
+        inst_geom = self._get_geometry()
+        super().__init__(inst_geom)
 
-    def _get_config(self):
+    def _get_geometry(self):
         """
-        Generate instrument configuration.
+        Generate instrument geometry.
 
         Returns
         -------
-        :py:class:`pypeline.phased_array.instrument.InstrumentConfig`
+        :py:class:`~pypeline.phased_array.instrument.InstrumentGeometry`
         """
         x = 0.27 + 2 * 0.015  # length of one side
         c1, c2, c3, c4 = 1 / np.sqrt(3), np.sqrt(2 / 3), np.sqrt(3) / 6, 0.5
@@ -599,20 +334,14 @@ class PyramicBlock(StationaryArrayCoordinateComputerBlock):
         # Reference point is 1cm below zero-th microphone
         coordinates[:, 2] += 0.01 - coordinates[0, 2]
 
-        station_cfgs = []
-        for i, xyz in enumerate(coordinates):
-            station_name = i
-            antenna_ids = [0]
-            antenna_xyz = xyz.reshape(3, 1)
-
-            cfg = StationConfig(station_name, antenna_ids, antenna_xyz)
-            station_cfgs.append(cfg)
-
-        inst_cfg = InstrumentConfig('Pyramic', station_cfgs)
-        return inst_cfg
+        N_mic = len(coordinates)
+        idx = pd.MultiIndex.from_product([range(N_mic), range(1)],
+                                         names=['STATION_ID', 'ANTENNA_ID'])
+        inst_geom = InstrumentGeometry(coordinates, idx)
+        return inst_geom
 
 
-class CompactSixBlock(StationaryArrayCoordinateComputerBlock):
+class CompactSixBlock(StationaryInstrumentGeometryBlock):
     """
     Compact-Six 6-element ring microphone array.
     """
@@ -621,16 +350,16 @@ class CompactSixBlock(StationaryArrayCoordinateComputerBlock):
         """
 
         """
-        inst_config = self._get_config()
-        super().__init__(inst_config)
+        inst_geom = self._get_geometry()
+        super().__init__(inst_geom)
 
-    def _get_config(self):
+    def _get_geometry(self):
         """
-        Generate instrument configuration.
+        Generate instrument geometry.
 
         Returns
         -------
-        :py:class:`pypeline.phased_array.instrument.InstrumentConfig`
+        :py:class:`~pypeline.phased_array.instrument.InstrumentGeometry`
         """
         N_mic = 6
         radius = 0.0675
@@ -640,41 +369,32 @@ class CompactSixBlock(StationaryArrayCoordinateComputerBlock):
                                          np.sin(angle),
                                          np.zeros(N_mic)), axis=1)
 
-        station_cfgs = []
-        for i, xyz in enumerate(coordinates):
-            station_name = i
-            antenna_ids = [0]
-            antenna_xyz = xyz.reshape(3, 1)
-
-            cfg = StationConfig(station_name, antenna_ids, antenna_xyz)
-            station_cfgs.append(cfg)
-
-        inst_cfg = InstrumentConfig('CompactSix', station_cfgs)
-        return inst_cfg
+        idx = pd.MultiIndex.from_product([range(N_mic), range(1)],
+                                         names=['STATION_ID', 'ANTENNA_ID'])
+        inst_geom = InstrumentGeometry(coordinates, idx)
+        return inst_geom
 
 
-class EarthBoundArrayCoordinateComputerBlock(CoordinateComputerBlock):
+class EarthBoundInstrumentGeometryBlock(InstrumentGeometryBlock):
     """
-    Sub-class specialized in instruments that move with the Earth, such as
-    radio telescopes.
+    Sub-class specialized in instruments that move with the Earth, such as radio telescopes.
     """
 
-    @chk.check(dict(inst_config=chk.is_instance(InstrumentConfig),
+    @chk.check(dict(inst_geom=chk.is_instance(InstrumentGeometry),
                     N_station=chk.allow_None(chk.is_integer)))
-    def __init__(self, inst_config, N_station=None):
+    def __init__(self, inst_geom, N_station=None):
         """
         Parameters
         ----------
-        inst_config : :py:class:`~pypeline.phased_array.instrument.InstrumentConfig`
+        inst_geom : :py:class:`~pypeline.phased_array.instrument.InstrumentGeometry`
             ITRS instrument geometry.
         N_station : int
             Number of stations to use. (Default = all)
 
-            Sometimes only a subset of an instrument's stations are desired.
-            Setting `N_station` limits the number of stations to those that
-            lexicographically appear first in `inst_config`.
+            Sometimes only a subset of an instrument’s stations are desired.
+            Setting `N_station` limits the number of stations to those that appear first in `inst_geom` when sorted by STATION_ID.
         """
-        super().__init__(inst_config, N_station)
+        super().__init__(inst_geom, N_station)
 
     @chk.check('time', chk.is_instance(time.Time))
     def __call__(self, time):
@@ -688,8 +408,8 @@ class EarthBoundArrayCoordinateComputerBlock(CoordinateComputerBlock):
 
         Returns
         -------
-        :py:class:`~pypeline.phased_array.instrument.InstrumentConfig`
-            ICRS instrument configuration.
+        :py:class:`~pypeline.phased_array.instrument.InstrumentGeometry`
+            ICRS instrument geometry.
         """
         layout = self._layout.loc[:, ['X', 'Y', 'Z']].values.T
         r = linalg.norm(layout, axis=0)
@@ -703,17 +423,14 @@ class EarthBoundArrayCoordinateComputerBlock(CoordinateComputerBlock):
         icrs_layout = pd.DataFrame(data=icrs_position.T,
                                    index=self._layout.index,
                                    columns=('X', 'Y', 'Z'))
-        return _as_InstrumentConfig('', icrs_layout)
+        return _as_InstrumentGeometry(icrs_layout)
 
 
-class LofarBlock(EarthBoundArrayCoordinateComputerBlock):
+class LofarBlock(EarthBoundInstrumentGeometryBlock):
     """
-    LOw-Frequency ARray (LOFAR) located in Europe: lofar_.
+    `LOw-Frequency ARray (LOFAR) <http://www.lofar.org/>`_ located in Europe.
 
-    This LOFAR model consists of 62 stations, each containing between 17 to 24
-    HBA dipole antennas.
-
-    .. _lofar: http://www.lofar.org/
+    This LOFAR model consists of 62 stations, each containing between 17 to 24 HBA dipole antennas.
     """
 
     @chk.check('N_station', chk.allow_None(chk.is_integer))
@@ -724,28 +441,113 @@ class LofarBlock(EarthBoundArrayCoordinateComputerBlock):
         N_station : int
             Number of stations to use. (Default = all)
 
-            Sometimes only a subset of an instrument's stations are desired.
-            Setting `N_station` limits the number of stations to those that
-            lexicographically appear first in `inst_config`.
+            Sometimes only a subset of an instrument’s stations are desired.
+            Setting `N_station` limits the number of stations to those that appear first in `inst_geom` when sorted by STATION_ID.
         """
-        inst_cfg = self._get_config()
-        super().__init__(inst_cfg, N_station)
+        inst_geom = self._get_geometry()
+        super().__init__(inst_geom, N_station)
 
-    def _get_config(self):
+    def _get_geometry(self):
         """
-        Load instrument configuration.
+        Load instrument geometry.
 
         Returns
         -------
-        :py:class:`pypeline.phased_array.instrument.InstrumentConfig`
+        :py:class:`~pypeline.phased_array.instrument.InstrumentGeometry`
             ITRS instrument geometry.
         """
         rel_path = pathlib.Path('data', 'phased_array',
                                 'instrument', 'LOFAR.csv')
         abs_path = pkg.resource_filename('pypeline', str(rel_path))
 
-        itrs_cfg = (pd.read_csv(abs_path)
-                    .set_index(['STATION_NAME', 'ANTENNA_ID']))
+        itrs_geom = (pd.read_csv(abs_path)
+                     .set_index(['STATION_ID', 'ANTENNA_ID']))
 
-        inst_cfg = _as_InstrumentConfig('LOFAR', itrs_cfg)
-        return inst_cfg
+        inst_geom = _as_InstrumentGeometry(itrs_geom)
+        return inst_geom
+
+
+class MwaBlock(EarthBoundInstrumentGeometryBlock):
+    """
+    `Murchison Widefield Array (MWA) <http://www.mwatelescope.org/>`_ located in Australia.
+
+    MWA consists of 128 stations, each containing 16 dipole antennas.
+    """
+
+    @chk.check(dict(N_station=chk.allow_None(chk.is_integer),
+                    station_only=chk.is_boolean))
+    def __init__(self, N_station=None, station_only=False):
+        """
+        Parameters
+        ----------
+        N_station : int
+            Number of stations to use. (Default = all)
+
+            Sometimes only a subset of an instrument’s stations are desired.
+            Setting `N_station` limits the number of stations to those that appear first in `inst_geom` when sorted by STATION_ID.
+
+        station_only : bool
+            If :py:obj:`True`, model MWA stations as single-element antennas. (Default = False)
+        """
+        inst_geom = self._get_geometry(station_only)
+        super().__init__(inst_geom, N_station)
+
+    def _get_geometry(self, station_only):
+        """
+        Load instrument geometry.
+
+        Parameters
+        ----------
+        station_only : bool
+            If :py:obj:`True`, model stations as single-element antennas.
+
+        Returns
+        -------
+        :py:class:`~pypeline.phased_array.instrument.InstrumentGeometry`
+            ITRS instrument geometry.
+        """
+        rel_path = pathlib.Path('data', 'phased_array',
+                                'instrument', 'MWA.csv')
+        abs_path = pkg.resource_filename('pypeline', str(rel_path))
+
+        itrs_geom = (pd.read_csv(abs_path)
+                     .set_index('STATION_ID'))
+
+        station_id = itrs_geom.index.get_level_values('STATION_ID')
+        if station_only:
+            itrs_geom.index = (pd.MultiIndex
+                .from_product(
+                [station_id, [0]],
+                names=['STATION_ID', 'ANTENNA_ID']))
+        else:
+            # Generate flat 4x4 antenna grid pointing towards the Noth pole.
+            x_lim = y_lim = 1.65
+            lY, lX = np.meshgrid(np.linspace(-y_lim, y_lim, 4),
+                                 np.linspace(-x_lim, x_lim, 4),
+                                 indexing='ij')
+            l = np.stack((lX, lY, np.zeros((4, 4))), axis=0)
+
+            # For each station: rotate 4x4 array to lie on the sphere's surface.
+            xyz_station = itrs_geom.loc[:, ['X', 'Y', 'Z']].values
+            df_stations = []
+            for st_id, st_cog in zip(station_id, xyz_station):
+                _, st_colat, st_lon = sph.cart2pol(*st_cog)
+                st_cog_unit = sph.pol2cart(1, st_colat, st_lon).reshape(-1)
+
+                R_1 = pylinalg.rot([0, 0, 1], st_lon)
+                R_2 = pylinalg.rot(axis=np.cross([0, 0, 1], st_cog_unit),
+                                   angle=st_colat)
+                R = R_2 @ R_1
+
+                st_layout = np.reshape(st_cog.reshape(3, 1, 1) +
+                                       np.tensordot(R, l, axes=1), (3, -1))
+                idx = (pd.MultiIndex
+                       .from_product([[st_id], range(16)],
+                                     names=['STATION_ID', 'ANTENNA_ID']))
+                df_stations += [pd.DataFrame(data=st_layout.T,
+                                             index=idx,
+                                             columns=['X', 'Y', 'Z'])]
+            itrs_geom = pd.concat(df_stations)
+
+        inst_geom = _as_InstrumentGeometry(itrs_geom)
+        return inst_geom

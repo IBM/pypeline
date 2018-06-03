@@ -6,21 +6,23 @@ pypeline.phased\_array.instrument
    
    
    
+   .. rubric:: Functions
 
+
+   .. autosummary::
+
+      is_antenna_index
    
    
    .. rubric:: Classes
 
    .. autosummary::
 
-      StationConfig
-      InstrumentConfig
-      CoordinateComputerBlock
-      StationaryArrayCoordinateComputerBlock
-      CompactSixBlock
+      InstrumentGeometry
+      InstrumentGeometryBlock
+      StationaryInstrumentGeometryBlock
       PyramicBlock
-      EarthBoundArrayCoordinateComputerBlock
+      CompactSixBlock
+      EarthBoundInstrumentGeometryBlock
       LofarBlock
-
-   
-   
+      MwaBlock
