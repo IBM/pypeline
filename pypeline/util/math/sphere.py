@@ -90,8 +90,9 @@ def ea_sample(N):
 @chk.check(dict(q=chk.has_integers,
                 l=chk.has_integers,
                 f=chk.accept_any(chk.has_reals, chk.has_complex),
-                N=chk.is_integer))
-def ea_interp(q, l, f, N):
+                N=chk.is_integer,
+                approximate_kernel=chk.is_boolean))
+def ea_interp(q, l, f, N, approximate_kernel=False):
     r"""
     Interpolate an order-limited zonal function from Equal-Angle samples.
 
@@ -108,6 +109,8 @@ def ea_interp(q, l, f, N):
         :math:`L`-dimensional zonal functions are also supported by supplying an (N_s, L) array instead.
     N : int
         Order of the reconstructed zonal function.
+    approximate_kernel : bool
+        If :py:obj:`True`, pass the `approx` option to :py:class:`~pypeline.util.math.func.sph_dirichlet`.
 
     Returns
     -------
@@ -191,10 +194,7 @@ def ea_interp(q, l, f, N):
              np.sum(np.sin(_2m1 * theta_sph) / _2m1, axis=1, keepdims=True))
     weight = (f * alpha[q]).to_value(u.dimensionless_unscaled)
 
-    if N <= 10:
-        kernel_func = func.sph_dirichlet(N)
-    else:
-        kernel_func = func.sph_dirichlet(N, approx=True)
+    kernel_func = func.sph_dirichlet(N, approx=approximate_kernel)
 
     @chk.check(dict(theta=chk.accept_any(chk.is_angle, chk.has_angles),
                     phi=chk.accept_any(chk.is_angle, chk.has_angles)))
