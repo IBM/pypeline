@@ -105,3 +105,13 @@ class LabeledMatrix:
                 (M,) column index.
         """
         return self.__index
+
+    @property
+    def shape(self):
+        """
+        Returns
+        -------
+        tuple(int)
+            (N_row, N_col) shape information.
+        """
+        return self.__data.shape
