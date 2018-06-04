@@ -29,7 +29,7 @@ class GramMatrix(array.LabeledMatrix):
 
        import numpy as np
        import pandas as pd
-       from pypeline.phased_array.gram import GramMatrix
+       from pypeline.phased_array.util.gram import GramMatrix
 
     .. doctest::
 
