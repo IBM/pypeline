@@ -29,9 +29,10 @@ def ___load_config():
         cfg.read_file(f)
 
     # Overwrite defaults with user's config file
-    u_cfg_path = pathlib.Path.home() / 'pypeline.cfg'
+    u_cfg_path = pathlib.Path.home() / '.pypeline' / 'pypeline.cfg'
     if u_cfg_path.exists():
         cfg.read(u_cfg_path)
+        print(f'Loaded user config from {u_cfg_path}.')
 
     return cfg
 
