@@ -10,6 +10,7 @@ pypeline.phased\_array.util.data\_gen
    .. autosummary::
    
       is_source_config
+      from_tgss_catalog
    
    
 

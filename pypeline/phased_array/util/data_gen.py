@@ -9,10 +9,14 @@ Tools and helper functions to generate synthetic data.
 """
 
 import collections.abc as abc
+import pathlib
+import shutil
+import urllib.request
 
 import astropy.coordinates as coord
 import astropy.units as u
 import numpy as np
+import pandas as pd
 import plotly.graph_objs as go
 
 import pypeline.util.argcheck as chk
@@ -210,3 +214,82 @@ class SkyEmission:
 
         fig = go.Figure(data=data, layout=layout)
         return fig
+
+
+@chk.check(dict(direction=chk.is_instance(coord.SkyCoord),
+                FoV=chk.is_angle,
+                N_src=chk.is_integer))
+def from_tgss_catalog(direction, FoV, N_src):
+    """
+    Generate :py:class:`~pypeline.phased_array.util.data_gen.SkyEmission` from the `TGSS <http://tgssadr.strw.leidenuniv.nl/doku.php>`_ catalog.
+
+    This function will automatically download and cache the catalog on disk for subsequent calls.
+
+    Parameters
+    ----------
+    direction : :py:class:`~astropy.coordinates.SkyCoord`
+        Direction in the sky.
+    FoV : :py:class:`~astropy.units.Quantity`
+        Spherical angle of the sky centered at `direction` from which sources are extracted.
+    N_src : int
+        Number of dominant sources to extract.
+
+    Returns
+    -------
+    :py:class:`~pypeline.phased_array.util.data_gen.SkyEmission`
+        Sky model.
+    """
+    if FoV.to_value(u.deg) <= 0:
+        raise ValueError('Parameter[FoV] must be positive.')
+
+    if N_src <= 0:
+        raise ValueError('Parameter[N_src] must be positive.')
+
+    disk_path = (pathlib.Path.home() /
+                 '.pypeline' /
+                 'catalog' /
+                 'TGSSADR1_7sigma_catalog.tsv')
+
+    if not disk_path.exists():
+        # Download catalog from web.
+        catalog_dir = disk_path.parent
+        if not catalog_dir.exists():
+            catalog_dir.mkdir(parents=True)
+
+        web_path = ('http://tgssadr.strw.leidenuniv.nl/'
+                    'catalogs/TGSSADR1_7sigma_catalog.tsv')
+        print(f'Downloading catalog from {web_path}')
+        with urllib.request.urlopen(web_path) as response:
+            with disk_path.open(mode='wb') as f:
+                shutil.copyfileobj(response, f)
+
+    # Read catalog from disk path
+    catalog_full = pd.read_table(disk_path)
+
+    theta = catalog_full.loc[:, 'DEC'].values * u.deg
+    phi = catalog_full.loc[:, 'RA'].values * u.deg
+    xyz = sph.eq2cart(1, theta, phi)
+    I = catalog_full.loc[:, 'Total_flux'].values * 1e-3  # mJy in catalog.
+
+    # Reduce catalog to area of interest
+    f_dir = (direction
+             .transform_to('icrs')
+             .cartesian
+             .xyz
+             .value)
+    mask = (f_dir @ xyz) >= np.cos(FoV / 2)
+
+    if mask.sum() < N_src:
+        raise ValueError('There are less than Parameter[N_src] '
+                         'sources in the field.')
+
+    I_region, xyz_region = I[mask], xyz[:, mask]
+    idx = np.argsort(I_region)[-N_src:]
+    I_region, xyz_region = I_region[idx], xyz_region[:, idx]
+    _, theta_region, phi_region = sph.cart2eq(*xyz_region)
+
+    source_config = [(coord.SkyCoord(az, el, frame='icrs'), intensity)
+                     for el, az, intensity in
+                     zip(theta_region, phi_region, I_region)]
+    sky_model = SkyEmission(source_config)
+    return sky_model
