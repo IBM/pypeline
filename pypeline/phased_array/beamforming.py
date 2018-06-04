@@ -253,7 +253,7 @@ class MatchedBeamformerBlock(BeamformerBlock):
         Parameters
         ----------
         XYZ : :py:class:`~pypeline.phased_array.instrument.InstrumentGeometry`
-            Instrument geometry.
+            (N_antenna, 3) ICRS instrument geometry.
         freq : :py:class:`~astropy.units.Quantity`
             Frequency at which to generate beamweights.
 
