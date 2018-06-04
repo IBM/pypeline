@@ -47,9 +47,9 @@ def is_antenna_index(x):
 
 
 def _as_InstrumentGeometry(df):
-    inst_geom = InstrumentGeometry(xyz=df.values,
+    XYZ = InstrumentGeometry(xyz=df.values,
                                    ant_idx=df.index)
-    return inst_geom
+    return XYZ
 
 
 class InstrumentGeometry(array.LabeledMatrix):
@@ -208,29 +208,29 @@ class InstrumentGeometryBlock(core.Block):
     Compute antenna positions.
     """
 
-    @chk.check(dict(inst_geom=chk.is_instance(InstrumentGeometry),
+    @chk.check(dict(XYZ=chk.is_instance(InstrumentGeometry),
                     N_station=chk.allow_None(chk.is_integer)))
-    def __init__(self, inst_geom, N_station=None):
+    def __init__(self, XYZ, N_station=None):
         """
         Parameters
         ----------
-        inst_geom : :py:class:`~pypeline.phased_array.instrument.InstrumentGeometry`
+        XYZ : :py:class:`~pypeline.phased_array.instrument.InstrumentGeometry`
             Instrument geometry.
         N_station : int
             Number of stations to use. (Default = all)
 
             Sometimes only a subset of an instrument's stations are desired.
-            Setting `N_station` limits the number of stations to those that appear first in `inst_geom` when sorted by STATION_ID.
+            Setting `N_station` limits the number of stations to those that appear first in `XYZ` when sorted by STATION_ID.
         """
         super().__init__()
         if N_station is not None:
             if N_station < 1:
                 raise ValueError('Parameter[N_station] must be positive.')
 
-        self._layout = inst_geom.as_frame()
+        self._layout = XYZ.as_frame()
 
         if N_station is not None:
-            stations = np.unique(inst_geom
+            stations = np.unique(XYZ
                                  .index[0]
                                  .get_level_values('STATION_ID'))[:N_station]
             self._layout = self._layout.loc[stations]
@@ -258,21 +258,21 @@ class StationaryInstrumentGeometryBlock(InstrumentGeometryBlock):
     Sub-class specialized in instruments that are stationary, i.e. that do not move with time.
     """
 
-    @chk.check(dict(inst_geom=chk.is_instance(InstrumentGeometry),
+    @chk.check(dict(XYZ=chk.is_instance(InstrumentGeometry),
                     N_station=chk.allow_None(chk.is_integer)))
-    def __init__(self, inst_geom, N_station=None):
+    def __init__(self, XYZ, N_station=None):
         """
         Parameters
         ----------
-        inst_geom : :py:class:`~pypeline.phased_array.instrument.InstrumentGeometry`
+        XYZ : :py:class:`~pypeline.phased_array.instrument.InstrumentGeometry`
             Instrument geometry.
         N_station : int
             Number of stations to use. (Default = all)
 
             Sometimes only a subset of an instrument's stations are desired.
-            Setting `N_station` limits the number of stations to those that appear first in `inst_geom` when sorted by STATION_ID.
+            Setting `N_station` limits the number of stations to those that appear first in `XYZ` when sorted by STATION_ID.
         """
-        super().__init__(inst_geom, N_station)
+        super().__init__(XYZ, N_station)
 
     def __call__(self):
         """
@@ -297,8 +297,8 @@ class PyramicBlock(StationaryInstrumentGeometryBlock):
         """
 
         """
-        inst_geom = self._get_geometry()
-        super().__init__(inst_geom)
+        XYZ = self._get_geometry()
+        super().__init__(XYZ)
 
     def _get_geometry(self):
         """
@@ -337,8 +337,8 @@ class PyramicBlock(StationaryInstrumentGeometryBlock):
         N_mic = len(coordinates)
         idx = pd.MultiIndex.from_product([range(N_mic), range(1)],
                                          names=['STATION_ID', 'ANTENNA_ID'])
-        inst_geom = InstrumentGeometry(coordinates, idx)
-        return inst_geom
+        XYZ = InstrumentGeometry(coordinates, idx)
+        return XYZ
 
 
 class CompactSixBlock(StationaryInstrumentGeometryBlock):
@@ -350,8 +350,8 @@ class CompactSixBlock(StationaryInstrumentGeometryBlock):
         """
 
         """
-        inst_geom = self._get_geometry()
-        super().__init__(inst_geom)
+        XYZ = self._get_geometry()
+        super().__init__(XYZ)
 
     def _get_geometry(self):
         """
@@ -371,8 +371,8 @@ class CompactSixBlock(StationaryInstrumentGeometryBlock):
 
         idx = pd.MultiIndex.from_product([range(N_mic), range(1)],
                                          names=['STATION_ID', 'ANTENNA_ID'])
-        inst_geom = InstrumentGeometry(coordinates, idx)
-        return inst_geom
+        XYZ = InstrumentGeometry(coordinates, idx)
+        return XYZ
 
 
 class EarthBoundInstrumentGeometryBlock(InstrumentGeometryBlock):
@@ -380,21 +380,21 @@ class EarthBoundInstrumentGeometryBlock(InstrumentGeometryBlock):
     Sub-class specialized in instruments that move with the Earth, such as radio telescopes.
     """
 
-    @chk.check(dict(inst_geom=chk.is_instance(InstrumentGeometry),
+    @chk.check(dict(XYZ=chk.is_instance(InstrumentGeometry),
                     N_station=chk.allow_None(chk.is_integer)))
-    def __init__(self, inst_geom, N_station=None):
+    def __init__(self, XYZ, N_station=None):
         """
         Parameters
         ----------
-        inst_geom : :py:class:`~pypeline.phased_array.instrument.InstrumentGeometry`
+        XYZ : :py:class:`~pypeline.phased_array.instrument.InstrumentGeometry`
             ITRS instrument geometry.
         N_station : int
             Number of stations to use. (Default = all)
 
             Sometimes only a subset of an instrument’s stations are desired.
-            Setting `N_station` limits the number of stations to those that appear first in `inst_geom` when sorted by STATION_ID.
+            Setting `N_station` limits the number of stations to those that appear first in `XYZ` when sorted by STATION_ID.
         """
-        super().__init__(inst_geom, N_station)
+        super().__init__(XYZ, N_station)
 
     @chk.check('time', chk.is_instance(time.Time))
     def __call__(self, time):
@@ -442,10 +442,10 @@ class LofarBlock(EarthBoundInstrumentGeometryBlock):
             Number of stations to use. (Default = all)
 
             Sometimes only a subset of an instrument’s stations are desired.
-            Setting `N_station` limits the number of stations to those that appear first in `inst_geom` when sorted by STATION_ID.
+            Setting `N_station` limits the number of stations to those that appear first in `XYZ` when sorted by STATION_ID.
         """
-        inst_geom = self._get_geometry()
-        super().__init__(inst_geom, N_station)
+        XYZ = self._get_geometry()
+        super().__init__(XYZ, N_station)
 
     def _get_geometry(self):
         """
@@ -463,8 +463,8 @@ class LofarBlock(EarthBoundInstrumentGeometryBlock):
         itrs_geom = (pd.read_csv(abs_path)
                      .set_index(['STATION_ID', 'ANTENNA_ID']))
 
-        inst_geom = _as_InstrumentGeometry(itrs_geom)
-        return inst_geom
+        XYZ = _as_InstrumentGeometry(itrs_geom)
+        return XYZ
 
 
 class MwaBlock(EarthBoundInstrumentGeometryBlock):
@@ -484,13 +484,13 @@ class MwaBlock(EarthBoundInstrumentGeometryBlock):
             Number of stations to use. (Default = all)
 
             Sometimes only a subset of an instrument’s stations are desired.
-            Setting `N_station` limits the number of stations to those that appear first in `inst_geom` when sorted by STATION_ID.
+            Setting `N_station` limits the number of stations to those that appear first in `XYZ` when sorted by STATION_ID.
 
         station_only : bool
             If :py:obj:`True`, model MWA stations as single-element antennas. (Default = False)
         """
-        inst_geom = self._get_geometry(station_only)
-        super().__init__(inst_geom, N_station)
+        XYZ = self._get_geometry(station_only)
+        super().__init__(XYZ, N_station)
 
     def _get_geometry(self, station_only):
         """
@@ -549,5 +549,5 @@ class MwaBlock(EarthBoundInstrumentGeometryBlock):
                                              columns=['X', 'Y', 'Z'])]
             itrs_geom = pd.concat(df_stations)
 
-        inst_geom = _as_InstrumentGeometry(itrs_geom)
-        return inst_geom
+        XYZ = _as_InstrumentGeometry(itrs_geom)
+        return XYZ

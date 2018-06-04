@@ -146,6 +146,9 @@ class BeamformerBlock(core.Block):
     """
 
     def __init__(self):
+        """
+
+        """
         super().__init__()
 
     def __call__(self, *args, **kwargs):
@@ -241,15 +244,15 @@ class MatchedBeamformerBlock(BeamformerBlock):
                                          F_Y=focus_dir[1],
                                          F_Z=focus_dir[2]))
 
-    @chk.check(dict(inst_geom=chk.is_instance(instrument.InstrumentGeometry),
+    @chk.check(dict(XYZ=chk.is_instance(instrument.InstrumentGeometry),
                     freq=chk.is_frequency))
-    def __call__(self, inst_geom, freq):
+    def __call__(self, XYZ, freq):
         """
         Determine beamweights to apply to each (antenna, beam) pair.
 
         Parameters
         ----------
-        inst_geom : :py:class:`~pypeline.phased_array.instrument.InstrumentGeometry`
+        XYZ : :py:class:`~pypeline.phased_array.instrument.InstrumentGeometry`
             Instrument geometry.
         freq : :py:class:`~astropy.units.Quantity`
             Frequency at which to generate beamweights.
@@ -262,7 +265,7 @@ class MatchedBeamformerBlock(BeamformerBlock):
         wps = pypeline.config.getfloat('phased_array', 'wps') * (u.m / u.s)
         wl = (wps / freq).to_value(u.m)
 
-        xyz = inst_geom.as_frame()
+        xyz = XYZ.as_frame()
         xyz = (xyz - xyz.mean()) / wl
 
         data = pd.merge(xyz.reset_index(), self._config, on='STATION_ID')
