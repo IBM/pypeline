@@ -6,6 +6,12 @@ pypeline.phased\_array.beamforming
 
    
    
+   .. rubric:: Functions
+
+   .. autosummary::
+   
+      is_beam_index
+      is_mb_beam_config
    
 
    
@@ -14,8 +20,9 @@ pypeline.phased\_array.beamforming
 
    .. autosummary::
    
-      BeamformingMatrix
+      BeamWeights
       BeamformerBlock
+      MatchedBeamformerBlock
    
 
    
