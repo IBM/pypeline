@@ -115,3 +115,9 @@ class LabeledMatrix:
             (N_row, N_col) shape information.
         """
         return self.__data.shape
+
+    def __str__(self):
+        return self.__data.__str__()
+
+    def __repr__(self):
+        return self.__data.__repr__()
