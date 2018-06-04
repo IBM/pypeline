@@ -16,6 +16,7 @@ import math
 import numbers
 
 import astropy.units as u
+import scipy.sparse as sparse
 import numpy as np
 
 import pypeline
@@ -560,9 +561,13 @@ def has_shape(shape):
     def _has_shape(x):
         if is_array_like(x):
             x = np.array(x, copy=False)
+        elif sparse.isspmatrix(x):
+            pass
+        else:
+            return False
 
-            if x.shape == shape:
-                return True
+        if x.shape == shape:
+            return True
 
         return False
 
