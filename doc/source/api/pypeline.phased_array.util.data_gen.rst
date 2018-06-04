@@ -21,7 +21,8 @@ pypeline.phased\_array.util.data\_gen
    .. autosummary::
    
       SkyEmission
-   
+      VisibilityMatrix
+      VisibilityGeneratorBlock
    
 
    
