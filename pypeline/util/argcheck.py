@@ -16,8 +16,8 @@ import math
 import numbers
 
 import astropy.units as u
-import scipy.sparse as sparse
 import numpy as np
+import scipy.sparse as sparse
 
 import pypeline
 
@@ -1058,5 +1058,33 @@ def _is_angle(x):
     """
     if x.unit.is_equivalent(u.rad):
         return True
+
+    return False
+
+
+def is_duration(x):
+    """
+    Return :py:obj:`True` if `x` is a duration.
+
+    Examples
+    --------
+    .. testsetup::
+
+       import astropy.units as u
+       from pypeline.util.argcheck import is_duration
+
+    .. doctest::
+
+       >>> is_duration(5 * u.s), is_duration(-1 * u.s)
+       (True, False)
+
+       >>> is_duration(1 * u.Hz)
+       False
+    """
+    if isinstance(x, u.Quantity):
+        if x.shape == tuple():
+            if x.unit.is_equivalent(u.s):
+                if np.all(x.to_value(u.s) > 0):
+                    return True
 
     return False

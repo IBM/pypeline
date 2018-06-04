@@ -39,6 +39,7 @@ pypeline.util.argcheck
       is_complex
       is_even
       is_frequency
+      is_duration
       is_integer
       is_odd
       is_pow2
