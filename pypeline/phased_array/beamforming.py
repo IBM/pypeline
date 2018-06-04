@@ -165,7 +165,7 @@ class BeamformerBlock(core.Block):
         Returns
         -------
         :py:class:`~pypeline.phased_array.beamforming.BeamWeights`
-            Synthesis beamweights.
+            (N_antenna, N_beam) synthesis beamweights.
         """
         raise NotImplementedError
 
@@ -260,7 +260,7 @@ class MatchedBeamformerBlock(BeamformerBlock):
         Returns
         -------
         :py:class:`~pypeline.phased_array.beamforming.BeamWeights`
-            Synthesis beamweights.
+            (N_antenna, N_beam) synthesis beamweights.
         """
         wps = pypeline.config.getfloat('phased_array', 'wps') * (u.m / u.s)
         wl = (wps / freq).to_value(u.m)

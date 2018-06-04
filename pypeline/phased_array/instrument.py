@@ -48,7 +48,7 @@ def is_antenna_index(x):
 
 def _as_InstrumentGeometry(df):
     XYZ = InstrumentGeometry(xyz=df.values,
-                                   ant_idx=df.index)
+                             ant_idx=df.index)
     return XYZ
 
 
@@ -248,7 +248,7 @@ class InstrumentGeometryBlock(core.Block):
         Returns
         -------
         :py:class:`~pypeline.phased_array.instrument.InstrumentGeometry`
-            Instrument geometry.
+            (N_antenna, 3) instrument geometry.
         """
         raise NotImplementedError
 
@@ -283,7 +283,7 @@ class StationaryInstrumentGeometryBlock(InstrumentGeometryBlock):
         Returns
         -------
         :py:class:`~pypeline.phased_array.instrument.InstrumentGeometry`
-            Instrument geometry.
+            (N_antenna, 3) instrument geometry.
         """
         return _as_InstrumentGeometry(self._layout)
 
@@ -409,7 +409,7 @@ class EarthBoundInstrumentGeometryBlock(InstrumentGeometryBlock):
         Returns
         -------
         :py:class:`~pypeline.phased_array.instrument.InstrumentGeometry`
-            ICRS instrument geometry.
+            (N_antenna, 3) ICRS instrument geometry.
         """
         layout = self._layout.loc[:, ['X', 'Y', 'Z']].values.T
         r = linalg.norm(layout, axis=0)
