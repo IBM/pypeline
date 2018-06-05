@@ -67,7 +67,7 @@ class LabeledMatrix:
                     sparse.isspmatrix_csr(self.__data)):
                 raise ValueError('Parameter[data] must be CSC/CSR-ordered.')
         else:
-            self.__data = np.array(data)
+            self.__data = np.array(data, copy=False)
             self.__data.setflags(write=False)
 
             if self.__data.ndim != 2:
