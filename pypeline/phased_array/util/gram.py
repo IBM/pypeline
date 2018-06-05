@@ -56,9 +56,14 @@ class GramMatrix(array.LabeledMatrix):
         beam_idx
             (N_beam,) index.
         """
+        data = np.array(data, copy=False)
         N_beam = len(beam_idx)
+
         if not chk.has_shape((N_beam, N_beam))(data):
             raise ValueError('Parameters[data, beam_idx] are not consistent.')
+
+        if not np.allclose(data, data.conj().T):
+            raise ValueError('Parameter[data] must be hermitian symmetric.')
 
         super().__init__(data, beam_idx, beam_idx)
 
