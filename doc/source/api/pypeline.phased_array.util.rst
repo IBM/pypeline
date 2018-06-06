@@ -9,6 +9,7 @@ pypeline.phased\_array.util
    pypeline.phased_array.util.gram
    pypeline.phased_array.util.data_gen
    pypeline.phased_array.util.io
+   pypeline.phased_array.util.grid
    
 
    

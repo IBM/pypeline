@@ -1,0 +1,198 @@
+# #############################################################################
+# grid.py
+# =======
+# Author : Sepand KASHANI [sep@zurich.ibm.com]
+# #############################################################################
+
+"""
+Pixel-grid generation and utilities for spherical surfaces.
+"""
+
+import astropy.coordinates as coord
+import astropy.units as u
+import numpy as np
+import scipy.linalg as linalg
+
+import pypeline.util.argcheck as chk
+import pypeline.util.math.linalg as pylinalg
+import pypeline.util.math.sphere as sph
+
+
+@chk.check(dict(direction=chk.require_all(chk.has_reals,
+                                          chk.has_shape([3, ])),
+                FoV=chk.is_angle,
+                size=chk.require_all(chk.has_integers,
+                                     chk.has_shape([2, ]))))
+def spherical_grid(direction, FoV, size):
+    """
+    Spherical pixel grid.
+
+    Parameters
+    ----------
+    direction : array-like(float)
+        (3,) vector around which the grid is centered.
+    FoV : :py:class:`~astropy.units.Quantity`
+        Span of the grid centered at `direction`.
+    size : array-like(int)
+        (N_height, N_width)
+
+        The grid will consist of `N_height` concentric circles around `direction`, each containing `N_width` pixels.
+
+    Returns
+    -------
+    :py:class:`~numpy.ndarray`
+        (3, N_height, N_width) pixel grid.
+    """
+    direction = np.array(direction, dtype=float)
+    direction /= linalg.norm(direction)
+
+    if not (0 < FoV.to_value(u.deg) <= 179):
+        raise ValueError('Parameter[FoV] must be in [0, 179] degrees.')
+
+    size = np.array(size, copy=False)
+    if np.any(size <= 0):
+        raise ValueError('Parameter[size] must contain positive entries.')
+
+    N_height, N_width = size
+    colat, lon = np.meshgrid(np.linspace(0, FoV / 2, N_height),
+                             np.linspace(0, 360 * u.deg, N_width),
+                             indexing='ij')
+    XYZ = sph.pol2cart(1, colat, lon)
+
+    # Center grid at 'direction'
+    _, dir_colat, _ = sph.cart2pol(*direction)
+    R_axis = np.cross([0, 0, 1], direction)
+    if np.allclose(R_axis, 0):
+        # R_axis is in span(E_z), so we must manually set R
+        R = np.eye(3)
+        if direction[2] < 0:
+            R[2, 2] = -1
+    else:
+        R = pylinalg.rot(axis=R_axis, angle=dir_colat)
+
+    XYZ = np.tensordot(R, XYZ, axes=1)
+    return XYZ
+
+
+@chk.check(dict(direction=chk.require_all(chk.has_reals,
+                                          chk.has_shape([3, ])),
+                FoV=chk.is_angle,
+                size=chk.require_all(chk.has_integers,
+                                     chk.has_shape([2, ]))))
+def ea_grid(direction, FoV, size):
+    """
+    Equal-Angle pixel grid.
+
+    Parameters
+    ----------
+    direction : array-like(float)
+        (3,) vector around which the grid is centered.
+    FoV : :py:class:`~astropy.units.Quantity`
+        Span of the grid centered at `direction`.
+    size : array-like(int)
+        (N_height, N_width)
+
+    Returns
+    -------
+    colat : :py:class:`~astropy.units.Quantity`
+        (N_height, 1) polar angles.
+
+    lon : :py:class:`~astropy.units.Quantity`
+        (1, N_width) azimuthal angles.
+    """
+    direction = np.array(direction, dtype=float)
+    direction /= linalg.norm(direction)
+
+    if np.allclose(np.cross([0, 0, 1], direction), 0):
+        raise ValueError('Generating Equal-Angle grids centered at poles are '
+                         'currently not supported.')
+
+    if not (0 < FoV.to_value(u.deg) <= 179):
+        raise ValueError('Parameter[FoV] must be in [0, 179] degrees.')
+
+    size = np.array(size, copy=False)
+    if np.any(size <= 0):
+        raise ValueError('Parameter[size] must contain positive entries.')
+
+    _, dir_colat, dir_lon = sph.cart2pol(*direction)
+    lim_lon = dir_lon + (FoV / 2) * np.r_[-1, 1]
+    lim_colat = dir_colat + (FoV / 2) * np.r_[-1, 1]
+    lim_colat = (max(0.5 * u.deg, lim_colat[0]),
+                 min(lim_colat[1], 179.5 * u.deg))
+
+    N_height, N_width = size
+    colat = np.linspace(*lim_colat, num=N_height).reshape(-1, 1)
+    lon = np.linspace(*lim_lon, num=N_width).reshape(1, -1)
+    return colat, lon
+
+
+@chk.check(dict(direction=chk.require_all(chk.has_reals,
+                                          chk.has_shape([3, ])),
+                FoV=chk.is_angle,
+                N=chk.is_integer))
+def ea_harmonic_grid(direction, FoV, N):
+    """
+    Region-limited Equal-Angle pixel grid of order `N`.
+
+    Parameters
+    ----------
+    direction : array-like(float)
+        (3,) vector around which the grid is centered.
+    FoV : :py:class:`~astropy.units.Quantity`
+        Span of the grid centered at `direction`.
+    N : int
+        Order of the grid, i.e. there will be :math:`4 (N + 1)^{2}` points on the sphere.
+
+    Returns
+    -------
+    q : :py:class:`~numpy.ndarray`
+        (N_height,) polar indices.
+
+    l : :py:class:`~numpy.ndarray`
+        (N_width,) azimuthal indices.
+
+    colat : :py:class:`~astropy.units.Quantity`
+        (N_height, 1) polar angles.
+
+    lon : :py:class:`~astropy.units.Quantity`
+        (1, N_width) azimuthal angles.
+
+    See Also
+    --------
+    :py:func:`~pypeline.util.math.sphere.ea_interp`
+    """
+    direction = np.array(direction, dtype=float)
+    direction /= linalg.norm(direction)
+
+    if np.allclose(np.cross([0, 0, 1], direction), 0):
+        raise ValueError('Generating Equal-Angle grids centered at poles are '
+                         'currently not supported.')
+
+    if not (0 < FoV.to_value(u.deg) <= 179):
+        raise ValueError('Parameter[FoV] must be in [0, 179] degrees.')
+
+    if N <= 0:
+        raise ValueError('Parameter[N] must be non-negative.')
+
+    _, dir_colat, dir_lon = sph.cart2pol(*direction)
+    lim_lon = dir_lon + (FoV / 2) * np.r_[-1, 1]
+    lim_lon = coord.Angle(lim_lon).wrap_at(360 * u.deg)
+    lim_colat = dir_colat + (FoV / 2) * np.r_[-1, 1]
+    lim_colat = (max(0.5 * u.deg, lim_colat[0]),
+                 min(lim_colat[1], 179.5 * u.deg))
+
+    colat_full, lon_full = sph.ea_sample(N)
+    q_full = np.arange(colat_full.size).reshape(-1, 1)
+    l_full = np.arange(lon_full.size).reshape(1, -1)
+
+    q_mask = ((lim_colat[0] <= colat_full) & (colat_full <= lim_colat[1]))
+    if lim_lon[0] < lim_lon[1]:
+        l_mask = ((lim_lon[0] <= lon_full) & (lon_full <= lim_lon[1]))
+    else:
+        l_mask = ((lim_lon[0] <= lon_full) | (lon_full <= lim_lon[1]))
+
+    q = q_full[q_mask]
+    l = l_full[l_mask]
+    colat = colat_full[q_mask].reshape(-1, 1)
+    lon = lon_full[l_mask].reshape(1, -1)
+    return q, l, colat, lon
