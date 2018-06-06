@@ -28,10 +28,10 @@ def ea_sample(N):
 
     Returns
     -------
-    theta : :py:class:`~astropy.units.Quantity`
+    colat : :py:class:`~astropy.units.Quantity`
         (2N + 2, 1) polar angles.
 
-    phi : :py:class:`~astropy.units.Quantity`
+    lon : :py:class:`~astropy.units.Quantity`
         (1, 2N + 2) azimuthal angles.
 
     Examples
@@ -47,9 +47,9 @@ def ea_sample(N):
     .. doctest::
 
        >>> N = 3
-       >>> theta, phi = ea_sample(N)
+       >>> colat, lon = ea_sample(N)
 
-       >>> np.around(theta.to_value(u.rad), 2)
+       >>> np.around(colat.to_value(u.rad), 2)
        array([[0.2 ],
               [0.59],
               [0.98],
@@ -58,7 +58,7 @@ def ea_sample(N):
               [2.16],
               [2.55],
               [2.95]])
-       >>> np.around(phi.to_value(u.rad), 2)
+       >>> np.around(lon.to_value(u.rad), 2)
        array([[0.  , 0.79, 1.57, 2.36, 3.14, 3.93, 4.71, 5.5 ]])
 
 
@@ -81,10 +81,10 @@ def ea_sample(N):
     _2N2 = 2 * N + 2
     q, l = np.ogrid[:_2N2, :_2N2]
 
-    theta = (np.pi / _2N2) * (0.5 + q) * u.rad
-    phi = (2 * np.pi / _2N2) * l * u.rad
+    colat = (np.pi / _2N2) * (0.5 + q) * u.rad
+    lon = (2 * np.pi / _2N2) * l * u.rad
 
-    return theta, phi
+    return colat, lon
 
 
 @chk.check(dict(q=chk.has_integers,
@@ -145,11 +145,11 @@ def ea_interp(q, l, f, N, approximate_kernel=False):
        >>> r0 = np.array([0, 0, 1])
 
        # Interpolate \gammaN from it's samples
-       >>> theta, phi = ea_sample(N)
-       >>> r = pol2cart(1, theta, phi)
+       >>> colat, lon = ea_sample(N)
+       >>> r = pol2cart(1, colat, lon)
        >>> g_samples = gammaN(r, r0, N)
-       >>> q, l = np.meshgrid(np.arange(theta.size),
-       ...                    np.arange(phi.size),
+       >>> q, l = np.meshgrid(np.arange(colat.size),
+       ...                    np.arange(lon.size),
        ...                    indexing='ij')
        >>> g_interp_func = ea_interp(q.reshape(-1),
        ...                           l.reshape(-1),
@@ -157,9 +157,9 @@ def ea_interp(q, l, f, N, approximate_kernel=False):
        ...                           N)
 
        # Compare with exact solution at off-sample positions
-       >>> theta, phi = ea_sample(2 * N)  # denser grid
-       >>> g_interp = g_interp_func(theta, phi)
-       >>> g_exact = gammaN(pol2cart(1, theta, phi), r0, N)
+       >>> colat, lon = ea_sample(2 * N)  # denser grid
+       >>> g_interp = g_interp_func(colat, lon)
+       >>> g_exact = gammaN(pol2cart(1, colat, lon), r0, N)
        >>> np.allclose(g_interp, g_exact)
        True
 
@@ -167,8 +167,8 @@ def ea_interp(q, l, f, N, approximate_kernel=False):
     -----
     If :math:`f(r)` only takes non-negligeable values when :math:`r \in \mathcal{S} \subset \mathbb{S}^{2}`, then the runtime of :py:func:`~pypeline.util.math.sphere.ea_interp` can be significantly reduced by only supplying the triplets (`q`, `l`, `f`) that belong to :math:`\mathcal{S}`.
     """
-    theta_sph, phi_sph = ea_sample(N)
-    _2N2 = theta_sph.size
+    colat_sph, lon_sph = ea_sample(N)
+    _2N2 = colat_sph.size
 
     q = np.array(q, copy=False)
     l = np.array(l, copy=False)
@@ -190,21 +190,21 @@ def ea_interp(q, l, f, N, approximate_kernel=False):
     f = f.reshape(N_s, L)
 
     _2m1 = np.reshape(2 * np.r_[:N + 1] + 1, (1, N + 1))
-    alpha = (np.sin(theta_sph) / _2N2 *
-             np.sum(np.sin(_2m1 * theta_sph) / _2m1, axis=1, keepdims=True))
+    alpha = (np.sin(colat_sph) / _2N2 *
+             np.sum(np.sin(_2m1 * colat_sph) / _2m1, axis=1, keepdims=True))
     weight = (f * alpha[q]).to_value(u.dimensionless_unscaled)
 
     kernel_func = func.sph_dirichlet(N, approx=approximate_kernel)
 
-    @chk.check(dict(theta=chk.accept_any(chk.is_angle, chk.has_angles),
-                    phi=chk.accept_any(chk.is_angle, chk.has_angles)))
-    def interp_func(theta, phi):
-        r = pol2cart(1, theta, phi)
+    @chk.check(dict(colat=chk.accept_any(chk.is_angle, chk.has_angles),
+                    lon=chk.accept_any(chk.is_angle, chk.has_angles)))
+    def interp_func(colat, lon):
+        r = pol2cart(1, colat, lon)
         sh_kern = (1,) + r.shape[1:]
         sh_weight = (L,) + (1,) * len(r.shape[1:])
 
         f_interp = np.zeros((L,) + r.shape[1:], dtype=f.dtype)
-        for w, t, p in zip(weight, theta_sph[q, 0], phi_sph[0, l]):
+        for w, t, p in zip(weight, colat_sph[q, 0], lon_sph[0, l]):
             similarity = np.tensordot(pol2cart(1, t, p), r, axes=[[0], [0]])
             kernel = kernel_func(similarity)
 
@@ -218,9 +218,9 @@ def ea_interp(q, l, f, N, approximate_kernel=False):
 
         Parameters
         ----------
-        theta : :py:class:`~astropy.units.Quantity`
+        colat : :py:class:`~astropy.units.Quantity`
             Polar/Zenith angle.
-        phi : :py:class:`~astropy.units.Quantity`
+        lon : :py:class:`~astropy.units.Quantity`
             Longitude angle.
 
         Returns
@@ -231,17 +231,17 @@ def ea_interp(q, l, f, N, approximate_kernel=False):
         Examples
         --------
         N = 3
-        theta, phi = ea_sample(2 * N)
-        f = interp_func(theta, phi)
+        colat, lon = ea_sample(2 * N)
+        f = interp_func(colat, lon)
         """)
 
     return interp_func
 
 
 @chk.check(dict(r=chk.accept_any(chk.is_real, chk.has_reals),
-                theta=chk.accept_any(chk.is_angle, chk.has_angles),
-                phi=chk.accept_any(chk.is_angle, chk.has_angles)))
-def pol2eq(r, theta, phi):
+                colat=chk.accept_any(chk.is_angle, chk.has_angles),
+                lon=chk.accept_any(chk.is_angle, chk.has_angles)))
+def pol2eq(r, colat, lon):
     """
     Polar coordinates to Equatorial coordinates.
 
@@ -249,9 +249,9 @@ def pol2eq(r, theta, phi):
     ----------
     r : float or array-like(float)
         Radius.
-    theta : :py:class:`~astropy.units.Quantity`
+    colat : :py:class:`~astropy.units.Quantity`
         Polar/Zenith angle.
-    phi : :py:class:`~astropy.units.Quantity`
+    lon : :py:class:`~astropy.units.Quantity`
         Longitude angle.
 
     Returns
@@ -259,20 +259,20 @@ def pol2eq(r, theta, phi):
     r : :py:class:`~numpy.ndarray`
         Radius.
 
-    theta : :py:class:`~astropy.units.Quantity`
+    lat : :py:class:`~astropy.units.Quantity`
         Elevation angle.
 
-    phi : :py:class:`~astropy.units.Quantity`
+    lon : :py:class:`~astropy.units.Quantity`
         Longitude angle.
     """
-    theta_eq = (90 * u.deg) - theta
-    return r, theta_eq, phi
+    lat = (90 * u.deg) - colat
+    return r, lat, lon
 
 
 @chk.check(dict(r=chk.accept_any(chk.is_real, chk.has_reals),
-                theta=chk.accept_any(chk.is_angle, chk.has_angles),
-                phi=chk.accept_any(chk.is_angle, chk.has_angles)))
-def eq2pol(r, theta, phi):
+                lat=chk.accept_any(chk.is_angle, chk.has_angles),
+                lon=chk.accept_any(chk.is_angle, chk.has_angles)))
+def eq2pol(r, lat, lon):
     """
     Equatorial coordinates to Polar coordinates.
 
@@ -280,9 +280,9 @@ def eq2pol(r, theta, phi):
     ----------
     r : float or array-like(float)
         Radius.
-    theta : :py:class:`~astropy.units.Quantity`
+    lat : :py:class:`~astropy.units.Quantity`
         Elevation angle.
-    phi : :py:class:`~astropy.units.Quantity`
+    lon : :py:class:`~astropy.units.Quantity`
         Longitude angle.
 
     Returns
@@ -290,20 +290,20 @@ def eq2pol(r, theta, phi):
     r : :py:class:`~numpy.ndarray`
         Radius.
 
-    theta : :py:class:`~astropy.units.Quantity`
+    colat : :py:class:`~astropy.units.Quantity`
         Polar/Zenith angle.
 
-    phi : :py:class:`~astropy.units.Quantity`
+    lon : :py:class:`~astropy.units.Quantity`
         Longitude angle.
     """
-    theta_pol = (90 * u.deg) - theta
-    return r, theta_pol, phi
+    colat = (90 * u.deg) - lat
+    return r, colat, lon
 
 
 @chk.check(dict(r=chk.accept_any(chk.is_real, chk.has_reals),
-                theta=chk.accept_any(chk.is_angle, chk.has_angles),
-                phi=chk.accept_any(chk.is_angle, chk.has_angles)))
-def eq2cart(r, theta, phi):
+                lat=chk.accept_any(chk.is_angle, chk.has_angles),
+                lon=chk.accept_any(chk.is_angle, chk.has_angles)))
+def eq2cart(r, lat, lon):
     """
     Equatorial coordinates to Cartesian coordinates.
 
@@ -311,9 +311,9 @@ def eq2cart(r, theta, phi):
     ----------
     r : float or array-like(float)
         Radius.
-    theta : :py:class:`~astropy.units.Quantity`
+    lat : :py:class:`~astropy.units.Quantity`
         Elevation angle.
-    phi : :py:class:`~astropy.units.Quantity`
+    lon : :py:class:`~astropy.units.Quantity`
         Longitude angle.
 
     Returns
@@ -341,7 +341,7 @@ def eq2cart(r, theta, phi):
     if np.any(r < 0):
         raise ValueError("Parameter[r] must be non-negative.")
 
-    XYZ = (coord.SphericalRepresentation(phi, theta, r)
+    XYZ = (coord.SphericalRepresentation(lon, lat, r)
            .to_cartesian()
            .xyz
            .to_value(u.dimensionless_unscaled))
@@ -350,9 +350,9 @@ def eq2cart(r, theta, phi):
 
 
 @chk.check(dict(r=chk.accept_any(chk.is_real, chk.has_reals),
-                theta=chk.accept_any(chk.is_angle, chk.has_angles),
-                phi=chk.accept_any(chk.is_angle, chk.has_angles)))
-def pol2cart(r, theta, phi):
+                colat=chk.accept_any(chk.is_angle, chk.has_angles),
+                lon=chk.accept_any(chk.is_angle, chk.has_angles)))
+def pol2cart(r, colat, lon):
     """
     Polar coordinates to Cartesian coordinates.
 
@@ -360,9 +360,9 @@ def pol2cart(r, theta, phi):
     ----------
     r : float or array-like(float)
         Radius.
-    theta : :py:class:`~astropy.units.Quantity`
+    colat : :py:class:`~astropy.units.Quantity`
         Polar/Zenith angle.
-    phi : :py:class:`~astropy.units.Quantity`
+    lon : :py:class:`~astropy.units.Quantity`
         Longitude angle.
 
     Returns
@@ -386,17 +386,8 @@ def pol2cart(r, theta, phi):
               [0.],
               [1.]])
     """
-    r = np.array([r]) if chk.is_scalar(r) else np.array(r, copy=False)
-    if np.any(r < 0):
-        raise ValueError("Parameter[r] must be non-negative.")
-
-    theta_eq = (90 * u.deg) - theta
-    XYZ = (coord.SphericalRepresentation(phi, theta_eq, r)
-           .to_cartesian()
-           .xyz
-           .to_value(u.dimensionless_unscaled))
-
-    return XYZ
+    lat = (90 * u.deg) - colat
+    return eq2cart(r, lat, lon)
 
 
 @chk.check(dict(x=chk.accept_any(chk.is_real, chk.has_reals),
@@ -420,10 +411,10 @@ def cart2pol(x, y, z):
     r : :py:class:`~numpy.ndarray`
         Radius.
 
-    theta : :py:class:`~astropy.units.Quantity`
+    colat : :py:class:`~astropy.units.Quantity`
         Polar/Zenith angle.
 
-    phi : :py:class:`~astropy.units.Quantity`
+    lon : :py:class:`~astropy.units.Quantity`
         Longitude angle.
 
     Examples
@@ -436,25 +427,25 @@ def cart2pol(x, y, z):
 
     .. doctest::
 
-       >>> r, theta, phi = cart2pol(0, 1 / np.sqrt(2), 1 / np.sqrt(2))
+       >>> r, colat, lon = cart2pol(0, 1 / np.sqrt(2), 1 / np.sqrt(2))
 
        >>> np.around(r, 2)
        1.0
 
-       >>> np.around(theta.to_value(u.deg), 2)
+       >>> np.around(colat.to_value(u.deg), 2)
        45.0
 
-       >>> np.around(phi.to_value(u.deg), 2)
+       >>> np.around(lon.to_value(u.deg), 2)
        90.0
     """
     cart = coord.CartesianRepresentation(x, y, z)
     sph = coord.SphericalRepresentation.from_cartesian(cart)
 
     r = sph.distance.to_value(u.dimensionless_unscaled)
-    theta = u.Quantity(90 * u.deg - sph.lat).to(u.rad)
-    phi = u.Quantity(sph.lon).to(u.rad)
+    colat = u.Quantity(90 * u.deg - sph.lat).to(u.rad)
+    lon = u.Quantity(sph.lon).to(u.rad)
 
-    return r, theta, phi
+    return r, colat, lon
 
 
 @chk.check(dict(x=chk.accept_any(chk.is_real, chk.has_reals),
@@ -478,10 +469,10 @@ def cart2eq(x, y, z):
     r : :py:class:`~numpy.ndarray`
         Radius.
 
-    theta : :py:class:`~astropy.units.Quantity`
+    lat : :py:class:`~astropy.units.Quantity`
         Elevation angle.
 
-    phi : :py:class:`~astropy.units.Quantity`
+    lon : :py:class:`~astropy.units.Quantity`
         Longitude angle.
 
     Examples
@@ -494,22 +485,17 @@ def cart2eq(x, y, z):
 
     .. doctest::
 
-       >>> r, theta, phi = cart2eq(0, 1 / np.sqrt(2), 1 / np.sqrt(2))
+       >>> r, lat, lon = cart2eq(0, 1 / np.sqrt(2), 1 / np.sqrt(2))
 
        >>> np.around(r, 2)
        1.0
 
-       >>> np.around(theta.to_value(u.deg), 2)
+       >>> np.around(lat.to_value(u.deg), 2)
        45.0
 
-       >>> np.around(phi.to_value(u.deg), 2)
+       >>> np.around(lon.to_value(u.deg), 2)
        90.0
     """
-    cart = coord.CartesianRepresentation(x, y, z)
-    sph = coord.SphericalRepresentation.from_cartesian(cart)
-
-    r = sph.distance.to_value(u.dimensionless_unscaled)
-    theta = u.Quantity(sph.lat).to(u.rad)
-    phi = u.Quantity(sph.lon).to(u.rad)
-
-    return r, theta, phi
+    r, colat, lon = cart2pol(x, y, z)
+    lat = (90 * u.deg) - colat
+    return r, lat, lon

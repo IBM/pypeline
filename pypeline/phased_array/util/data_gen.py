@@ -158,10 +158,10 @@ class SkyEmission:
         """
         # Hollow Sphere
         N_height = N_width = 128
-        theta, phi = np.meshgrid(np.linspace(0, 180, N_height) * u.deg,
+        colat, lon = np.meshgrid(np.linspace(0, 180, N_height) * u.deg,
                                  np.linspace(0, 360, N_width) * u.deg,
                                  indexing='ij')
-        sph_X, sph_Y, sph_Z = sph.pol2cart(1, theta, phi)
+        sph_X, sph_Y, sph_Z = sph.pol2cart(1, colat, lon)
         globe_trace = go.Surface(
             contours={'x': {'show': False, 'highlight': False},
                       'y': {'show': False, 'highlight': False},
@@ -272,9 +272,9 @@ def from_tgss_catalog(direction, FoV, N_src):
     # Read catalog from disk path
     catalog_full = pd.read_table(disk_path)
 
-    theta = catalog_full.loc[:, 'DEC'].values * u.deg
-    phi = catalog_full.loc[:, 'RA'].values * u.deg
-    xyz = sph.eq2cart(1, theta, phi)
+    lat = catalog_full.loc[:, 'DEC'].values * u.deg
+    lon = catalog_full.loc[:, 'RA'].values * u.deg
+    xyz = sph.eq2cart(1, lat, lon)
     I = catalog_full.loc[:, 'Total_flux'].values * 1e-3  # mJy in catalog.
 
     # Reduce catalog to area of interest
@@ -292,11 +292,11 @@ def from_tgss_catalog(direction, FoV, N_src):
     I_region, xyz_region = I[mask], xyz[:, mask]
     idx = np.argsort(I_region)[-N_src:]
     I_region, xyz_region = I_region[idx], xyz_region[:, idx]
-    _, theta_region, phi_region = sph.cart2eq(*xyz_region)
+    _, lat_region, lon_region = sph.cart2eq(*xyz_region)
 
     source_config = [(coord.SkyCoord(az, el, frame='icrs'), intensity)
                      for el, az, intensity in
-                     zip(theta_region, phi_region, I_region)]
+                     zip(lat_region, lon_region, I_region)]
     sky_model = SkyEmission(source_config)
     return sky_model
 
