@@ -12,16 +12,19 @@ import pathlib
 
 import astropy.coordinates as coord
 import astropy.time as time
+import astropy.units as u
 import numpy as np
 import pandas as pd
 import pkg_resources as pkg
 import plotly.graph_objs as go
 import scipy.linalg as linalg
 
+import pypeline
 import pypeline.core as core
 import pypeline.util.argcheck as chk
 import pypeline.util.array as array
 import pypeline.util.math.linalg as pylinalg
+import pypeline.util.math.special as sp
 import pypeline.util.math.sphere as sph
 
 
@@ -251,6 +254,31 @@ class InstrumentGeometryBlock(core.Block):
             (N_antenna, 3) instrument geometry.
         """
         raise NotImplementedError
+
+    @chk.check('freq', chk.is_frequency)
+    def nyquist_rate(self, freq):
+        """
+        Order of imageable complex plane-waves.
+
+        Parameters
+        ----------
+        freq : :py:class:`~astropy.units.Quantity`
+            Frequency of observations.
+
+        Returns
+        -------
+        N : int
+            Maximum order of complex plane waves that can be imaged by the instrument.
+        """
+        wps = pypeline.config.getfloat('phased_array', 'wps') * (u.m / u.s)
+        wl = (wps / freq).to_value(u.m)
+
+        XYZ = self._layout.values
+        baseline = linalg.norm(XYZ[:, np.newaxis, :] -
+                               XYZ[np.newaxis, :, :], axis=-1)
+
+        N = sp.spherical_jn_threshold((2 * np.pi / wl) * baseline.max())
+        return N
 
 
 class StationaryInstrumentGeometryBlock(InstrumentGeometryBlock):
