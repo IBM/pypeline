@@ -453,6 +453,95 @@ class EarthBoundInstrumentGeometryBlock(InstrumentGeometryBlock):
                                    columns=('X', 'Y', 'Z'))
         return _as_InstrumentGeometry(icrs_layout)
 
+    @chk.check(dict(obs_start=chk.is_instance(time.Time),
+                    obs_end=chk.is_instance(time.Time)))
+    def icrs2bfsf_rot(self, obs_start, obs_end):
+        """
+        Rotation matrix from ICRS to the local *Bluebild FastSynthesis Frame* (BFSF).
+
+        Parameters
+        ----------
+        obs_start : :py:class:`~astropy.time.Time`
+            Start of the observation period.
+        obs_end : :py:class:`~astropy.time.Time`
+            End of the observation period.
+
+        Returns
+        -------
+        R : :py:class:`~numpy.ndarray`
+            (3, 3) ICRS -> BFSF rotation matrix.
+        """
+        if obs_start > obs_end:
+            raise ValueError('Parameter[obs_start] must precede '
+                             'Parameter[obs_end].')
+
+        # Find the position of the antennas at several time-instants
+        # during `period`.
+        N_interval = 20
+        sampling_times = (obs_start +
+                          ((obs_end - obs_start) / (N_interval - 1)) *
+                          np.arange(N_interval))
+        icrs_layouts = [self.__call__(t).data for t in sampling_times]
+        icrs_layouts = np.stack(icrs_layouts, axis=1)  # (N_antenna, N_time, 3)
+
+        # For each antenna `i`, find a normal vector `n_{i}` to the
+        # rotation plane.
+        N_antenna = len(icrs_layouts)
+        abc = np.zeros((N_antenna, 3))
+        for i, xyz in enumerate(icrs_layouts):
+            a = np.concatenate([xyz[:, :2], np.ones((len(xyz), 1))], axis=-1)
+            b = xyz[:, 2]
+            coeffs, *_ = linalg.lstsq(a, b)
+            abc[i] = coeffs
+
+        # Average vectors `n_{i}` to obtain the global normal vector `n`.
+        # Construct rotation matrix R using 3 basis vectors Ex, Ey, Ez.
+        #    Ez must be co-linear to the plane's normal vector.
+        a, b, c = np.mean(abc, axis=0)
+        z_ax = np.r_[a, b, -1]
+        y_ax = np.r_[b, -a, 0]
+        x_ax = np.cross(z_ax, y_ax)
+        R = np.stack([x_ax, y_ax, z_ax], axis=0)
+        R /= linalg.norm(R, axis=1, keepdims=True)
+        return R
+
+    @chk.check(dict(freq=chk.is_frequency,
+                    obs_start=chk.is_instance(time.Time),
+                    obs_end=chk.is_instance(time.Time)))
+    def kernel_bandwidth(self, freq, obs_start, obs_end):
+        """
+        Bandwidth of :math:`2 \pi`-periodic complex plane-wave kernel.
+
+        Parameters
+        ----------
+        freq : :py:class:`~astropy.units.Quantity`
+            Frequency of observations.
+        obs_start : :py:class:`~astropy.time.Time`
+            Start of the observation period.
+        obs_end : :py:class:`~astropy.time.Time`
+            End of the observation period.
+
+        Returns
+        -------
+        N_FS : int
+            Kernel bandwidth when evaluated in the BFSF reference frame.
+        """
+        wps = pypeline.config.getfloat('phased_array', 'wps') * (u.m / u.s)
+        wl = (wps / freq).to_value(u.m)
+
+        R = self.icrs2bfsf_rot(obs_start, obs_end)
+        obs_mid = obs_start + (obs_end - obs_start) / 2
+
+        icrs_XYZ = self.__call__(obs_mid).data
+        bfsf_XYZ = icrs_XYZ @ R.T
+        bfsf_XYZ -= np.mean(bfsf_XYZ, axis=0)
+        bfsf_XY = bfsf_XYZ[:, :2]
+        XY_baseline = linalg.norm(bfsf_XY[:, np.newaxis, :] -
+                                  bfsf_XY[np.newaxis, :, :], axis=-1)
+
+        N = sp.jv_threshold((2 * np.pi / wl) * XY_baseline.max())
+        return 2 * N + 1
+
 
 class LofarBlock(EarthBoundInstrumentGeometryBlock):
     """
