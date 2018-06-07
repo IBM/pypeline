@@ -10,6 +10,9 @@ IO-related operations and tools.
 
 import astropy.io.fits as fits
 import astropy.units as u
+import matplotlib.axes as axes
+import matplotlib.cm as cm
+import matplotlib.pyplot as plt
 import numpy as np
 import scipy.linalg as linalg
 
@@ -17,6 +20,7 @@ import pypeline.phased_array.beamforming as beamforming
 import pypeline.phased_array.util.data_gen as dgen
 import pypeline.util.argcheck as chk
 import pypeline.util.math.sphere as sph
+import pypeline.util.plot as plot
 
 
 @chk.check(dict(S=chk.is_instance(dgen.VisibilityMatrix),
@@ -126,13 +130,118 @@ class SphericalImage:
         """
         return self._grid
 
-    def draw(self):
+    @chk.check(dict(index=chk.accept_any(chk.has_integers,
+                                         chk.is_instance(slice)),
+                    mode=chk.is_instance(str),
+                    ax=chk.allow_None(chk.is_instance(axes.Axes)),
+                    catalog=chk.allow_None(chk.is_instance(dgen.SkyEmission))))
+    def draw(self,
+             index=slice(None),
+             mode='CAE',
+             ax=None,
+             catalog=None,
+             **kwargs):
         """
+        2D contour plot of the data.
+
+        Parameters
+        ----------
+        index : array-like(int) or slice
+            Choice of images to show. (Default = all)
+            If multiple layers are selected, they are summed together before display.
+        mode : str
+            Plot mode. Two available options:
+
+            * CAE: Contour plot in Azimuth-Elevation. (Default)
+            * CUV: Contour plot on the projected tangent plane.
+              This option is useful if plotting a region which lies at a longitudinal discontinuity.
+        ax : :py:class:`~matplotlib.axes.Axes`
+            Axes to draw on. If none is provided, a new figure is generated.
+        catalog : :py:class:`~pypeline.phased_array.util.data_gen.SkyEmission`
+            Optional ICRS source overlay.
+            If the imaging grid was not provided in ICRS, then the overlays will be incorrectly placed.
+        **kwargs
+            Keyword arguments. These are forwarded to :py:func:`~matplotlib.axes.Axes.contourf`.
 
         Returns
         -------
-
+        :py:class:`~matplotlib.axes.Axes`
+            Axes object.
         """
+        I = np.sum(self._data[index], axis=0)
+
+        if ax is None:
+            fig, ax = plt.subplots()
+
+        if 'cmap' in kwargs:
+            cmap = cm.get_cmap(kwargs.pop('cmap'))
+        else:
+            cmap = plot.cmap('matthieu-custom-sky', N=38)
+
+        if mode == 'CAE':
+            _, lat, lon = sph.cart2eq(*self._grid)
+            lat = lat.to_value(u.deg)
+            lon = lon.to_value(u.deg)
+
+            im = ax.contourf(lon, lat, I, cmap.N, cmap=cmap, **kwargs)
+            plot.colorbar(im, ax)
+
+            ax.set_xlabel('AZ [deg]')
+            ax.set_xlim(lon.min(), lon.max())
+            ax.set_ylabel('EL [deg]')
+            ax.set_ylim(lat.min(), lat.max())
+            ax.set_aspect(aspect='equal', adjustable='box')
+
+            if catalog is not None:
+                _, c_lat, c_lon = sph.cart2eq(*catalog.xyz.T)
+                c_lat = c_lat.to_value(u.deg)
+                c_lon = c_lon.to_value(u.deg)
+                ax.scatter(c_lon, c_lat, s=400,
+                           facecolors='none', edgecolors='w')
+        elif mode == 'CUV':
+            # UVW coordinates are defined by 3 axes (U,V,W) such that:
+            # - U: points East (Northern Hemisphere) or West (Southern Hemisphere)
+            # - V: points North (Northern Hemisphere) or South (Southern Hemisphere)
+            # - W: points away from the origin.
+            #
+            # To plot images in UV mode, we need to project the grid on the U, V axes.
+            f_dir = np.mean(self._grid, axis=(1, 2))
+            f_dir /= linalg.norm(f_dir)
+            _, f_lat, _ = sph.cart2eq(*f_dir)
+            pole_dir = 1 if (f_lat >= 0 * u.deg) else -1
+            pole_similarity = np.stack([[0, 0, 1], [0, 0, -1]], axis=0) @ f_dir
+
+            if np.any(pole_similarity >= np.cos(0.05 * u.deg)):
+                # When `direction` is facing towards a pole, U and V can
+                # be chosen arbitrarily. As a convention, we will always choose
+                # (U,V) = (X,Y) in these circumstances.
+                u_axis = np.r_[1, 0, 0]
+                v_axis = np.r_[0, 1, 0]
+                w_axis = np.r_[0, 0, pole_dir]
+            else:
+                w_axis = f_dir
+                u_axis = np.cross([0, 0, pole_dir], w_axis)
+                u_axis /= linalg.norm(u_axis)
+                v_axis = np.cross(w_axis, u_axis)
+
+            UV = np.stack((u_axis, v_axis), axis=0)
+            g_u, g_v = np.tensordot(UV, self._grid, axes=1)
+
+            im = ax.contourf(g_u, g_v, I, cmap.N, cmap=cmap, **kwargs)
+            plot.colorbar(im, ax)
+
+            ax.set_xlabel('U')
+            ax.set_xlim(g_u.min(), g_u.max())
+            ax.set_ylabel('V')
+            ax.set_ylim(g_v.min(), g_v.max())
+            ax.set_aspect(aspect='equal', adjustable='box')
+
+            if catalog is not None:
+                c_u, c_v = np.tensordot(UV, catalog.xyz.T, axes=1)
+                ax.scatter(c_u, c_v, s=400,
+                           facecolors='none', edgecolors='w')
+        else:
+            raise ValueError('Parameter[mode] only accepts {CAE, CUV}.')
 
     @chk.check('file_name', chk.is_instance(str))
     def to_fits(self, file_name):
