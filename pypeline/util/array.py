@@ -121,3 +121,40 @@ class LabeledMatrix:
 
     def __repr__(self):
         return self.__data.__repr__()
+
+    @chk.check('axes', chk.require_all(chk.has_integers,
+                                       chk.has_shape([2, ])))
+    def is_consistent_with(self, lmtx, axes):
+        """
+        Test matrices for consistency along directions.
+
+        Two labeled matrices are considered consistent if their indexes match along the specified dimensions.
+
+        Parameters
+        ----------
+        lmtx : :py:class:`~pypeline.util.array.LabeledMatrix`
+            Matrix to compare with.
+        axes : tuple(int)
+            (2,) tuple with dimensions along which indices of `self` and `lmtx` must match.
+
+        Returns
+        -------
+        bool
+            True if axes are consistent.
+        """
+        if not chk.is_instance(LabeledMatrix)(lmtx):
+            raise ValueError('Parameter[lmtx] must be a LabeledMatrix.')
+
+        axes = np.array(axes, copy=False)
+        if not np.all((axes == 0) | (axes == 1)):
+            raise ValueError('Parameter[axes] can only contain {0, 1}.')
+
+        idxA = self.index[axes[0]]
+        idxB = lmtx.index[axes[1]]
+
+        if tuple(idxA.names) == tuple(idxB.names):
+            if len(idxA) == len(idxB):
+                if np.all(idxA == idxB):
+                    return True
+
+        return False

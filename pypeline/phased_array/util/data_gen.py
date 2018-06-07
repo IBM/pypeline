@@ -397,6 +397,9 @@ class VisibilityGeneratorBlock(core.Block):
         :py:class:`~pypeline.phased_array.util.data_gen.VisibilityMatrix`
             (N_beam, N_beam) visibility matrix.
         """
+        if not XYZ.is_consistent_with(W, axes=[0, 0]):
+            raise ValueError('Parameters[XYZ, W] are inconsistent.')
+
         wps = pypeline.config.getfloat('phased_array', 'wps') * (u.m / u.s)
         wl = (wps / freq).to_value(u.m)
 

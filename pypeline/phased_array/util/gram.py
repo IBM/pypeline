@@ -15,6 +15,7 @@ import scipy.linalg as linalg
 import pypeline
 import pypeline.core as core
 import pypeline.phased_array.beamforming as beamforming
+import pypeline.phased_array.instrument as instrument
 import pypeline.util.argcheck as chk
 import pypeline.util.array as array
 
@@ -79,6 +80,9 @@ class GramBlock(core.Block):
         """
         super().__init__()
 
+    @chk.check(dict(XYZ=chk.is_instance(instrument.InstrumentGeometry),
+                    W=chk.is_instance(beamforming.BeamWeights),
+                    freq=chk.is_frequency))
     def __call__(self, XYZ, W, freq):
         """
         Compute Gram matrix.
@@ -97,6 +101,9 @@ class GramBlock(core.Block):
         :py:class:`~pypeline.phased_array.gram.GramMatrix`
             (N_beam, N_beam) Gram matrix.
         """
+        if not XYZ.is_consistent_with(W, axes=[0, 0]):
+            raise ValueError('Parameters[XYZ, W] are inconsistent.')
+
         wps = pypeline.config.getfloat('phased_array', 'wps') * (u.m / u.s)
         wl = (wps / freq).to_value(u.m)
 
