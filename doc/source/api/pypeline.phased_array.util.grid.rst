@@ -10,6 +10,7 @@ pypeline.phased\_array.util.grid
    .. autosummary::
 
       spherical_grid
+      uniform_grid
       ea_grid
       ea_harmonic_grid
 

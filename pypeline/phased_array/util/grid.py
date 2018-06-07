@@ -79,6 +79,66 @@ def spherical_grid(direction, FoV, size):
                 FoV=chk.is_angle,
                 size=chk.require_all(chk.has_integers,
                                      chk.has_shape([2, ]))))
+def uniform_grid(direction, FoV, size):
+    """
+    Uniform pixel grid.
+
+    Parameters
+    ----------
+    direction : array-like(float)
+        (3,) vector around which the grid is centered.
+    FoV : :py:class:`~astropy.units.Quantity`
+        Span of the grid centered at `direction`.
+    size : array-like(int)
+        (N_height, N_width)
+
+    Returns
+    -------
+    :py:class:`~numpy.ndarray`
+        (3, N_height, N_width) pixel grid.
+    """
+    direction = np.array(direction, dtype=float)
+    direction /= linalg.norm(direction)
+
+    if not (0 < FoV.to_value(u.deg) <= 179):
+        raise ValueError('Parameter[FoV] must be in [0, 179] degrees.')
+
+    size = np.array(size, copy=False)
+    if np.any(size <= 0):
+        raise ValueError('Parameter[size] must contain positive entries.')
+
+    N_height, N_width = size
+    lim = np.sin(FoV / 2).to_value(u.dimensionless_unscaled)
+    Y, X = np.meshgrid(np.linspace(-lim, lim, N_height),
+                       np.linspace(-lim, lim, N_width),
+                       indexing='ij')
+    Z = 1 - X ** 2 - Y ** 2
+    X[Z < 0], Y[Z < 0], Z[Z < 0] = 0, 0, 0
+    Z = np.sqrt(Z)
+    XYZ = np.stack([X, Y, Z], axis=0)
+
+    # Center grid at 'direction'
+    _, dir_colat, dir_lon = sph.cart2pol(*direction)
+    R1 = pylinalg.rot(axis=[0, 0, 1], angle=dir_lon)
+    R2_axis = np.cross([0, 0, 1], direction)
+    if np.allclose(R2_axis, 0):
+        # R2_axis is in span(E_z), so we must manually set R2.
+        R2 = np.eye(3)
+        if direction[2] < 0:
+            R2[2, 2] = -1
+    else:
+        R2 = pylinalg.rot(axis=R2_axis, angle=dir_colat)
+    R = R2 @ R1
+
+    XYZ = np.tensordot(R, XYZ, axes=1)
+    return XYZ
+
+
+@chk.check(dict(direction=chk.require_all(chk.has_reals,
+                                          chk.has_shape([3, ])),
+                FoV=chk.is_angle,
+                size=chk.require_all(chk.has_integers,
+                                     chk.has_shape([2, ]))))
 def ea_grid(direction, FoV, size):
     """
     Equal-Angle pixel grid.
