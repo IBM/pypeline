@@ -2,7 +2,7 @@ pypeline.phased\_array.util.io
 ==============================
 
 .. automodule:: pypeline.phased_array.util.io
-
+   :special-members: __init__
    
    
    .. rubric:: Functions
@@ -15,8 +15,13 @@ pypeline.phased\_array.util.io
 
    
    
+   .. rubric:: Classes
+
+   .. autosummary::
+   
+      SphericalImage
+   
    
 
-   
    
    
