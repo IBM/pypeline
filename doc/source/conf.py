@@ -96,7 +96,9 @@ intersphinx_mapping = {
     'NumPy [latest]': ('https://docs.scipy.org/doc/numpy/', None),
     'SciPy [latest]': ('https://docs.scipy.org/doc/scipy/reference', None),
     'matplotlib [latest]': ('https://matplotlib.org', None),
-    'astropy [latest]': ('http://docs.astropy.org/en/latest/', None)}
+    'astropy [latest]': ('http://docs.astropy.org/en/latest/', None),
+    'python-casacore [latest]': ('http://casacore.github.io/python-casacore/',
+                                 None)}
 
 # -- Options for napoleon extension ------------------------------------------
 napoleon_google_docstring = False

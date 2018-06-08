@@ -12,7 +12,7 @@ Pypeline relies on the `PyData <https://pydata.org>`_ and `NumFOCUS <https://www
 Due to strong non-Python dependencies required to achieve high performance, we highly recommend the use of `conda <https://conda.io/docs/>`_ packages when available.
 
 Pypeline is developed and tested on x86_64 systems running Linux.
-Aside from :py:mod:`pypeline.phased_array.io`, Pypeline should also run correctly on ppc64le Linux platforms and OSX, but we provide no support for this.
+Aside from :py:mod:`pypeline.phased_array.util.io`, Pypeline should also run correctly on ppc64le Linux platforms and OSX, but we provide no support for this.
 
 
 Development Environment
@@ -29,6 +29,13 @@ After installing `Miniconda <https://conda.io/miniconda.html>`_ or `Anaconda <ht
     $ python3 setup.py develop
     $ tox  # Run test suites (optional)
     $ python3 setup.py build_sphinx  # Generate documentation (optional)
+
+
+.. Note::
+
+    If accessing MS files from pypeline, run the following before launching python::
+
+        $ export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}":<miniconda_dir>/lib
 
 
 Release Environment
