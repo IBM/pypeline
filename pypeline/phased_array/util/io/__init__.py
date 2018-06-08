@@ -1,6 +1,6 @@
 # #############################################################################
-# io.py
-# =====
+# __init__.py
+# ===========
 # Author : Sepand KASHANI [sep@zurich.ibm.com]
 # #############################################################################
 
@@ -242,6 +242,8 @@ class SphericalImage:
                            facecolors='none', edgecolors='w')
         else:
             raise ValueError('Parameter[mode] only accepts {CAE, CUV}.')
+
+        return ax
 
     @chk.check('file_name', chk.is_instance(str))
     def to_fits(self, file_name):
