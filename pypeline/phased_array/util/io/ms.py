@@ -231,36 +231,37 @@ class MeasurementSet:
 
             # DataFrame description of visibility data.
             # Each column represents a different channel.
-            S_idx = pd.MultiIndex.from_arrays((beam_id_0, beam_id_1),
-                                              names=('B_0', 'B_1'))
-            S = pd.DataFrame(data=data,
-                             columns=channel_id,
-                             index=S_idx)
+            S_full_idx = pd.MultiIndex.from_arrays((beam_id_0, beam_id_1),
+                                                   names=('B_0', 'B_1'))
+            S_full = pd.DataFrame(data=data,
+                                  columns=channel_id,
+                                  index=S_full_idx)
 
-            # Depending on the dataset, some (ANTENNA1, ANTENNA2) pairs that have correlation=0 are omitted in the table.
-            # This is problematic as the previous DataFrame construction could be potentially missing entire antenna ranges.
-            # To fix this issue, we check the DataFrame's index and make sure the full upper-triangular section is included.
-            # If this is not the case, we augment `S` to match the desired shape.
+            # Drop rows of `S_full` corresponding to unwanted beams.
             beam_id = np.unique(self.geometry
                                 ._layout
                                 .index
                                 .get_level_values('STATION_ID'))
             N_beam = len(beam_id)
+            i, j = np.triu_indices(N_beam, k=0)
+            wanted_index = (pd.MultiIndex
+                            .from_arrays((beam_id[i], beam_id[j]),
+                                         names=('B_0', 'B_1')))
+            index_to_drop = S_full_idx.difference(wanted_index)
+            S_trunc = S_full.drop(index=index_to_drop)
 
-            if len(S) != N_beam * (N_beam + 1) // 2:
-                i, j = np.triu_indices(N_beam, k=0)
-                full_index = (pd.MultiIndex
-                              .from_arrays((beam_id[i], beam_id[j]),
-                                           names=('B_0', 'B_1')))
-                index_diff = full_index.difference(S_idx)
-                N_diff = len(index_diff)
+            # Depending on the dataset, some (ANTENNA1, ANTENNA2) pairs that have correlation=0 are omitted in the table.
+            # This is problematic as the previous DataFrame construction could be potentially missing entire antenna ranges.
+            # To fix this issue, we augment the dataframe to always make sure `S_trunc` matches the desired shape.
+            index_diff = wanted_index.difference(S_trunc.index)
+            N_diff = len(index_diff)
 
-                S_fill_in = pd.DataFrame(
-                    data=np.zeros((N_diff, len(channel_id)), dtype=data.dtype),
-                    columns=channel_id,
-                    index=index_diff)
-                S = pd.concat([S, S_fill_in], axis=0, ignore_index=False)
-            S = S.sort_index(level=['B_0', 'B_1'])
+            S_fill_in = pd.DataFrame(
+                data=np.zeros((N_diff, len(channel_id)), dtype=data.dtype),
+                columns=channel_id,
+                index=index_diff)
+            S = (pd.concat([S_trunc, S_fill_in], axis=0, ignore_index=False)
+                 .sort_index(level=['B_0', 'B_1']))
 
             # Break S into columns and stream out
             t = time.Time(sub_table.calc('MJD(TIME)')[0],
