@@ -15,6 +15,7 @@ import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.linalg as linalg
+import scipy.sparse as sparse
 
 import pypeline.phased_array.beamforming as beamforming
 import pypeline.phased_array.util.data_gen as dgen
@@ -66,8 +67,13 @@ def filter_data(S, W):
     mask = np.any(beam_idx2.values.reshape(-1, 1) ==
                   broken_beam_idx.values.reshape(1, -1), axis=1)
 
-    w_f = W.data.copy()
-    w_f[:, mask] = 0
+    if (np.any(mask) and sparse.isspmatrix(W.data)):
+        w_lil = W.data.tolil()  # for efficiency
+        w_lil[:, mask] = 0
+        w_f = w_lil.tocsr()
+    else:
+        w_f = W.data.copy()
+        w_f[:, mask] = 0
     W_f = beamforming.BeamWeights(data=w_f,
                                   ant_idx=W.index[0],
                                   beam_idx=beam_idx2)
