@@ -14,6 +14,7 @@ import numpy as np
 import scipy.fftpack as fftpack
 
 import pypeline.util.argcheck as chk
+import pypeline.util.array as array
 
 
 @chk.check(dict(T=chk.is_real,
@@ -275,68 +276,6 @@ def iffs(x_FS, T, T_c, N_FS, axis=-1):
     return X
 
 
-@chk.check(dict(x=chk.is_instance(np.ndarray),
-                axis=chk.is_integer,
-                index_spec=chk.accept_any(chk.is_integer,
-                                          chk.is_instance(slice))))
-def _index(x, axis, index_spec):
-    """
-    Form indexing tuple for NumPy arrays.
-
-    Given an array `x`, generates the indexing tuple that has :py:class:`slice` in each axis except `axis`, where `index_spec` is used instead.
-
-    Parameters
-    ----------
-    x : :py:class:`~numpy.ndarray`
-        Array to index.
-    axis : int
-        Dimension along which to apply `index_spec`.
-    index_spec : slice or int
-        Index/slice to use.
-
-    Returns
-    -------
-    tuple
-        indexing tuple.
-
-    Examples
-    --------
-    .. testsetup::
-
-       from pypeline.util.math.fourier import _index
-
-    .. doctest::
-
-       >>> x = np.arange(5 * 4).reshape(5, 4)
-       >>> idx = _index(x, 0, 3)
-       >>> x[idx] = 0
-       >>> print(x)
-      [[ 0  1  2  3]
-       [ 4  5  6  7]
-       [ 8  9 10 11]
-       [ 0  0  0  0]
-       [16 17 18 19]]
-
-    .. doctest::
-
-       >>> x = np.arange(5 * 4).reshape(5, 4)
-       >>> idx = _index(x, 1, slice(2))
-       >>> x[idx] = 0
-       >>> print(x)
-      [[ 0  0  2  3]
-       [ 0  0  6  7]
-       [ 0  0 10 11]
-       [ 0  0 14 15]
-       [ 0  0 18 19]]
-    """
-    if not (-x.ndim <= axis < x.ndim):
-        raise ValueError('Parameter[axis] is out-of-bounds.')
-
-    indexer = [slice(None)] * x.ndim
-    indexer[axis] = index_spec
-    return tuple(indexer)
-
-
 @chk.check(dict(x=chk.accept_any(chk.has_reals, chk.has_complex),
                 A=chk.accept_any(chk.is_real, chk.is_complex),
                 W=chk.accept_any(chk.is_real, chk.is_complex),
@@ -433,8 +372,8 @@ def czt(x, A, W, M, axis=-1):
     n = np.arange(L)
     y = np.zeros(sh_Y, dtype=complex)
     y_mod = (A ** -n[:N]) * np.float_power(W, (n[:N] ** 2) / 2)
-    y[_index(y, axis, slice(N))] = x
-    y[_index(y, axis, slice(N))] *= y_mod.reshape(sh_N)
+    y[array._index(y, axis, slice(N))] = x
+    y[array._index(y, axis, slice(N))] *= y_mod.reshape(sh_N)
     Y = fftpack.fft(y, axis=axis)
 
     v = np.zeros(L, dtype=complex)
@@ -446,9 +385,9 @@ def czt(x, A, W, M, axis=-1):
     G *= V
     g = fftpack.ifft(G, axis=axis)
     g_mod = np.float_power(W, (n[:M] ** 2) / 2)
-    g[_index(g, axis, slice(M))] *= g_mod.reshape(sh_M)
+    g[array._index(g, axis, slice(M))] *= g_mod.reshape(sh_M)
 
-    X = g[_index(g, axis, slice(M))]
+    X = g[array._index(g, axis, slice(M))]
     return X
 
 
@@ -603,8 +542,8 @@ def fs_interp(x_FS, T, a, b, M, axis=-1, real_x=False):
     E = np.arange(M)
 
     if real_x:  # Real-valued functions.
-        x0_FS = x_FS[_index(x_FS, axis, slice(N, N + 1))]
-        xp_FS = x_FS[_index(x_FS, axis, slice(N + 1, N_FS))]
+        x0_FS = x_FS[array._index(x_FS, axis, slice(N, N + 1))]
+        xp_FS = x_FS[array._index(x_FS, axis, slice(N + 1, N_FS))]
         C = np.reshape(W ** E, sh) / A
 
         x = czt(xp_FS, A, W, M, axis=axis)
