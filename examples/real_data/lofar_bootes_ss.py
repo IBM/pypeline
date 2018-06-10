@@ -38,6 +38,7 @@ sky_model = dgen.from_tgss_catalog(ms.field_center, field_of_view, N_src=20)
 
 # Imaging
 N_level = 4
+N_bits = 32
 pix_q, pix_l, pix_colat, pix_lon = grid.ea_harmonic_grid(
     direction=ms.field_center.cartesian.xyz.value,
     FoV=field_of_view,
@@ -60,9 +61,9 @@ N_eig, c_centroid = I_est.infer_parameters()
 
 # Imaging
 I_dp = data_proc.IntensityFieldDataProcessorBlock(N_eig, c_centroid)
-I_mfs = bb_sd.Spatial_IMFS_Block(frequency, pix_grid, N_level)
+I_mfs = bb_sd.Spatial_IMFS_Block(frequency, pix_grid, N_level, N_bits)
 for t, f, S in ProgressBar(ms.visibilities(channel_id=[channel_id],
-                                           time_id=slice(None, None, 50),
+                                           time_id=slice(None, None, 1),
                                            column='DATA_SIMULATED')):
     XYZ = ms.geometry(t)
     W = ms.beamformer(XYZ, f)
@@ -86,7 +87,7 @@ N_eig = S_est.infer_parameters()
 
 # Imaging
 S_dp = data_proc.SensitivityFieldDataProcessorBlock(N_eig)
-S_mfs = bb_sd.Spatial_IMFS_Block(frequency, pix_grid, N_level=1)
+S_mfs = bb_sd.Spatial_IMFS_Block(frequency, pix_grid, 1, N_bits)
 for t, f, S in ProgressBar(ms.visibilities(channel_id=[channel_id],
                                            time_id=slice(None, None, 50),
                                            column='DATA_SIMULATED')):

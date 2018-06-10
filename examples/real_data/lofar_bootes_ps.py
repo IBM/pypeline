@@ -38,6 +38,7 @@ obs_start, obs_end = ms.time['TIME'][[0, -1]]
 
 # Imaging
 N_level = 4
+N_bits = 32
 R = ms.geometry.icrs2bfsf_rot(obs_start, obs_end)
 pix_q, pix_l, pix_colat, pix_lon = grid.ea_harmonic_grid(
     direction=R @ ms.field_center.cartesian.xyz.value,  # BFSF-equivalent f_dir.
@@ -63,9 +64,9 @@ N_eig, c_centroid = I_est.infer_parameters()
 # Imaging
 I_dp = data_proc.IntensityFieldDataProcessorBlock(N_eig, c_centroid)
 I_mfs = bb_fd.Fourier_IMFS_Block(frequency, pix_colat, pix_lon,
-                                 N_FS, T_kernel, R, N_level)
+                                 N_FS, T_kernel, R, N_level, N_bits)
 for t, f, S in ProgressBar(ms.visibilities(channel_id=[channel_id],
-                                           time_id=slice(None, None, 50),
+                                           time_id=slice(None, None, 1),
                                            column='DATA_SIMULATED')):
     XYZ = ms.geometry(t)
     W = ms.beamformer(XYZ, f)
@@ -90,7 +91,7 @@ N_eig = S_est.infer_parameters()
 # Imaging
 S_dp = data_proc.SensitivityFieldDataProcessorBlock(N_eig)
 S_mfs = bb_fd.Fourier_IMFS_Block(frequency, pix_colat, pix_lon,
-                                 N_FS, T_kernel, R, N_level=1)
+                                 N_FS, T_kernel, R, 1, N_bits)
 for t, f, S in ProgressBar(ms.visibilities(channel_id=[channel_id],
                                            time_id=slice(None, None, 50),
                                            column='DATA_SIMULATED')):

@@ -47,6 +47,7 @@ time = obs_start + T_integration * np.arange(3595)
 
 # Imaging
 N_level = 4
+N_bits = 32
 pix_q, pix_l, pix_colat, pix_lon = grid.ea_harmonic_grid(
     direction=field_center.cartesian.xyz.value,
     FoV=field_of_view,
@@ -67,8 +68,8 @@ N_eig, c_centroid = I_est.infer_parameters()
 
 # Imaging
 I_dp = data_proc.IntensityFieldDataProcessorBlock(N_eig, c_centroid)
-I_mfs = bb_sd.Spatial_IMFS_Block(frequency, pix_grid, N_level)
-for t in ProgressBar(time[::50]):
+I_mfs = bb_sd.Spatial_IMFS_Block(frequency, pix_grid, N_level, N_bits)
+for t in ProgressBar(time[::1]):
     XYZ = dev(t)
     W = mb(XYZ, frequency)
     S = vis(XYZ, W, frequency, sky_model)
@@ -91,7 +92,7 @@ N_eig = S_est.infer_parameters()
 
 # Imaging
 S_dp = data_proc.SensitivityFieldDataProcessorBlock(N_eig)
-S_mfs = bb_sd.Spatial_IMFS_Block(frequency, pix_grid, N_level=1)
+S_mfs = bb_sd.Spatial_IMFS_Block(frequency, pix_grid, 1, N_bits)
 for t in ProgressBar(time[::50]):
     XYZ = dev(t)
     W = mb(XYZ, frequency)
