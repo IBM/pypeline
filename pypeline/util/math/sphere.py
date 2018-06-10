@@ -11,6 +11,7 @@ Spherical geometry tools.
 import astropy.coordinates as coord
 import astropy.units as u
 import numpy as np
+import tqdm
 
 import pypeline.util.argcheck as chk
 import pypeline.util.math.func as func
@@ -204,12 +205,15 @@ def ea_interp(q, l, f, N, approximate_kernel=False):
         sh_weight = (L,) + (1,) * len(r.shape[1:])
 
         f_interp = np.zeros((L,) + r.shape[1:], dtype=f.dtype)
-        for w, t, p in zip(weight, colat_sph[q, 0], lon_sph[0, l]):
-            similarity = np.tensordot(pol2cart(1, t, p), r, axes=[[0], [0]])
-            kernel = kernel_func(similarity)
+        with tqdm.tqdm(total=len(f)) as pbar:
+            for w, t, p in zip(weight, colat_sph[q, 0], lon_sph[0, l]):
+                similarity = np.tensordot(pol2cart(1, t, p), r, axes=[[0], [0]])
+                kernel = kernel_func(similarity)
 
-            f_interp += (kernel.reshape(sh_kern) *
-                         w.reshape(sh_weight))
+                f_interp += (kernel.reshape(sh_kern) *
+                             w.reshape(sh_weight))
+
+                pbar.update()
 
         return f_interp
 
