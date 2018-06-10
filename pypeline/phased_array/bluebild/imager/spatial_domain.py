@@ -25,8 +25,9 @@ class Spatial_IMFS_Block(bim.IntegratingMultiFieldSynthesizerBlock):
 
     @chk.check(dict(freq=chk.is_frequency,
                     pix_grid=chk.has_reals,
-                    N_level=chk.is_integer))
-    def __init__(self, freq, pix_grid, N_level):
+                    N_level=chk.is_integer,
+                    precision=chk.is_integer))
+    def __init__(self, freq, pix_grid, N_level, precision=64):
         """
         Parameters
         ----------
@@ -36,14 +37,28 @@ class Spatial_IMFS_Block(bim.IntegratingMultiFieldSynthesizerBlock):
             (3, N_height, N_width) pixel vectors.
         N_level : int
             Number of clustered energy-levels to output.
+        precision : int
+            Numerical accuracy of floating-point operations.
+
+            Must be 32 or 64.
         """
         super().__init__()
 
-        self._synthesizer = ssd.SpatialFieldSynthesizerBlock(freq, pix_grid)
+        if precision == 32:
+            self._fp = np.float32
+            self._cp = np.complex64
+        elif precision == 64:
+            self._fp = np.float64
+            self._cp = np.complex128
+        else:
+            raise ValueError('Parameter[precision] must be 32 or 64.')
 
         if N_level <= 0:
             raise ValueError('Parameter[N_level] must be positive.')
         self._N_level = N_level
+
+        self._synthesizer = ssd.SpatialFieldSynthesizerBlock(
+            freq, pix_grid, precision)
 
     @chk.check(dict(D=chk.has_reals,
                     V=chk.has_complex,
@@ -76,6 +91,8 @@ class Spatial_IMFS_Block(bim.IntegratingMultiFieldSynthesizerBlock):
         stat : :py:class:`~numpy.ndarray`
             (2, N_level, N_height, N_width) field statistics.
         """
+        D = D.astype(self._fp, copy=False)
+
         stat_std = self._synthesizer(V, XYZ, W)
         stat_lsq = stat_std * D.reshape(-1, 1, 1)
 

@@ -36,8 +36,9 @@ class SpatialFieldSynthesizerBlock(synth.FieldSynthesizerBlock):
     """
 
     @chk.check(dict(freq=chk.is_frequency,
-                    pix_grid=chk.has_reals))
-    def __init__(self, freq, pix_grid):
+                    pix_grid=chk.has_reals,
+                    precision=chk.is_integer))
+    def __init__(self, freq, pix_grid, precision=64):
         """
         Parameters
         ----------
@@ -45,8 +46,21 @@ class SpatialFieldSynthesizerBlock(synth.FieldSynthesizerBlock):
             Frequency of observations.
         pix_grid : :py:class:`~numpy.ndarray`
             (3, N_height, N_width) pixel vectors.
+        precision : int
+            Numerical accuracy of floating-point operations.
+
+            Must be 32 or 64.
         """
         super().__init__()
+
+        if precision == 32:
+            self._fp = np.float32
+            self._cp = np.complex64
+        elif precision == 64:
+            self._fp = np.float64
+            self._cp = np.complex128
+        else:
+            raise ValueError('Parameter[precision] must be 32 or 64.')
 
         wps = pypeline.config.getfloat('phased_array', 'wps') * (u.m / u.s)
         self._wl = (wps / freq).to_value(u.m)
@@ -85,14 +99,21 @@ class SpatialFieldSynthesizerBlock(synth.FieldSynthesizerBlock):
         """
         if not _have_matching_shapes(V, XYZ, W):
             raise ValueError('Parameters[V, XYZ, W] are inconsistent.')
+        V = V.astype(self._cp, copy=False)
+        XYZ = XYZ.astype(self._fp, copy=False)
+        W = W.astype(self._cp, copy=False)
 
         N_antenna, N_beam = W.shape
         N_height, N_width = self._grid.shape[1:]
 
         XYZ = XYZ - XYZ.mean(axis=0)
-        P = ne.evaluate('exp(A * B)',
-                        dict(A=1j * 2 * np.pi / self._wl,
-                             B=np.tensordot(XYZ, self._grid, axes=1)))
+        P = np.zeros((N_antenna, N_height, N_width), dtype=self._cp)
+        ne.evaluate('exp(A * B)',
+                    dict(A=1j * 2 * np.pi / self._wl,
+                         B=np.tensordot(XYZ, self._grid, axes=1)),
+                    out=P,
+                    casting='same_kind')  # Due to limitations of NumExpr2
+
         PW = W.T @ P.reshape(N_antenna, N_height * N_width)
         PW = PW.reshape(N_beam, N_height, N_width)
 

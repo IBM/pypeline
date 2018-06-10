@@ -201,6 +201,11 @@ def ffs(x, T, T_c, N_FS, axis=-1):
     C_1 = np.reshape(B_1 ** (- E_1), sh)
     C_2 = np.reshape(B_2 ** (- N * E_2), sh)
 
+    # Cast C_2 to 32 bits if x is 32 bits. (Allows faster transforms.)
+    if ((x.dtype == np.dtype('complex64')) or
+            (x.dtype == np.dtype('float32'))):
+        C_2 = C_2.astype(np.complex64)
+
     X_FS = fftpack.fft(x * C_2, axis=axis)
     X_FS *= C_1 / N_s
     return X_FS
@@ -270,6 +275,11 @@ def iffs(x_FS, T, T_c, N_FS, axis=-1):
     sh[axis] = N_s
     C_1 = np.reshape(B_1 ** (E_1), sh)
     C_2 = np.reshape(B_2 ** (N * E_2), sh)
+
+    # Cast C_1 to 32 bits if x_FS is 32 bits. (Allows faster transforms.)
+    if ((x_FS.dtype == np.dtype('complex64')) or
+            (x_FS.dtype == np.dtype('float32'))):
+        C_1 = C_1.astype(np.complex64)
 
     X = fftpack.ifft(x_FS * C_1, axis=axis)
     X *= C_2 * N_s

@@ -36,8 +36,9 @@ class FourierFieldSynthesizerBlock(synth.FieldSynthesizerBlock):
                     N_FS=chk.is_odd,
                     T=chk.is_angle,
                     R=chk.require_all(chk.has_shape([3, 3]),
-                                      chk.has_reals)))
-    def __init__(self, freq, grid_colat, grid_lon, N_FS, T, R):
+                                      chk.has_reals),
+                    precision=chk.is_integer))
+    def __init__(self, freq, grid_colat, grid_lon, N_FS, T, R, precision=64):
         """
         Parameters
         ----------
@@ -53,6 +54,10 @@ class FourierFieldSynthesizerBlock(synth.FieldSynthesizerBlock):
             Kernel periodicity to use for imaging.
         R : array-like(float)
             (3, 3) ICRS -> BFSF rotation matrix.
+        precision : int
+            Numerical accuracy of floating-point operations.
+
+            Must be 32 or 64.
 
         Notes
         -----
@@ -61,6 +66,15 @@ class FourierFieldSynthesizerBlock(synth.FieldSynthesizerBlock):
         * `R` can be obtained by calling :py:meth:`~pypeline.phased_array.instrument.EarthBoundInstrumentGeometryBlock.icrs2bfsf_rot`.
         """
         super().__init__()
+
+        if precision == 32:
+            self._fp = np.float32
+            self._cp = np.complex64
+        elif precision == 64:
+            self._fp = np.float64
+            self._cp = np.complex128
+        else:
+            raise ValueError('Parameter[precision] must be 32 or 64.')
 
         wps = pypeline.config.getfloat('phased_array', 'wps') * (u.m / u.s)
         self._wl = (wps / freq).to_value(u.m)
@@ -135,6 +149,9 @@ class FourierFieldSynthesizerBlock(synth.FieldSynthesizerBlock):
         """
         if not fsd._have_matching_shapes(V, XYZ, W):
             raise ValueError('Parameters[V, XYZ, W] are inconsistent.')
+        V = V.astype(self._cp, copy=False)
+        XYZ = XYZ.astype(self._fp, copy=False)
+        W = W.astype(self._cp, copy=False)
 
         bfsf_XYZ = XYZ @ self._R.T
         if self._XYZk is None:
@@ -246,13 +263,19 @@ class FourierFieldSynthesizerBlock(synth.FieldSynthesizerBlock):
                                 self._grid_colat,
                                 lon_smpl.reshape(1, -1) * u.rad)
 
+        N_antenna = len(XYZ)
+        N_height = len(self._grid_colat)
+
         # `self._NFS` assumes imaging is performed with `XYZ` centered at the origin.
         XYZ_c = XYZ - XYZ.mean(axis=0)
         window = func.tukey(self._T, self._Tc, self._alpha_window)
-        k_smpl = ne.evaluate('exp(A * B) * C',
-                             dict(A=1j * 2 * np.pi / self._wl,
-                                  B=np.tensordot(XYZ_c, pix_smpl, axes=1),
-                                  C=window(lon_smpl)))
+        k_smpl = np.zeros((N_antenna, N_height, N_samples), dtype=self._cp)
+        ne.evaluate('exp(A * B) * C',
+                    dict(A=1j * 2 * np.pi / self._wl,
+                         B=np.tensordot(XYZ_c, pix_smpl, axes=1),
+                         C=window(lon_smpl)),
+                    out=k_smpl,
+                    casting='same_kind')  # Due to limitations of NumExpr2
 
         self._FSk = fourier.ffs(k_smpl, self._T, self._Tc, self._NFS, axis=2)
         self._XYZk = XYZ
