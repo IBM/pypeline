@@ -25,4 +25,4 @@ pypeline.phased\_array.bluebild.imager
       :toctree:
 
       pypeline.phased_array.bluebild.imager.spatial_domain
-
+      pypeline.phased_array.bluebild.imager.fourier_domain
