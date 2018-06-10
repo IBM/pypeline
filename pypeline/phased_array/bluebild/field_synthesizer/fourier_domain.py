@@ -9,6 +9,7 @@ Field synthesizers that work in Fourier Series domain.
 """
 
 import astropy.units as u
+import numexpr as ne
 import numpy as np
 import scipy.fftpack as fftpack
 import scipy.linalg as linalg
@@ -247,10 +248,11 @@ class FourierFieldSynthesizerBlock(synth.FieldSynthesizerBlock):
 
         # `self._NFS` assumes imaging is performed with `XYZ` centered at the origin.
         XYZ_c = XYZ - XYZ.mean(axis=0)
-        k_smpl = np.exp((1j * 2 * np.pi / self._wl) *
-                        np.tensordot(XYZ_c, pix_smpl, axes=1))
         window = func.tukey(self._T, self._Tc, self._alpha_window)
-        k_smpl *= window(lon_smpl)
+        k_smpl = ne.evaluate('exp(A * B) * C',
+                             dict(A=1j * 2 * np.pi / self._wl,
+                                  B=np.tensordot(XYZ_c, pix_smpl, axes=1),
+                                  C=window(lon_smpl)))
 
         self._FSk = fourier.ffs(k_smpl, self._T, self._Tc, self._NFS, axis=2)
         self._XYZk = XYZ

@@ -9,6 +9,7 @@ Field synthesizers that work in the spatial domain.
 """
 
 import astropy.units as u
+import numexpr as ne
 import numpy as np
 import scipy.linalg as linalg
 import scipy.sparse as sparse
@@ -89,8 +90,9 @@ class SpatialFieldSynthesizerBlock(synth.FieldSynthesizerBlock):
         N_height, N_width = self._grid.shape[1:]
 
         XYZ = XYZ - XYZ.mean(axis=0)
-        P = np.exp((1j * 2 * np.pi / self._wl) *
-                   np.tensordot(XYZ, self._grid, axes=1))
+        P = ne.evaluate('exp(A * B)',
+                        dict(A=1j * 2 * np.pi / self._wl,
+                             B=np.tensordot(XYZ, self._grid, axes=1)))
         PW = W.T @ P.reshape(N_antenna, N_height * N_width)
         PW = PW.reshape(N_beam, N_height, N_width)
 

@@ -15,6 +15,7 @@ astropy == 3.0.*
 flake8 == 3.5.*
 ipython == 6.3.*
 matplotlib == 2.2.*
+numexpr == 2.6.*
 numpy == 1.14.*
 pandas == 0.22.*
 plotly == 2.6.*
