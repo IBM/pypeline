@@ -27,7 +27,7 @@ After installing `Miniconda <https://conda.io/miniconda.html>`_ or `Anaconda <ht
                    --file=conda_requirements.txt
     $ source activate pypeline_dev
     $ python3 setup.py develop
-    $ tox  # Run test suites (optional)
+    $ python3 test.py  # Run test suites (optional)
     $ python3 setup.py build_sphinx  # Generate documentation (optional)
 
 

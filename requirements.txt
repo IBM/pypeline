@@ -25,5 +25,4 @@ scikit-learn == 0.19.*
 scipy == 1.1.*
 sphinx == 1.7.*
 sphinx_rtd_theme == 0.3.*
-tox == 3.0.*
 tqdm == 4.23.*
