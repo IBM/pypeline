@@ -69,10 +69,13 @@ templates_path = ['_templates']
 master_doc = 'index'
 exclude_patterns = []
 pygments_style = 'sphinx'
+add_module_names = False
 
 # -- Options for HTML output -------------------------------------------------
 html_theme = 'sphinx_rtd_theme'
-html_static_path = ['_static']
+html_theme_options = {
+    'navigation_depth': -1,
+    'titles_only': True}
 
 # -- Options for HTMLHelp output ---------------------------------------------
 htmlhelp_basename = 'pypelinedoc'
@@ -82,10 +85,10 @@ htmlhelp_basename = 'pypelinedoc'
 autosummary_generate = True
 
 # -- Options for autodoc extension -------------------------------------------
-autodoc_member_order = 'groupwise'
+autodoc_member_order = 'bysource'
 autodoc_default_flags = [
     'members',
-    'inherited-members',
+    # 'inherited-members',
     'show-inheritance',
 ]
 autodoc_inherit_docstrings = True

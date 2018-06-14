@@ -10,12 +10,3 @@ pypeline.phased\_array.util.data\_gen
 
    ~pypeline.phased_array.util.data_gen.sky
    ~pypeline.phased_array.util.data_gen.visibility
-   
-   
-
-   
-   
-   
-
-   
-   
