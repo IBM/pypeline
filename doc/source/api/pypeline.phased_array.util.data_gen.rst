@@ -2,27 +2,19 @@ pypeline.phased\_array.util.data\_gen
 =====================================
 
 .. automodule:: pypeline.phased_array.util.data_gen
-   :special-members: __init__, __call__
-   
-   
-   .. rubric:: Functions
 
-   .. autosummary::
-   
-      is_source_config
-      from_tgss_catalog
+.. rubric:: Modules
+
+.. autosummary::
+   :toctree:
+
+   ~pypeline.phased_array.util.data_gen.sky
+   ~pypeline.phased_array.util.data_gen.visibility
    
    
 
    
    
-   .. rubric:: Classes
-
-   .. autosummary::
-   
-      SkyEmission
-      VisibilityMatrix
-      VisibilityGeneratorBlock
    
 
    
