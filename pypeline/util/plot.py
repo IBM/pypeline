@@ -35,8 +35,7 @@ def colorbar(scm, ax):
 
     Returns
     -------
-    :py:class:`~matplotlib.colorbar.Colorbar`
-        Attached colorbar.
+    colorbar : :py:class:`~matplotlib.colorbar.Colorbar`
 
     Examples
     --------
@@ -60,8 +59,8 @@ def colorbar(scm, ax):
     divider = ax_grid.make_axes_locatable(ax)
     ax_colorbar = divider.append_axes('right', size='5%', pad=0.05,
                                       axes_class=axes.Axes)
-
-    return fig.colorbar(scm, cax=ax_colorbar)
+    colorbar = fig.colorbar(scm, cax=ax_colorbar)
+    return colorbar
 
 
 @chk.check(dict(name=chk.is_instance(str),
@@ -83,8 +82,7 @@ def cmap(name, N=None):
 
     Returns
     -------
-    :py:class:`~matplotlib.colors.ListedColormap`
-        `Matplotlib <https://matplotlib.org/>`_ colormap.
+    colormap : :py:class:`~matplotlib.colors.ListedColormap`
 
     Examples
     --------

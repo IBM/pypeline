@@ -39,6 +39,7 @@ def wishrnd(S, df):
 
        import numpy as np
        from pypeline.util.math.stat import wishrnd
+       import scipy.linalg as linalg
 
        np.random.seed(0)
 
@@ -46,27 +47,28 @@ def wishrnd(S, df):
            '''
            Construct a (N, N) Hermitian matrix.
            '''
-           i, j = np.triu_indices(N)
-           A = np.zeros((N, N), dtype=complex)
-           A[i, j] = np.random.randn(len(i)) + 1j * np.random.randn(len(i))
-           A += A.conj().T
+           D = np.arange(N)
+           Rmtx = np.random.randn(N,N) + 1j * np.random.randn(N, N)
+           Q, _ = linalg.qr(Rmtx)
+
+           A = (Q * D) @ Q.conj().T
            return A
 
     .. doctest::
 
        >>> A = hermitian_array(N=4)  # random (N, N) PSD array.
        >>> print(np.around(A, 2))
-       [[ 3.53+0.j    0.4 +1.45j  0.98+0.76j  2.24+0.12j]
-        [ 0.4 -1.45j  3.74+0.j   -0.98+0.33j  0.95+1.49j]
-        [ 0.98-0.76j -0.98-0.33j -0.3 +0.j   -0.1 +0.31j]
-        [ 2.24-0.12j  0.95-1.49j -0.1 -0.31j  0.82+0.j  ]]
+       [[ 1.85+0.j   -0.1 -0.53j -0.62+0.26j -0.63+0.46j]
+        [-0.1 +0.53j  1.17+0.j    0.78+0.42j  0.21+0.21j]
+        [-0.62-0.26j  0.78-0.42j  1.68+0.j    0.31-0.17j]
+        [-0.63-0.46j  0.21-0.21j  0.31+0.17j  1.29+0.j  ]]
 
        >>> B = wishrnd(A, df=7)
        >>> print(np.around(B, 2))
-       [[ 3.92 +0.j    6.55 +0.68j  2.95 -0.33j  3.87 -1.47j]
-        [ 6.55 -0.68j 43.29 +0.j    3.8  -2.26j  7.59 +1.84j]
-        [ 2.95 +0.33j  3.8  +2.26j 18.7  +0.j    4.63-16.52j]
-        [ 3.87 +1.47j  7.59 -1.84j  4.63+16.52j 20.74 +0.j  ]]
+       [[ 6.79+0.j   -3.13-1.96j -6.83-0.71j -0.41+2.05j]
+        [-3.13+1.96j  3.15+0.j    3.13-0.94j  1.28+0.15j]
+        [-6.83+0.71j  3.13+0.94j 11.03-0.j   -3.6 -5.7j ]
+        [-0.41-2.05j  1.28-0.15j -3.6 +5.7j  10.79+0.j  ]]
 
     Notes
     -----

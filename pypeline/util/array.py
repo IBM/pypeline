@@ -141,6 +141,32 @@ class LabeledMatrix:
         -------
         bool
             True if axes are consistent.
+
+        Examples
+        --------
+        .. testsetup::
+
+           import numpy as np
+           import pandas as pd
+           from pypeline.util.array import LabeledMatrix
+
+        .. doctest::
+
+           >>> N, M, K = 5, 3, 4
+           >>> index = [pd.Index(range(N), name='A'),
+           ...          pd.Index(range(M), name='B'),
+           ...          pd.Index(range(K), name='C'),
+           ...          pd.Index(range(M), name='D')]
+
+           >>> M1 = LabeledMatrix(np.random.rand(N, M), index[0], index[1])
+           >>> M2 = LabeledMatrix(np.random.rand(M, K), index[1], index[2])
+           >>> M3 = LabeledMatrix(np.random.rand(M, K), index[3], index[2])
+
+           >>> M1.is_consistent_with(M2, axes=[1, 0])
+           True
+
+           >>> M1.is_consistent_with(M3, axes=[1, 0])  # different index names.
+           False
         """
         if not chk.is_instance(LabeledMatrix)(lmtx):
             raise ValueError('Parameter[lmtx] must be a LabeledMatrix.')

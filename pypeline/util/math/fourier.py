@@ -95,7 +95,7 @@ def ffs(x, T, T_c, N_FS, axis=-1):
 
     Parameters
     ----------
-    x : array-like(complex)
+    x : array-like(float or complex)
         (..., N_s, ...) function values at sampling points specified by :py:func:`~pypeline.util.math.fourier.ffs_sample`.
     T : float
         Function period.
@@ -224,7 +224,7 @@ def iffs(x_FS, T, T_c, N_FS, axis=-1):
 
     Parameters
     ----------
-    x_FS : array-like(complex)
+    x_FS : array-like(float or complex)
         (..., N_s, ...) FS coefficients in the order :math:`\left[ x_{-N}^{FS}, \ldots, x_{N}^{FS}, 0, \ldots, 0 \right] \in \mathbb{C}^{N_{s}}`.
     T : float
         Function period.
@@ -301,9 +301,9 @@ def czt(x, A, W, M, axis=-1):
     ----------
     x : array-like(float or complex)
         (..., N, ...) input array.
-    A : complex
+    A : float or complex
         Circular offset from the positive real-axis.
-    W : complex
+    W : float or complex
         Circular spacing between transform points.
     M : int
         Length of the transform.

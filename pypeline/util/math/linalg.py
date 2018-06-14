@@ -64,6 +64,7 @@ def eigh(A, B=None, tau=1, N=None):
 
        import numpy as np
        from pypeline.util.math.linalg import eigh
+       import scipy.linalg as linalg
 
        np.random.seed(0)
 
@@ -71,10 +72,11 @@ def eigh(A, B=None, tau=1, N=None):
            '''
            Construct a (N, N) Hermitian matrix.
            '''
-           i, j = np.triu_indices(N)
-           A = np.zeros((N, N), dtype=complex)
-           A[i, j] = np.random.randn(len(i)) + 1j * np.random.randn(len(i))
-           A += A.conj().T
+           D = np.arange(N)
+           Rmtx = np.random.randn(N,N) + 1j * np.random.randn(N, N)
+           Q, _ = linalg.qr(Rmtx)
+
+           A = (Q * D) @ Q.conj().T
            return A
 
        M = 4
@@ -97,13 +99,13 @@ def eigh(A, B=None, tau=1, N=None):
 
        >>> D, V = eigh(A, B)
        >>> print(np.around(D, 4))  # The last term is small but positive.
-       [0.0574 0.0397 0.002  0.    ]
+       [0.0296 0.0198 0.0098 0.    ]
 
        >>> print(np.around(V, 4))
-       [[-0.0781-0.0007j  0.0473+0.0011j  0.017 -0.0002j -0.0436+0.0023j]
-        [-0.0375+0.0351j -0.0692+0.0235j  0.0158+0.0004j -0.002 -0.0366j]
-        [-0.0043+0.0047j  0.0235-0.0079j -0.002 -0.0779j  0.0321-0.0477j]
-        [-0.0313+0.021j   0.0208+0.0326j -0.0514+0.0275j  0.0577+0.0089j]]
+       [[-0.0621+0.0001j -0.0561+0.0005j -0.0262-0.0004j  0.0474+0.0005j]
+        [ 0.0285+0.0041j -0.0413-0.0501j  0.0129-0.0209j -0.004 -0.0647j]
+        [ 0.0583+0.0055j -0.0443+0.0033j  0.0069+0.0474j  0.0281+0.0371j]
+        [ 0.0363+0.0209j  0.0006+0.0235j -0.029 -0.0736j  0.0321+0.0142j]]
 
     * Drop some trailing eigenpairs:
 
@@ -111,13 +113,13 @@ def eigh(A, B=None, tau=1, N=None):
 
        >>> D, V = eigh(A, B, tau=0.8)
        >>> print(np.around(D, 4))
-       [0.0574]
+       [0.0296]
 
        >>> print(np.around(V, 4))
-       [[-0.0781-0.0007j]
-        [-0.0375+0.0351j]
-        [-0.0043+0.0047j]
-        [-0.0313+0.021j ]]
+       [[-0.0621+0.0001j]
+        [ 0.0285+0.0041j]
+        [ 0.0583+0.0055j]
+        [ 0.0363+0.0209j]]
 
     * Pad output to certain size:
 
@@ -125,13 +127,13 @@ def eigh(A, B=None, tau=1, N=None):
 
        >>> D, V = eigh(A, B, tau=0.8, N=3)
        >>> print(np.around(D, 4))
-       [0.0574 0.     0.    ]
+       [0.0296 0.     0.    ]
 
        >>> print(np.around(V, 4))
-       [[-0.0781-0.0007j  0.    +0.j      0.    +0.j    ]
-        [-0.0375+0.0351j  0.    +0.j      0.    +0.j    ]
-        [-0.0043+0.0047j  0.    +0.j      0.    +0.j    ]
-        [-0.0313+0.021j   0.    +0.j      0.    +0.j    ]]
+       [[-0.0621+0.0001j  0.    +0.j      0.    +0.j    ]
+        [ 0.0285+0.0041j  0.    +0.j      0.    +0.j    ]
+        [ 0.0583+0.0055j  0.    +0.j      0.    +0.j    ]
+        [ 0.0363+0.0209j  0.    +0.j      0.    +0.j    ]]
     """
     A = np.array(A, copy=False)
     M = len(A)
