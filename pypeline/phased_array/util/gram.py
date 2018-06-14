@@ -100,6 +100,39 @@ class GramBlock(core.Block):
         -------
         :py:class:`~pypeline.phased_array.gram.GramMatrix`
             (N_beam, N_beam) Gram matrix.
+
+        Examples
+        --------
+        .. testsetup::
+
+           import astropy.units as u
+           import astropy.time as atime
+           import astropy.coordinates as coord
+           from pypeline.phased_array.instrument import LofarBlock
+           from pypeline.phased_array.beamforming import MatchedBeamformerBlock
+           from pypeline.phased_array.util.gram import GramBlock
+
+        .. doctest::
+
+           >>> instr = LofarBlock()
+           >>> station_id = instr._layout.index.get_level_values('STATION_ID')
+           >>> freq = 145 * u.MHz
+
+           >>> mb_cfg = [(_, _, coord.SkyCoord(0 * u.deg, 90 * u.deg))
+           ...           for _ in station_id.drop_duplicates()]
+           >>> mb = MatchedBeamformerBlock(mb_cfg)
+
+           >>> XYZ = instr(atime.Time('J2000'))
+           >>> W = mb(XYZ, freq)
+
+           >>> gr = GramBlock()
+           >>> G = gr(XYZ, W, freq)
+
+           >>> np.around(np.abs(G.data[:4, :4]), 2)
+           array([[3.0774e+02, 3.3000e-01, 1.0000e-02, 1.8000e-01],
+                  [3.3000e-01, 3.0774e+02, 4.0000e-02, 9.0000e-02],
+                  [1.0000e-02, 4.0000e-02, 3.0654e+02, 8.2000e-01],
+                  [1.8000e-01, 9.0000e-02, 8.2000e-01, 2.6708e+02]])
         """
         if not XYZ.is_consistent_with(W, axes=[0, 0]):
             raise ValueError('Parameters[XYZ, W] are inconsistent.')

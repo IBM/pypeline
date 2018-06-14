@@ -5,7 +5,15 @@
 # #############################################################################
 
 """
-Instrument-related operations and geometry.
+Instrument-related operations.
+
+Phased-arrays are collections of receiving elements (i.e., antennas or microphones) that sense a random field around them.
+These instruments are characterized by the properties of their receiving elements, such as position, sensitivity, etc.
+
+Only positional information is modeled at the moment, and can be accessed through 2 objects:
+
+ * :py:class:`~pypeline.phased_array.instrument.InstrumentGeometryBlock` : compute positional information.
+ * :py:class:`~pypeline.phased_array.instrument.InstrumentGeometry` : container for positional information.
 """
 
 import pathlib
@@ -269,6 +277,19 @@ class InstrumentGeometryBlock(core.Block):
         -------
         N : int
             Maximum order of complex plane waves that can be imaged by the instrument.
+
+        Examples
+        --------
+        .. testsetup::
+
+           from pypeline.phased_array.instrument import MwaBlock
+           import astropy.units as u
+
+        .. doctest::
+
+           >>> instr = MwaBlock()
+           >>> instr.nyquist_rate(freq=145 * u.MHz)
+           8910
         """
         wps = pypeline.config.getfloat('phased_array', 'wps') * (u.m / u.s)
         wl = (wps / freq).to_value(u.m)
@@ -312,6 +333,23 @@ class StationaryInstrumentGeometryBlock(InstrumentGeometryBlock):
         -------
         :py:class:`~pypeline.phased_array.instrument.InstrumentGeometry`
             (N_antenna, 3) instrument geometry.
+
+        Examples
+        --------
+        .. testsetup::
+
+           from pypeline.phased_array.instrument import PyramicBlock
+
+        .. doctest::
+
+           >>> instr = PyramicBlock()
+           >>> xyz = instr().data[:5]
+           >>> np.around(xyz, 3)
+           array([[-0.014, -0.025,  0.01 ],
+                  [-0.026, -0.045,  0.043],
+                  [-0.038, -0.065,  0.075],
+                  [-0.042, -0.073,  0.088],
+                  [-0.044, -0.077,  0.095]])
         """
         return _as_InstrumentGeometry(self._layout)
 
@@ -438,6 +476,35 @@ class EarthBoundInstrumentGeometryBlock(InstrumentGeometryBlock):
         -------
         :py:class:`~pypeline.phased_array.instrument.InstrumentGeometry`
             (N_antenna, 3) ICRS instrument geometry.
+
+        Examples
+        --------
+        .. testsetup::
+
+           from pypeline.phased_array.instrument import LofarBlock
+           import astropy.time as atime
+           import astropy.units as u
+
+        .. doctest::
+
+           >>> instr = LofarBlock()
+
+           >>> time = atime.Time('J2000')
+           >>> xyz = instr(time)
+           >>> np.around(xyz.data[:5], 2)
+           array([[ 1148711.63, -3679538.21,  5064569.  ],
+                  [ 1148716.62, -3679538.41,  5064567.74],
+                  [ 1148705.76, -3679542.23,  5064567.43],
+                  [ 1148710.75, -3679542.42,  5064566.16],
+                  [ 1148715.74, -3679542.61,  5064564.9 ]])
+
+           >>> xyz = instr(time + 30 * u.min)
+           >>> np.around(xyz.data[:5], 2)
+           array([[ 1620400.85, -3497579.41,  5064547.21],
+                  [ 1620405.82, -3497578.94,  5064545.95],
+                  [ 1620395.56, -3497584.15,  5064545.63],
+                  [ 1620400.53, -3497583.69,  5064544.37],
+                  [ 1620405.5 , -3497583.23,  5064543.11]])
         """
         layout = self._layout.loc[:, ['X', 'Y', 'Z']].values.T
         r = linalg.norm(layout, axis=0)
@@ -470,6 +537,26 @@ class EarthBoundInstrumentGeometryBlock(InstrumentGeometryBlock):
         -------
         R : :py:class:`~numpy.ndarray`
             (3, 3) ICRS -> BFSF rotation matrix.
+
+        Examples
+        --------
+        .. testsetup::
+
+           from pypeline.phased_array.instrument import LofarBlock
+           import astropy.time as atime
+           import astropy.units as u
+
+        .. doctest::
+
+           >>> instr = LofarBlock()
+
+           >>> obs_start = atime.Time('J2000')
+           >>> obs_end = obs_start + 4 * u.h
+           >>> R = instr.icrs2bfsf_rot(obs_start, obs_end)
+           >>> np.around(R, 3)
+           array([[ 0.963, -0.27 , -0.   ],
+                  [ 0.27 ,  0.963,  0.   ],
+                  [-0.   ,  0.   , -1.   ]])
         """
         if obs_start > obs_end:
             raise ValueError('Parameter[obs_start] must precede '
@@ -525,6 +612,24 @@ class EarthBoundInstrumentGeometryBlock(InstrumentGeometryBlock):
         -------
         N_FS : int
             Kernel bandwidth when evaluated in the BFSF reference frame.
+
+        Examples
+        --------
+        .. testsetup::
+
+           from pypeline.phased_array.instrument import LofarBlock
+           import astropy.time as atime
+           import astropy.units as u
+
+        .. doctest::
+
+           >>> instr = LofarBlock(N_station=48)
+
+           >>> freq = 145 * u.MHz
+           >>> obs_start = atime.Time('J2000')
+           >>> obs_end = obs_start + 4 * u.h
+           >>> instr.bfsf_kernel_bandwidth(freq, obs_start, obs_end)
+           22061
         """
         wps = pypeline.config.getfloat('phased_array', 'wps') * (u.m / u.s)
         wl = (wps / freq).to_value(u.m)

@@ -6,6 +6,13 @@
 
 """
 Beamforming-related operations and tools.
+
+*Beamforming* is the process of combining signals from different receiving elements through a linear operator, with the dual role of:
+
+* Reducing data-rates from antennas;
+* Form super-antennas with particular radiation patterns.
+
+Only simple beamformers are included here: more advanced variants can be found in the :py:mod:`pypeline_extras` package.
 """
 
 import collections.abc as abc
@@ -261,6 +268,40 @@ class MatchedBeamformerBlock(BeamformerBlock):
         -------
         :py:class:`~pypeline.phased_array.beamforming.BeamWeights`
             (N_antenna, N_beam) synthesis beamweights.
+
+        Examples
+        --------
+        .. testsetup::
+
+           from pypeline.phased_array.instrument import LofarBlock
+           from pypeline.phased_array.beamforming import MatchedBeamformerBlock
+           import astropy.units as u
+           import astropy.time as atime
+           import astropy.coordinates as coord
+
+        .. doctest::
+
+           >>> instr = LofarBlock(N_station=24)
+           >>> station_id = instr._layout.index.get_level_values('STATION_ID')
+
+           >>> mb_cfg = [(_, _, coord.SkyCoord(0 * u.deg, 90 * u.deg))
+           ...           for _ in station_id.drop_duplicates()]
+           >>> mb = MatchedBeamformerBlock(mb_cfg)
+
+           >>> XYZ = instr(atime.Time('J2000'))
+           >>> W = mb(XYZ, freq=145 * u.MHz)
+
+        When using radio telescopes, W is generally sparse:
+
+        .. doctest::
+
+           fig, ax = plt.subplots()
+           W_mask = ~np.isclose(W.data.todense(), 0)
+           ax.imshow(W_mask.T)
+
+           fig.show()
+
+        .. image:: _img/mb_weights_mask_example.png
         """
         wps = pypeline.config.getfloat('phased_array', 'wps') * (u.m / u.s)
         wl = (wps / freq).to_value(u.m)
