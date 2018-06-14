@@ -5,7 +5,7 @@
 # #############################################################################
 
 """
-Measurement Set (MS) file tools.
+Measurement Set (MS) readers and tools.
 """
 
 import pathlib
@@ -17,11 +17,69 @@ import astropy.units as u
 import casacore.tables as ct
 import numpy as np
 import pandas as pd
+import scipy.sparse as sparse
 
 import pypeline.phased_array.beamforming as beamforming
 import pypeline.phased_array.instrument as instrument
-import pypeline.phased_array.util.data_gen as dgen
+import pypeline.phased_array.util.data_gen.visibility as vis
 import pypeline.util.argcheck as chk
+
+
+@chk.check(dict(S=chk.is_instance(vis.VisibilityMatrix),
+                W=chk.is_instance(beamforming.BeamWeights)))
+def filter_data(S, W):
+    """
+    Fix mis-matches to make data streams compatible.
+
+    Visibility matrices from MS files typically include broken beams and/or may not match beams specified in beamforming matrices.
+    This mis-match causes computations further down the imaging pypeline to be less efficient or completely wrong.
+    This function applies 2 corrections to visibility and beamforming matrices to make them compliant:
+
+    * Drop beams in `S` that do not appear in `W`;
+    * Insert 0s in `W` where `S` has broken beams.
+
+    Parameters
+    ----------
+    S : :py:class:`~pypeline.phased_array.util.data_gen.visibility.VisibilityMatrix`
+        (N_beam1, N_beam1) visibility matrix.
+    W : :py:class:`~pypeline.phased_array.beamforming.BeamWeights`
+        (N_antenna, N_beam2) beamforming matrix.
+
+    Returns
+    -------
+    S : :py:class:`~pypeline.phased_array.util.data_gen.visibility.VisibilityMatrix`
+        (N_beam2, N_beam2) filtered visibility matrix.
+    W : :py:class:`~pypeline.phased_array.beamforming.BeamWeights`
+        (N_antenna, N_beam2) filtered beamforming matrix.
+    """
+    # Stage 1: Drop beams in S that do not appear in W
+    beam_idx1 = S.index[0]
+    beam_idx2 = W.index[1]
+    beams_to_drop = beam_idx1.difference(beam_idx2)
+    beams_to_keep = beam_idx1.drop(beams_to_drop)
+
+    mask = np.any(beam_idx1.values.reshape(-1, 1) ==
+                  beams_to_keep.values.reshape(1, -1), axis=1)
+    S_f = vis.VisibilityMatrix(data=S.data[np.ix_(mask, mask)],
+                               beam_idx=beam_idx1[mask])
+
+    # Stage 2: Insert 0s in W where S had broken beams
+    broken_beam_idx = beam_idx2[np.isclose(np.sum(S_f.data, axis=1), 0)]
+    mask = np.any(beam_idx2.values.reshape(-1, 1) ==
+                  broken_beam_idx.values.reshape(1, -1), axis=1)
+
+    if (np.any(mask) and sparse.isspmatrix(W.data)):
+        w_lil = W.data.tolil()  # for efficiency
+        w_lil[:, mask] = 0
+        w_f = w_lil.tocsr()
+    else:
+        w_f = W.data.copy()
+        w_f[:, mask] = 0
+    W_f = beamforming.BeamWeights(data=w_f,
+                                  ant_idx=W.index[0],
+                                  beam_idx=beam_idx2)
+
+    return S_f, W_f
 
 
 class MeasurementSet:
@@ -56,7 +114,7 @@ class MeasurementSet:
         self._field_center = None
         self._channels = None
         self._time = None
-        self._geometry = None
+        self._instrument = None
         self._beamformer = None
 
     @property
@@ -143,7 +201,7 @@ class MeasurementSet:
         return self._time
 
     @property
-    def geometry(self):
+    def instrument(self):
         """
         Returns
         -------
@@ -179,7 +237,7 @@ class MeasurementSet:
         channel_id : array-like(int) or slice
             Several CHANNEL_IDs from :py:attr:`~pypeline.phased_array.util.io.ms.MeasurementSet.channels`.
         time_id : int or slice
-            Several TIME_IDs from :py:attr:`~pypeline.phased_arary.util.io.ms.MeasurementSet.time`.
+            Several TIME_IDs from :py:attr:`~pypeline.phased_array.util.io.ms.MeasurementSet.time`.
         column : str
             Column name from MAIN table where visibility data resides.
 
@@ -193,7 +251,7 @@ class MeasurementSet:
 
             * time (:py:class:`~astropy.time.Time`): moment the visibility was formed;
             * freq (:py:class:`~astropy.units.Quantity`): center frequency of the visibility;
-            * S (:py:class:`~pypeline.phased_array.util.data_gen.VisibilityMatrix`)
+            * S (:py:class:`~pypeline.phased_array.util.data_gen.visibility.VisibilityMatrix`)
         """
         if column not in ct.taql(f'select * from {self._msf}').colnames():
             raise ValueError(f'column={column} does not exist '
@@ -238,7 +296,7 @@ class MeasurementSet:
                                   index=S_full_idx)
 
             # Drop rows of `S_full` corresponding to unwanted beams.
-            beam_id = np.unique(self.geometry
+            beam_id = np.unique(self.instrument
                                 ._layout
                                 .index
                                 .get_level_values('STATION_ID'))
@@ -269,8 +327,8 @@ class MeasurementSet:
             f = self.channels['FREQUENCY']
             beam_idx = pd.Index(beam_id, name='BEAM_ID')
             for ch_id in channel_id:
-                vis = _series2array(S[ch_id].rename('S', inplace=True))
-                visibility = dgen.VisibilityMatrix(vis, beam_idx)
+                v = _series2array(S[ch_id].rename('S', inplace=True))
+                visibility = vis.VisibilityMatrix(v, beam_idx)
                 yield t, f[ch_id], visibility
 
 
@@ -285,10 +343,10 @@ def _series2array(visibility: pd.Series) -> np.ndarray:
     col_map = row_map.rename(columns={'ROW_ID': 'COL_ID'})
 
     data = (visibility
-                .reset_index()
-                .merge(row_map, left_on='B_0', right_on='BEAM_ID')
-                .merge(col_map, left_on='B_1', right_on='BEAM_ID')
-                .loc[:, ['ROW_ID', 'COL_ID', 'S']])
+            .reset_index()
+            .merge(row_map, left_on='B_0', right_on='BEAM_ID')
+            .merge(col_map, left_on='B_1', right_on='BEAM_ID')
+            .loc[:, ['ROW_ID', 'COL_ID', 'S']])
 
     N_beam = len(row_map)
     S = np.zeros(shape=(N_beam, N_beam), dtype=complex)
@@ -326,7 +384,7 @@ class LofarMeasurementSet(MeasurementSet):
         self._N_station = N_station
 
     @property
-    def geometry(self):
+    def instrument(self):
         """
         Returns
         -------
@@ -372,11 +430,11 @@ class LofarMeasurementSet(MeasurementSet):
             # Finally, only keep the stations that were specified in `__init__()`.
             XYZ = instrument.InstrumentGeometry(xyz=cfg.values,
                                                 ant_idx=cfg.index)
-            self._geometry = (instrument
-                              .EarthBoundInstrumentGeometryBlock(XYZ,
-                                                                 self._N_station))
+            self._instrument = (instrument
+                                .EarthBoundInstrumentGeometryBlock(XYZ,
+                                                                   self._N_station))
 
-        return self._geometry
+        return self._instrument
 
     @property
     def beamformer(self):
@@ -391,7 +449,7 @@ class LofarMeasurementSet(MeasurementSet):
         """
         if self._beamformer is None:
             # LOFAR uses Matched-Beamforming exclusively, with a single beam output per station.
-            XYZ = self.geometry._layout
+            XYZ = self.instrument._layout
             beam_id = np.unique(XYZ.index.get_level_values('STATION_ID'))
 
             direction = self.field_center
@@ -417,14 +475,14 @@ class MwaMeasurementSet(MeasurementSet):
         super().__init__(file_name)
 
     @property
-    def geometry(self):
+    def instrument(self):
         """
         Returns
         -------
         :py:class:`~pypeline.phased_array.instrument.EarthBoundInstrumentGeometryBlock`
             Instrument position computer.
         """
-        if self._geometry is None:
+        if self._instrument is None:
             # Following the MS file specification from https://casa.nrao.edu/casadocs/casa-5.1.0/reference-material/measurement-set, the ANTENNA sub-table specifies the antenna geometry.
             # Some remarks on the required fields:
             # - POSITION: absolute station positions in ITRF coordinates.
@@ -447,10 +505,10 @@ class MwaMeasurementSet(MeasurementSet):
             XYZ = instrument.InstrumentGeometry(xyz=cfg.values,
                                                 ant_idx=cfg.index)
 
-            self._geometry = (instrument
-                              .EarthBoundInstrumentGeometryBlock(XYZ))
+            self._instrument = (instrument
+                                .EarthBoundInstrumentGeometryBlock(XYZ))
 
-        return self._geometry
+        return self._instrument
 
     @property
     def beamformer(self):
@@ -466,7 +524,7 @@ class MwaMeasurementSet(MeasurementSet):
         if self._beamformer is None:
             # MWA does not do any beamforming.
             # Given the single-antenna station model in MS files from MWA, this can be seen as Matched-Beamforming, with a single beam output per station.
-            XYZ = self.geometry._layout
+            XYZ = self.instrument._layout
             beam_id = np.unique(XYZ.index.get_level_values('STATION_ID'))
 
             direction = self.field_center
