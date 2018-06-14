@@ -508,9 +508,9 @@ class EarthBoundInstrumentGeometryBlock(InstrumentGeometryBlock):
     @chk.check(dict(freq=chk.is_frequency,
                     obs_start=chk.is_instance(time.Time),
                     obs_end=chk.is_instance(time.Time)))
-    def kernel_bandwidth(self, freq, obs_start, obs_end):
+    def bfsf_kernel_bandwidth(self, freq, obs_start, obs_end):
         """
-        Bandwidth of :math:`2 \pi`-periodic complex plane-wave kernel.
+        Bandwidth of :math:`2 \pi`-periodic complex plane-wave kernel in BFSF coordinates.
 
         Parameters
         ----------

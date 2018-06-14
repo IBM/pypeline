@@ -53,7 +53,7 @@ pix_q, pix_l, pix_colat, pix_lon = grid.ea_harmonic_grid(
     direction=R @ field_center.cartesian.xyz.value,  # BFSF-equivalent f_dir.
     FoV=field_of_view,
     N=dev.nyquist_rate(frequency))
-N_FS = dev.kernel_bandwidth(frequency, obs_start, obs_end)
+N_FS = dev.bfsf_kernel_bandwidth(frequency, obs_start, obs_end)
 T_kernel = 10 * u.deg
 
 ### Intensity Field ===========================================================
