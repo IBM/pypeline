@@ -51,4 +51,4 @@ If you know your Pypeline scripts are correct (i.e., they execute without error)
 
 .. warning::
 
-   Some Tox integration tests will *not* pass if ``ignore_checks = True``.
+   Some tests will *not* pass if ``ignore_checks = True``.
