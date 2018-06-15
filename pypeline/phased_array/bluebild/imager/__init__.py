@@ -4,8 +4,17 @@
 # Author : Sepand KASHANI [sep@zurich.ibm.com]
 # #############################################################################
 
-"""
+r"""
 High-level Bluebild interfaces.
+
+Let :math:`I_{k}(r,t)` denote the :math:`k`-th energy-level obtained at time :math:`t`.
+Subclasses of :py:class:`~pypeline.phased_array.bluebild.imager.IntegratingMultiFieldSynthesizerBlock` do 3 things:
+
+* integrate snapshot images to obtain integrated images spanning many observation periods: :math:`I_{k}(r) = \sum_{q=1}^{N_{t}} I_{k}(r, t_{q})`;
+* aggregate energy levels;
+* re-weight energy levels to output both a least-squares estimate and a standardized estimate of the (integrated) field.
+
+Integrated images can then be directly output in viewable form by calling :py:meth:`~pypeline.phased_array.bluebild.imager.IntegratingMultiFieldSynthesizerBlock.as_image`.
 """
 
 import pypeline.core as core

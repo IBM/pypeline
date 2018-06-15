@@ -13,7 +13,7 @@ import scipy.sparse as sparse
 
 import pypeline.phased_array.bluebild.field_synthesizer.fourier_domain as psd
 import pypeline.phased_array.bluebild.imager as bim
-import pypeline.phased_array.util.io as io
+import pypeline.phased_array.util.io.image as image
 import pypeline.util.argcheck as chk
 import pypeline.util.array as array
 import pypeline.util.math.sphere as sph
@@ -22,6 +22,110 @@ import pypeline.util.math.sphere as sph
 class Fourier_IMFS_Block(bim.IntegratingMultiFieldSynthesizerBlock):
     """
     Multi-field synthesizer based on PeriodicSynthesis.
+
+    Examples
+    --------
+    Assume we are imaging a portion of the Bootes field with LOFAR's 24 core stations.
+
+    The short script below shows how to use :py:class:`~pypeline.phased_array.bluebild.imager.fourier_domain.Fourier_IMFS_Block` to form continuous integrated energy level estimates.
+
+    .. testsetup::
+
+       import numpy as np
+       import astropy.units as u
+       import astropy.time as atime
+       import astropy.coordinates as coord
+       from tqdm import tqdm as ProgressBar
+       from pypeline.phased_array.bluebild.data_processor import IntensityFieldDataProcessorBlock
+       from pypeline.phased_array.bluebild.imager.fourier_domain import Fourier_IMFS_Block
+       from pypeline.phased_array.instrument import LofarBlock
+       from pypeline.phased_array.beamforming import MatchedBeamformerBlock
+       from pypeline.phased_array.util.gram import GramBlock
+       from pypeline.phased_array.util.data_gen.sky import from_tgss_catalog
+       from pypeline.phased_array.util.data_gen.visibility import VisibilityGeneratorBlock
+       from pypeline.phased_array.util.grid import ea_grid
+       from pypeline.util.math.sphere import pol2cart
+
+       np.random.seed(0)
+
+    .. doctest::
+
+       ### Experiment setup ================================================
+       # Observation
+       >>> obs_start = atime.Time(56879.54171302732, scale='utc', format='mjd')
+       >>> field_center = coord.SkyCoord(218 * u.deg, 34.5 * u.deg)
+       >>> field_of_view = 5 * u.deg
+       >>> frequency = 145 * u.MHz
+
+       # instrument
+       >>> N_station = 24
+       >>> dev = LofarBlock(N_station)
+       >>> mb = MatchedBeamformerBlock([(_, _, field_center) for _ in range(N_station)])
+       >>> gram = GramBlock()
+
+       # Visibility generation
+       >>> sky_model=from_tgss_catalog(field_center, field_of_view, N_src=10)
+       >>> vis = VisibilityGeneratorBlock(sky_model,
+       ...                                T=8 * u.s,
+       ...                                fs=196 * u.kHz,
+       ...                                SNR=np.inf)
+
+       ### Energy-level imaging ============================================
+       # Kernel parameters
+       >>> t_img = obs_start + np.arange(200) * 8 * u.s  # fine-grained snapshots
+       >>> obs_start, obs_end = t_img[0], t_img[-1]
+       >>> R = dev.icrs2bfsf_rot(obs_start, obs_end)
+       >>> N_FS = dev.bfsf_kernel_bandwidth(frequency, obs_start, obs_end)
+       >>> T_kernel = 10 * u.deg
+
+       # Pixel grid: make sure to generate it in BFSF coordinates by applying R.
+       >>> px_colat, px_lon = ea_grid(direction=np.dot(R, field_center.transform_to('icrs').cartesian.xyz.value),
+       ...                            FoV=field_of_view,
+       ...                            size=[256, 386])
+
+       >>> I_dp = IntensityFieldDataProcessorBlock(N_eig=7,  # assumed obtained from IntensityFieldParameterEstimator.infer_parameters()
+       ...                                         cluster_centroids=[124.927,  65.09 ,  38.589,  23.256])
+       >>> I_mfs = Fourier_IMFS_Block(frequency, px_colat, px_lon,
+       ...                            N_FS, T_kernel, R, N_level=4)
+       >>> for t in ProgressBar(t_img):
+       ...     XYZ = dev(t)
+       ...     W = mb(XYZ, frequency)
+       ...     S = vis(XYZ, W, frequency)
+       ...     G = gram(XYZ, W, frequency)
+       ...
+       ...     D, V, c_idx = I_dp(S, G)
+       ...
+       ...     # (2, N_eig, N_height, N_FS+Q) energy levels [integrated, clustered) (compact descriptor, not the same thing as [D, V]).
+       ...     field_stat = I_mfs(D, V, XYZ.data, W.data, c_idx)
+
+       >>> I_std, I_lsq = I_mfs.as_image()
+
+    The standardized and least-squares images can then be viewed side-by-side:
+
+    .. doctest::
+
+       from pypeline.phased_array.util.io.image import SphericalImage
+       import matplotlib.pyplot as plt
+
+       # Transform grid to ICRS coordinates before plotting.
+       px_grid = np.tensordot(R.T, pol2cart(1, px_colat, px_lon), axes=1)
+
+       fig, ax = plt.subplots(ncols=2)
+       I_std.draw(index=slice(None),  # Collapse all energy levels
+                  catalog=sky_model,
+                  data_kwargs=dict(cmap='cubehelix'),
+                  catalog_kwargs=dict(s=600),
+                  ax=ax[0])
+       ax[0].set_title('Standardized Estimate')
+       I_lsq.draw(index=slice(None),  # Collapse all energy levels
+                  catalog=sky_model,
+                  data_kwargs=dict(cmap='cubehelix'),
+                  catalog_kwargs=dict(s=600),
+                  ax=ax[1])
+       ax[1].set_title('Least-Squares Estimate')
+       fig.show()
+
+    .. image:: _img/bluebild_FourierIMFSBlock_integrate_example.png
     """
 
     @chk.check(dict(freq=chk.is_frequency,
@@ -145,10 +249,10 @@ class Fourier_IMFS_Block(bim.IntegratingMultiFieldSynthesizerBlock):
 
         stat_std = self._statistics[0]
         field_std = self._synthesizer.synthesize(stat_std)
-        std = io.SphericalImage(field_std, icrs_grid)
+        std = image.SphericalImage(field_std, icrs_grid)
 
         stat_lsq = self._statistics[1]
         field_lsq = self._synthesizer.synthesize(stat_lsq)
-        lsq = io.SphericalImage(field_lsq, icrs_grid)
+        lsq = image.SphericalImage(field_lsq, icrs_grid)
 
         return std, lsq

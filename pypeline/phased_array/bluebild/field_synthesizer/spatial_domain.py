@@ -33,6 +33,96 @@ def _have_matching_shapes(V, XYZ, W):
 class SpatialFieldSynthesizerBlock(synth.FieldSynthesizerBlock):
     """
     Field synthesizer based on StandardSynthesis.
+
+    Examples
+    --------
+    Assume we are imaging a portion of the Bootes field with LOFAR's 24 core stations.
+
+    The short script below shows how to use :py:class:`~pypeline.phased_array.bluebild.field_synthesizer.spatial_domain.SpatialFieldSynthesizerBlock` to form continuous energy level estimates.
+
+    .. testsetup::
+
+       import numpy as np
+       import astropy.units as u
+       import astropy.time as atime
+       import astropy.coordinates as coord
+       from tqdm import tqdm as ProgressBar
+       from pypeline.phased_array.bluebild.data_processor import IntensityFieldDataProcessorBlock
+       from pypeline.phased_array.bluebild.field_synthesizer.spatial_domain import SpatialFieldSynthesizerBlock
+       from pypeline.phased_array.instrument import LofarBlock
+       from pypeline.phased_array.beamforming import MatchedBeamformerBlock
+       from pypeline.phased_array.util.gram import GramBlock
+       from pypeline.phased_array.util.data_gen.sky import from_tgss_catalog
+       from pypeline.phased_array.util.data_gen.visibility import VisibilityGeneratorBlock
+       from pypeline.phased_array.util.grid import spherical_grid
+
+       np.random.seed(0)
+
+    .. doctest::
+
+       ### Experiment setup ================================================
+       # Observation
+       >>> obs_start = atime.Time(56879.54171302732, scale='utc', format='mjd')
+       >>> field_center = coord.SkyCoord(218 * u.deg, 34.5 * u.deg)
+       >>> field_of_view = 5 * u.deg
+       >>> frequency = 145 * u.MHz
+
+       # instrument
+       >>> N_station = 24
+       >>> dev = LofarBlock(N_station)
+       >>> mb = MatchedBeamformerBlock([(_, _, field_center) for _ in range(N_station)])
+       >>> gram = GramBlock()
+
+       # Visibility generation
+       >>> sky_model=from_tgss_catalog(field_center, field_of_view, N_src=10)
+       >>> vis = VisibilityGeneratorBlock(sky_model,
+       ...                                T=8 * u.s,
+       ...                                fs=196 * u.kHz,
+       ...                                SNR=np.inf)
+
+       ### Energy-level imaging ============================================
+       # Pixel grid
+       >>> px_grid = spherical_grid(field_center.transform_to('icrs').cartesian.xyz.value,
+       ...                          FoV=field_of_view,
+       ...                          size=[256, 386])
+
+       >>> I_dp = IntensityFieldDataProcessorBlock(N_eig=7,  # assumed obtained from IntensityFieldParameterEstimator.infer_parameters()
+       ...                                         cluster_centroids=[124.927,  65.09 ,  38.589,  23.256])
+       >>> I_fs = SpatialFieldSynthesizerBlock(frequency, px_grid)
+       >>> t_img = obs_start + np.arange(20) * 400 * u.s  # well-spaced snapshots
+       >>> for t in ProgressBar(t_img):
+       ...     XYZ = dev(t)
+       ...     W = mb(XYZ, frequency)
+       ...     S = vis(XYZ, W, frequency)
+       ...     G = gram(XYZ, W, frequency)
+       ...
+       ...     D, V, c_idx = I_dp(S, G)
+       ...
+       ...     # (N_eig, N_height, N_width) energy levels (compact descriptor, not the same thing as [D, V]).
+       ...     field_stat = I_fs(V, XYZ.data, W.data)
+       ...
+       ...     # (N_eig, N_height, N_width) energy levels
+       ...     # These are the actual field values. Depending on the implementation of FieldSynthesizerBlock, `field_stat` and `field` may differ.
+       ...     field = I_fs.synthesize(field_stat)
+
+       # For SpatialFieldSynthesizerBlock(), `field` and `field_stat` are actually identical.
+       >>> np.allclose(field_stat, field)
+       True
+
+    In the example above, individual snapshots were not added together, hence the final image is just the last field snapshot and can be quite noisy:
+
+    .. doctest::
+
+       from pypeline.phased_array.util.io.image import SphericalImage
+       I_snapshot = SphericalImage(data=field, grid=px_grid)
+
+       ax = I_snapshot.draw(index=slice(None),  # Collapse all energy levels
+                            catalog=sky_model,
+                            data_kwargs=dict(cmap='cubehelix'),
+                            catalog_kwargs=dict(s=600))
+       ax.get_figure().show()
+
+    .. image:: _img/bluebild_SpatialFieldSynthesizer_snapshot_example.png
     """
 
     @chk.check(dict(freq=chk.is_frequency,

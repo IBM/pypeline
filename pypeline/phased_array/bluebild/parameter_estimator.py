@@ -4,14 +4,21 @@
 # Author : Sepand KASHANI [sep@zurich.ibm.com]
 # #############################################################################
 
-"""
+r"""
 Parameter estimators.
+
+Bluebild field synthesizers output :math:`N_{\text{beam}}` energy levels, with :math:`N_{\text{beam}}` being the height of the visibility/Gram matrices :math:`\Sigma, G`.
+We are often not interested in such fined-grained energy decompositions but would rather have 4-5 well-separated energy levels as output.
+This is accomplished by clustering energy levels together during the aggregation stage.
+
+As the energy scale depends on the visibilities, it is preferable to infer the cluster centroids (and any other parameters of interest) by scanning a portion of the data stream.
+Subclasses of :py:class:`~pypeline.phased_array.bluebild.parameter_estimator.ParameterEstimator` are specifically tailored for such tasks.
 """
 
 import numpy as np
 import sklearn.cluster as skcl
 
-import pypeline.phased_array.util.data_gen as dgen
+import pypeline.phased_array.util.data_gen.visibility as vis
 import pypeline.phased_array.util.gram as gr
 import pypeline.util.argcheck as chk
 import pypeline.util.math.linalg as pylinalg
@@ -56,6 +63,71 @@ class ParameterEstimator:
 class IntensityFieldParameterEstimator(ParameterEstimator):
     """
     Parameter estimator for computing intensity fields.
+
+    Examples
+    --------
+    Assume we are imaging a portion of the Bootes field with LOFAR's 24 core stations.
+    As 24 energy levels exhibit a smooth spectrum, we decide to aggregate them into 4 well-separated energy levels through clustering.
+
+    The short script below shows how to use :py:class:`~pypeline.phased_array.bluebild.parameter_estimator.IntensityFieldParameterEstimator` to optimally choose cluster centroids.
+
+    .. testsetup::
+
+       import numpy as np
+       import astropy.units as u
+       import astropy.time as atime
+       import astropy.coordinates as coord
+       from pypeline.phased_array.bluebild.parameter_estimator import IntensityFieldParameterEstimator
+       from pypeline.phased_array.instrument import LofarBlock
+       from pypeline.phased_array.beamforming import MatchedBeamformerBlock
+       from pypeline.phased_array.util.gram import GramBlock
+       from pypeline.phased_array.util.data_gen.sky import from_tgss_catalog
+       from pypeline.phased_array.util.data_gen.visibility import VisibilityGeneratorBlock
+
+       np.random.seed(0)
+
+    .. doctest::
+
+       ### Experiment setup ================================================
+       # Observation
+       >>> obs_start = atime.Time(56879.54171302732, scale='utc', format='mjd')
+       >>> field_center = coord.SkyCoord(218 * u.deg, 34.5 * u.deg)
+       >>> field_of_view = 5 * u.deg
+       >>> frequency = 145 * u.MHz
+
+       # instrument
+       >>> N_station = 24
+       >>> dev = LofarBlock(N_station)
+       >>> mb = MatchedBeamformerBlock([(_, _, field_center) for _ in range(N_station)])
+       >>> gram = GramBlock()
+
+       # Visibility generation
+       >>> vis = VisibilityGeneratorBlock(sky_model=from_tgss_catalog(field_center, field_of_view, N_src=10),
+       ...                                T=8 * u.s,
+       ...                                fs=196 * u.kHz,
+       ...                                SNR=np.inf)
+
+       ### Parameter estimation ============================================
+       >>> I_est = IntensityFieldParameterEstimator(N_level=4, sigma=0.95)
+       >>> t_est = obs_start + np.arange(20) * 400 * u.s  # sample visibilities throughout the 8h observation.
+       >>> for t in t_est:
+       ...    XYZ = dev(t)
+       ...    W = mb(XYZ, frequency)
+       ...    S = vis(XYZ, W, frequency)
+       ...    G = gram(XYZ, W, frequency)
+       ...
+       ...    I_est.collect(S, G)  # Store S, G internally until full 8h interval has been sampled.
+       ...
+       >>> N_eig, c_centroid = I_est.infer_parameters()  # optimal estimate
+
+       # notice that it is less than N_src=10 because sigma=0.95 made
+       # it throw away the trailing eigenpairs that account for 5% of
+       # the sky's energy.
+       >>> N_eig
+       7
+
+       >>> np.around(c_centroid, 3)
+       array([124.927,  65.09 ,  38.589,  23.256])
     """
 
     @chk.check(dict(N_level=chk.is_integer,
@@ -83,7 +155,7 @@ class IntensityFieldParameterEstimator(ParameterEstimator):
         self._visibilities = []
         self._grams = []
 
-    @chk.check(dict(S=chk.is_instance(dgen.VisibilityMatrix),
+    @chk.check(dict(S=chk.is_instance(vis.VisibilityMatrix),
                     G=chk.is_instance(gr.GramMatrix)))
     def collect(self, S, G):
         """
@@ -91,7 +163,7 @@ class IntensityFieldParameterEstimator(ParameterEstimator):
 
         Parameters
         ----------
-        S : :py:class:`~pypeline.phased_array.util.data_gen.VisibilityMatrix`
+        S : :py:class:`~pypeline.phased_array.util.data_gen.visibility.VisibilityMatrix`
             (N_beam, N_beam) visibility matrix.
         G : :py:class:`~pypeline.phased_array.util.gram.GramMatrix`
             (N_beam, N_beam) gram matrix.

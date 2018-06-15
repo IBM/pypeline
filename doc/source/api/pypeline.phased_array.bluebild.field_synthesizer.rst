@@ -23,8 +23,8 @@ pypeline.phased\_array.bluebild.field\_synthesizer
    .. autosummary::
       :toctree:
 
-      pypeline.phased_array.bluebild.field_synthesizer.spatial_domain
-      pypeline.phased_array.bluebild.field_synthesizer.fourier_domain
+      ~pypeline.phased_array.bluebild.field_synthesizer.spatial_domain
+      ~pypeline.phased_array.bluebild.field_synthesizer.fourier_domain
 
 
 
