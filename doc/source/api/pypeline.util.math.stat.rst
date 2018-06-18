@@ -15,6 +15,7 @@ pypeline.util.math.stat
    
       Distribution
       Wishart
+      Kent
    
    
 
