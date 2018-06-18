@@ -2,10 +2,22 @@ pypeline.util.math.func
 =======================
 
 .. automodule:: pypeline.util.math.func
+   :special-members: __init__, __call__
 
-   .. rubric:: Functions
+   
+   
+   
+
+   
+   
+   .. rubric:: Classes
 
    .. autosummary::
+   
+      SphericalDirichlet
+      Tukey
+   
+   
 
-      sph_dirichlet
-      tukey
+   
+   

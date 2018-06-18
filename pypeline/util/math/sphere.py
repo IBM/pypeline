@@ -109,11 +109,11 @@ class EqualAngleInterpolator(core.Block):
 
        import numpy as np
        from pypeline.util.math.sphere import ea_sample, EqualAngleInterpolator, pol2cart
-       from pypeline.util.math.func import sph_dirichlet
+       from pypeline.util.math.func import SphericalDirichlet
 
        def gammaN(r, r0, N):
            similarity = np.tensordot(r0, r, axes=1)
-           d_func = sph_dirichlet(N)
+           d_func = SphericalDirichlet(N)
            return d_func(similarity) * (N + 1) / (4 * np.pi)
 
     .. doctest::
@@ -161,7 +161,7 @@ class EqualAngleInterpolator(core.Block):
         N : int
             Order of the reconstructed zonal function.
         approximate_kernel : bool
-            If :py:obj:`True`, pass the `approx` option to :py:class:`~pypeline.util.math.func.sph_dirichlet`.
+            If :py:obj:`True`, pass the `approx` option to :py:class:`~pypeline.util.math.func.SphericalDirichlet`.
 
         Notes
         -----
@@ -197,7 +197,7 @@ class EqualAngleInterpolator(core.Block):
                  np.sum(np.sin(_2m1 * colat_sph) / _2m1, axis=1, keepdims=True))
         self._weight = (f * alpha[q]).to_value(u.dimensionless_unscaled)
 
-        self._kernel_func = func.sph_dirichlet(N, approx=approximate_kernel)
+        self._kernel_func = func.SphericalDirichlet(N, approximate_kernel)
 
     @chk.check(dict(colat=chk.accept_any(chk.is_angle, chk.has_angles),
                     lon=chk.accept_any(chk.is_angle, chk.has_angles)))

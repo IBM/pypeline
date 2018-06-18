@@ -15,43 +15,27 @@ import numpy as np
 import scipy.interpolate as interpolate
 import scipy.special as sp
 
+import pypeline.core as core
 import pypeline.util.argcheck as chk
 
 
-@chk.check(dict(T=chk.is_real,
-                beta=chk.is_real,
-                alpha=chk.is_real))
-def tukey(T, beta, alpha):
+class Tukey(core.Block):
     r"""
     Parameterized Tukey function.
-
-    Parameters
-    ----------
-    T : float
-        Function support.
-    beta : float
-        Function mid-point.
-    alpha : float
-        Normalized decay-rate.
-
-    Returns
-    -------
-    :py:obj:`~typing.Callable`
-        Function that outputs the amplitude of the parameterized Tukey function at specified locations.
 
     Examples
     --------
     .. testsetup::
 
        import numpy as np
-       from pypeline.util.math.func import tukey
+       from pypeline.util.math.func import Tukey
 
     .. doctest::
 
-       >>> f = tukey(T=1, beta=0.5, alpha=0.25)
-       >>> sample_points = np.linspace(0, 1, 25).reshape(5, 5)  # any shape
+       >>> tukey = Tukey(T=1, beta=0.5, alpha=0.25)
 
-       >>> amplitudes = f(sample_points)
+       >>> sample_points = np.linspace(0, 1, 25).reshape(5, 5)  # any shape
+       >>> amplitudes = tukey(sample_points)
        >>> np.around(amplitudes, 2)
        array([[0.  , 0.25, 0.75, 1.  , 1.  ],
               [1.  , 1.  , 1.  , 1.  , 1.  ],
@@ -85,88 +69,83 @@ def tukey(T, beta, alpha):
            \text{otherwise.}
        \end{cases}
     """
-    if not (T > 0):
-        raise ValueError('Parameter[T] must be positive.')
-    if not (0 <= alpha <= 1):
-        raise ValueError('Parameter[alpha] must be in [0, 1].')
+
+    @chk.check(dict(T=chk.is_real,
+                    beta=chk.is_real,
+                    alpha=chk.is_real))
+    def __init__(self, T, beta, alpha):
+        """
+        Parameters
+        ----------
+        T : float
+            Function support.
+        beta : float
+            Function mid-point.
+        alpha : float
+           Normalized decay-rate.
+        """
+        super().__init__()
+        self._beta = beta
+
+        if not (T > 0):
+            raise ValueError('Parameter[T] must be positive.')
+        self._T = T
+
+        if not (0 <= alpha <= 1):
+            raise ValueError('Parameter[alpha] must be in [0, 1].')
+        self._alpha = alpha
 
     @chk.check('x', chk.accept_any(chk.is_real, chk.has_reals))
-    def tukey_func(x):
-        x = np.array(x, copy=False)
-
-        y = x - beta + T / 2
-        if np.isclose(alpha, 0):
-            left_lim = 0.
-            right_lim = T
-        else:
-            left_lim = T * alpha / 2
-            right_lim = T - (T * alpha / 2)
-
-        ramp_up = (0 <= y) & (y < left_lim)
-        body = (left_lim <= y) & (y <= right_lim)
-        ramp_down = (right_lim < y) & (y <= T)
-
-        amplitude = np.zeros_like(x)
-        amplitude[body] = 1
-        if not np.isclose(alpha, 0):
-            amplitude[ramp_up] = np.sin(np.pi / (T * alpha) *
-                                        y[ramp_up]) ** 2
-            amplitude[ramp_down] = np.sin(np.pi / (T * alpha) *
-                                          (T - y[ramp_down])) ** 2
-        return amplitude
-
-    tukey_func.__doc__ = (rf"""
-        Tukey(T={T}, beta={beta}, alpha={alpha}) function.
+    def __call__(self, x):
+        """
+        Sample the Tukey(T, beta, alpha) function.
 
         Parameters
         ----------
         x : float or array-like(float)
-            Values at which to compute Tukey({T}, {beta}, {alpha})(x).
+            Sample points.
 
         Returns
         -------
-        :py:class:`~numpy.ndarray`
-        """)
+        Tukey(T, beta, alpha)(x) : :py:class:`~numpy.ndarray`
+        """
+        x = np.array(x, copy=False)
 
-    return tukey_func
+        y = x - self._beta + self._T / 2
+        left_lim = float(self._T * self._alpha / 2)
+        right_lim = float(self._T - (self._T * self._alpha / 2))
+
+        ramp_up = (0 <= y) & (y < left_lim)
+        body = (left_lim <= y) & (y <= right_lim)
+        ramp_down = (right_lim < y) & (y <= self._T)
+
+        amplitude = np.zeros_like(x)
+        amplitude[body] = 1
+        if not np.isclose(self._alpha, 0):
+            amplitude[ramp_up] = np.sin(np.pi / (self._T * self._alpha) *
+                                        y[ramp_up]) ** 2
+            amplitude[ramp_down] = np.sin(np.pi / (self._T * self._alpha) *
+                                          (self._T - y[ramp_down])) ** 2
+        return amplitude
 
 
-@chk.check(dict(N=chk.is_integer,
-                approx=chk.is_boolean))
-def sph_dirichlet(N, approx=False):
+class SphericalDirichlet(core.Block):
     r"""
     Parameterized spherical Dirichlet kernel.
-
-    Parameters
-    ----------
-    N : int
-        Kernel order.
-    approx : bool
-        Approximate kernel using cubic-splines.
-
-        This method provides extremely reliable estimates of :math:`K_{N}(t)` in the vicinity of 1 where the function's main sidelobes are found.
-        Values outside the vicinity smoothly converge to 0.
-
-        Only works for `N` greater than 10.
-
-    Returns
-    -------
-    :py:obj:`~typing.Callable`
-        Function that outputs the amplitude of the parameterized spherical Dirichlet function at specified locations.
 
     Examples
     --------
     .. testsetup::
 
        import numpy as np
-       from pypeline.util.math.func import sph_dirichlet
+       from pypeline.util.math.func import SphericalDirichlet
 
     .. doctest::
 
        >>> N = 4
-       >>> f = sph_dirichlet(N)
-       >>> sample_points = np.linspace(-1, 1, 25).reshape(5, 5)  # any shape
+       >>> f = SphericalDirichlet(N)
 
+       >>> sample_points = np.linspace(-1, 1, 25).reshape(5, 5)  # any shape
        >>> amplitudes = f(sample_points)
        >>> np.around(amplitudes, 2)
        array([[ 1.  ,  0.2 , -0.25, -0.44, -0.44],
@@ -180,8 +159,8 @@ def sph_dirichlet(N, approx=False):
     .. doctest::
 
        N = 11
-       f_exact = func.sph_dirichlet(N)
-       f_approx = func.sph_dirichlet(N, approx=True)
+       f_exact = SphericalDirichlet(N)
+       f_approx = SphericalDirichlet(N, approx=True)
 
        x = np.linspace(-1, 1, 2000)
        e_y = f_exact(x)
@@ -201,7 +180,6 @@ def sph_dirichlet(N, approx=False):
 
     .. image:: _img/sph_dirichlet_example.png
 
-
     Notes
     -----
     The spherical Dirichlet function :math:`K_{N}(t): [-1, 1] \to \mathbb{R}` is defined as:
@@ -210,11 +188,78 @@ def sph_dirichlet(N, approx=False):
 
     where :math:`P_{N}(t)` is the `Legendre polynomial <https://en.wikipedia.org/wiki/Legendre_polynomials>`_ of order :math:`N`.
     """
-    if N < 0:
-        raise ValueError("Parameter[N] must be non-negative.")
+
+    @chk.check(dict(N=chk.is_integer,
+                    approx=chk.is_boolean))
+    def __init__(self, N, approx=False):
+        """
+        Parameters
+        ----------
+        N : int
+            Kernel order.
+        approx : bool
+            Approximate kernel using cubic-splines.
+
+            This method provides extremely reliable estimates of :math:`K_{N}(t)` in the vicinity of 1 where the function's main sidelobes are found.
+            Values outside the vicinity smoothly converge to 0.
+
+            Only works for `N` greater than 10.
+        """
+        super().__init__()
+
+        if N < 0:
+            raise ValueError("Parameter[N] must be non-negative.")
+        self._N = N
+
+        if (approx is True) and (N <= 10):
+            raise ValueError('Cannot use approximation method if '
+                             'Parameter[N] <= 10.')
+        self._approx = approx
+
+        if approx is True:  # Fit cubic-spline interpolator.
+            N_samples = 10 ** 3
+
+            # Find interval LHS after which samples will be evaluated exactly.
+            theta_max = 180 * u.deg
+            while True:
+                x = np.linspace(0, theta_max, N_samples)
+                cx = np.cos(x).value
+                cy = self._exact_kernel(cx)
+                zero_cross = np.diff(np.sign(cy))
+                N_cross = np.abs(np.sign(zero_cross)).sum()
+
+                if N_cross > 10:
+                    theta_max /= 2
+                else:
+                    break
+
+            window = Tukey(T=2 - 2 * np.cos(2 * theta_max.to_value(u.rad)),
+                           beta=1,
+                           alpha=0.5)
+
+            x = np.r_[np.linspace(np.cos(theta_max * 2), np.cos(theta_max),
+                                  N_samples, endpoint=False),
+                      np.linspace(np.cos(theta_max), 1, N_samples)].value
+            y = self._exact_kernel(x) * window(x)
+            self.__cs_interp = interpolate.interp1d(x, y,
+                                                    kind='cubic',
+                                                    bounds_error=False,
+                                                    fill_value=0)
 
     @chk.check('x', chk.accept_any(chk.is_real, chk.has_reals))
-    def exact_func(x):
+    def __call__(self, x):
+        r"""
+        Sample the order-N spherical Dirichlet kernel.
+
+        Parameters
+        ----------
+        x : float or array-like(float)
+            Values at which to compute :math:`K_{N}(x)`.
+
+        Returns
+        -------
+        K_N(x) : :py:class:`~numpy.ndarray`
+        """
         if chk.is_scalar(x):
             x = np.array([x], dtype=float)
         else:
@@ -223,72 +268,31 @@ def sph_dirichlet(N, approx=False):
         if not np.all((-1 <= x) & (x <= 1)):
             raise ValueError('Parameter[x] must lie in [-1, 1].')
 
-        amplitude = (sp.eval_legendre(N + 1, x) - sp.eval_legendre(N, x))
+        if self._approx is True:
+            f = self._approx_kernel
+        else:
+            f = self._exact_kernel
+
+        amplitude = f(x)
+        return amplitude
+
+    # @chk.check('x', chk.accept_any(chk.is_real, chk.has_reals))
+    def _exact_kernel(self, x):
+        amplitude = (sp.eval_legendre(self._N + 1, x) -
+                     sp.eval_legendre(self._N, x))
         with warnings.catch_warnings():
+            # The kernel is so condensed near 1 at high N that np.isclose()
+            # does a terrible job at letting us manually treat values close to
+            # the upper limit.
+            # The best way to implement K_N(t) is to let the floating point
+            # division fail and then replace NaNs.
             warnings.simplefilter(action='ignore', category=RuntimeWarning)
             amplitude /= x - 1
-        amplitude[np.isnan(amplitude)] = N + 1
+        amplitude[np.isnan(amplitude)] = self._N + 1
 
         return amplitude
 
-    sph_dirichlet_func = exact_func
-    if approx:
-        if N <= 10:
-            raise ValueError('Cannot use approximation method if '
-                             'Parameter[N] <= 10.')
-
-        N_samples = 10 ** 3
-
-        theta_max = 180 * u.deg
-        while True:
-            x = np.linspace(0, theta_max, N_samples)
-            cx = np.cos(x)
-            cy = exact_func(cx)
-            zero_cross = np.diff(np.sign(cy))
-            N_cross = np.abs(np.sign(zero_cross)).sum()
-
-            if N_cross > 10:
-                theta_max /= 2
-            else:
-                break
-
-        window = tukey(T=2 - 2 * np.cos(2 * theta_max.to_value(u.rad)),
-                       beta=1,
-                       alpha=0.5)
-
-        x = np.r_[np.linspace(np.cos(theta_max * 2), np.cos(theta_max),
-                              N_samples, endpoint=False),
-                  np.linspace(np.cos(theta_max), 1, N_samples)]
-        y = exact_func(x) * window(x)
-        f = interpolate.interp1d(x, y,
-                                 kind='cubic',
-                                 bounds_error=False,
-                                 fill_value=0)
-
-        @chk.check('x', chk.accept_any(chk.is_real, chk.has_reals))
-        def interp_func(x):
-            x = np.array(x, copy=False, dtype=float)
-
-            if not np.all((-1 <= x) & (x <= 1)):
-                raise ValueError('Parameter[x] must lie in [-1, 1].')
-
-            amplitude = f(x)
-
-            return amplitude
-
-        sph_dirichlet_func = interp_func
-
-    sph_dirichlet_func.__doc__ = (rf"""
-        Order-{N} spherical Dirichlet kernel.
-
-        Parameters
-        ----------
-        x : float or array-like(float)
-            Values at which to compute :math:`K_{{{N}}}(x)`.
-
-        Returns
-        -------
-        :py:class:`~numpy.ndarray`
-        """)
-
-    return sph_dirichlet_func
+    # @chk.check('x', chk.accept_any(chk.is_real, chk.has_reals))
+    def _approx_kernel(self, x):
+        amplitude = self.__cs_interp(x)
+        return amplitude

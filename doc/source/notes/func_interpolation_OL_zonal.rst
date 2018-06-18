@@ -69,4 +69,4 @@ Implementation Notes
 
 * When :math:`N` is large, precise values of :math:`K_{N}(x)` can only be achieved using the recurrence relation on Legendre polynomials.
   If minor errors can be tolerated, it is computationally advantageous to use function interpolation to approximate :math:`K_{N}(x)`.
-  Both exact and approximate values of :math:`K_{N}(x)` can be obtained using :py:func:`~pypeline.util.math.func.sph_dirichlet`.
+  Both exact and approximate values of :math:`K_{N}(x)` can be obtained using :py:class:`~pypeline.util.math.func.SphericalDirichlet`.
