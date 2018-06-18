@@ -65,7 +65,7 @@ In the case of Equal-Angle sampling:
 Implementation Notes
 ********************
 
-* :py:func:`~pypeline.util.math.sphere.ea_sample` and :py:func:`~pypeline.util.math.sphere.ea_interp` can be used to sample order-limited zonal functions and evaluate them at arbitrary :math:`r \in \mathbb{S}^{2}`.
+* :py:func:`~pypeline.util.math.sphere.ea_sample` and :py:class:`~pypeline.util.math.sphere.EqualAngleInterpolator` can be used to sample order-limited zonal functions and evaluate them at arbitrary :math:`r \in \mathbb{S}^{2}`.
 
 * When :math:`N` is large, precise values of :math:`K_{N}(x)` can only be achieved using the recurrence relation on Legendre polynomials.
   If minor errors can be tolerated, it is computationally advantageous to use function interpolation to approximate :math:`K_{N}(x)`.

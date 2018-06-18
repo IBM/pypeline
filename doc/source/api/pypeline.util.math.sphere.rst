@@ -2,6 +2,7 @@ pypeline.util.math.sphere
 =========================
 
 .. automodule:: pypeline.util.math.sphere
+   :special-members: __init__, __call__
 
    
    
@@ -11,16 +12,21 @@ pypeline.util.math.sphere
    
       cart2eq
       cart2pol
+      ea_sample
       eq2cart
-      pol2cart
       eq2pol
       pol2cart
-      ea_interp
-      ea_sample
-
+      pol2eq
+   
    
 
    
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+   
+      EqualAngleInterpolator
    
    
 

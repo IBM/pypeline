@@ -219,7 +219,7 @@ def ea_harmonic_grid(direction, FoV, N):
 
     See Also
     --------
-    :py:func:`~pypeline.util.math.sphere.ea_interp`
+    :py:class:`~pypeline.util.math.sphere.EqualAngleInterpolator`
     """
     direction = np.array(direction, dtype=float)
     direction /= linalg.norm(direction)
