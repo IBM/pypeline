@@ -10,6 +10,7 @@ pypeline.util.math.special
    .. autosummary::
    
       jv_threshold
+      iv_threshold
       spherical_jn_threshold
    
    
