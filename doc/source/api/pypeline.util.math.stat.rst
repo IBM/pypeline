@@ -2,9 +2,21 @@ pypeline.util.math.stat
 =======================
 
 .. automodule:: pypeline.util.math.stat
+   :special-members: __init__, __call__
+   
+   
+   
 
-   .. rubric:: Functions
+   
+   
+   .. rubric:: Classes
 
    .. autosummary::
    
-      wishrnd
+      Distribution
+      Wishart
+   
+   
+
+   
+   
