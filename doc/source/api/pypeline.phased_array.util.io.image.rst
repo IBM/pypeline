@@ -5,6 +5,12 @@ pypeline.phased\_array.util.io.image
    :special-members: __init__
    
    
+   .. rubric:: Functions
+
+   .. autosummary::
+   
+      from_fits
+   
    
 
    
@@ -12,9 +18,11 @@ pypeline.phased\_array.util.io.image
    .. rubric:: Classes
 
    .. autosummary::
-   
+
       SphericalImage
-   
+      EqualAngleImage
+      HEALPixImage
+
    
 
    
