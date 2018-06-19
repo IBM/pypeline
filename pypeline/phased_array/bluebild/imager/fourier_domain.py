@@ -130,10 +130,10 @@ class Fourier_IMFS_Block(bim.IntegratingMultiFieldSynthesizerBlock):
 
         Returns
         -------
-        std : :py:class:`~pypeline.phased_array.util.io.SphericalImage`
+        std : :py:class:`~pypeline.phased_array.util.io.image.SphericalImage`
             (N_level, N_height, N_width) standardized energy-levels.
 
-        lsq : :py:class:`~pypeline.phased_array.util.io.SphericalImage`
+        lsq : :py:class:`~pypeline.phased_array.util.io.image.SphericalImage`
             (N_level, N_height, N_width) least-squares energy-levels.
         """
         bfsf_grid = sph.pol2cart(1,
