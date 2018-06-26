@@ -20,6 +20,7 @@ import pyproj
 import scipy.linalg as linalg
 from astropy.wcs import WCS
 
+import pypeline.phased_array.util.data_gen.sky as sky
 import pypeline.util.argcheck as chk
 import pypeline.util.math.sphere as sph
 import pypeline.util.plot as plot
@@ -311,19 +312,23 @@ class SphericalImage:
     @chk.check(dict(index=chk.accept_any(chk.is_integer, chk.has_integers,
                                          chk.is_instance(slice)),
                     projection=chk.is_instance(str),
+                    catalog=chk.allow_None(chk.is_instance(sky.SkyEmission)),
                     show_gridlines=chk.is_boolean,
                     show_colorbar=chk.is_boolean,
                     ax=chk.allow_None(chk.is_instance(axes.Axes)),
                     data_kwargs=chk.allow_None(chk.is_instance(dict)),
-                    grid_kwargs=chk.allow_None(chk.is_instance(dict))))
+                    grid_kwargs=chk.allow_None(chk.is_instance(dict)),
+                    catalog_kwargs=chk.allow_None(chk.is_instance(dict))))
     def draw(self,
              index=slice(None),
              projection='AEQD',
+             catalog=None,
              show_gridlines=True,
              show_colorbar=True,
              ax=None,
              data_kwargs=None,
-             grid_kwargs=None):
+             grid_kwargs=None,
+             catalog_kwargs=None):
         """
         Plot spherical image using a 2D projection.
 
@@ -352,6 +357,8 @@ class SphericalImage:
                 * LCC breaks down when mapping polar regions.
 
             * (ROBIN, HEALPIX) are recommended for mapping the entire sphere.
+        catalog : :py:class:`~pypeline.phased_array.util.data_gen.sky.SkyEmission`
+            Source catalog to overlay on top of images. (Default: no overlay)
         show_gridlines : bool
             Show RA/DEC gridlines. (Default: True)
         show_colorbar : bool
@@ -386,6 +393,12 @@ class SphericalImage:
             * ticks : bool
                 Add RA/DEC labels next to gridlines. (Default: False)
                 TODO: change to True once implemented
+        catalog_kwargs : dict
+            Keyword arguments related to catalog visualization.
+
+            Accepted keys are:
+
+            * :py:meth:`~matplotlib.axes.Axes.scatter` options.
 
         Returns
         -------
@@ -398,6 +411,7 @@ class SphericalImage:
         scm = self._draw_data(index, data_kwargs, proj, ax)
         cbar = self._draw_colorbar(show_colorbar, scm, ax)  # noqa: F841
         self._draw_gridlines(show_gridlines, grid_kwargs, proj, ax)
+        self._draw_catalog(catalog, catalog_kwargs, proj, ax)
         self._draw_beautify(proj, ax)
 
         return ax
@@ -700,6 +714,46 @@ class SphericalImage:
         # LAT/LON ticks
         if show_gridlines and show_ticks:
             raise NotImplementedError('Not yet implemented.')
+
+    @chk.check(dict(catalog=chk.allow_None(chk.is_instance(sky.SkyEmission)),
+                    projection=chk.is_instance(pyproj.Proj),
+                    ax=chk.is_instance(axes.Axes)))
+    def _draw_catalog(self, catalog, catalog_kwargs, projection, ax):
+        """
+        Overlay catalog on top of map.
+
+        Parameters
+        ----------
+        catalog : :py:class:`~pypeline.phased_array.util.data_gen.sky.SkyEmission`
+            `catalog` parameter given to :py:meth:`draw`.
+        catalog_kwargs : dict
+            `catalog_kwargs` parameter given to :py:meth:`draw`.
+        projection : :py:class:`pyproj.Proj`
+            PyProj projection object.
+        ax : :py:class:`~matplotlib.axes.Axes`
+            Axes to plot on.
+        """
+        if catalog is not None:
+            _, c_lat, c_lon = sph.cart2eq(*catalog.xyz.T)
+            c_lat = (coord.Angle(c_lat)
+                     .to_value(u.deg))
+            c_lon = (coord.Angle(c_lon)
+                     .wrap_at(180 * u.deg)
+                     .to_value(u.deg))
+
+            c_x, c_y = projection(c_lon, c_lat, errcheck=False)
+            c_x[np.isclose(c_x, 1e30)] = np.nan
+            c_y[np.isclose(c_y, 1e30)] = np.nan
+
+            if catalog_kwargs is None:
+                catalog_kwargs = dict()
+
+            plot_style = dict(s=400,
+                              facecolors='none',
+                              edgecolors='w')
+            plot_style.update(catalog_kwargs)
+
+            ax.scatter(c_x, c_y, **plot_style)
 
     @chk.check(dict(projection=chk.is_instance(pyproj.Proj),
                     ax=chk.is_instance(axes.Axes)))
