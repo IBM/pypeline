@@ -5,7 +5,7 @@
 # #############################################################################
 
 """
-Tools and utilities or manipulating arrays.
+Tools and utilities for manipulating arrays.
 """
 
 import numpy as np
