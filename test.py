@@ -24,8 +24,8 @@ cmds = dict(pytest=[(f'pytest '
             doctest=[(f'sphinx-build '
                       f'-b '
                       f'doctest '
-                      f'{project_root_dir}/doc/source '
-                      f'{project_root_dir}/doc/build/doctest'), ], )
+                      f'{project_root_dir}/doc '
+                      f'{project_root_dir}/build/doctest'), ], )
 
 parser = argparse.ArgumentParser(description='Pypeline test runner.',
                                  epilog=(

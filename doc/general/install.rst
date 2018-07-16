@@ -21,11 +21,23 @@ Development Environment
 After installing `Miniconda <https://conda.io/miniconda.html>`_ or `Anaconda <https://www.anaconda.com/download/#linux>`_, run the following::
 
     $ cd <pypeline_dir>/
-    $ conda create --name=pypeline_dev \
-                   --channel=defaults \
+
+    $ # C++/Python Dependencies ===================
+    $ conda create --name=pypeline_dev   \
+                   --channel=defaults    \
                    --channel=conda-forge \
                    --file=conda_requirements.txt
     $ source activate pypeline_dev
+
+    $ # C++ Tools =================================
+    $ PYPELINE_CPP_BUILD_DIR=build/cpp
+    $ mkdir --parents "${PYPELINE_CPP_BUILD_DIR}"
+    $ cd "${PYPELINE_CPP_BUILD_DIR}"
+    $ cmake -DCMAKE_BUILD_TYPE=<Debug or Release> ../..
+    $ make
+
+    $ # Python Tools ==============================
+    $ cd ../..
     $ python3 setup.py develop
     $ python3 test.py  # Run test suites (optional)
     $ python3 setup.py build_sphinx  # Generate documentation (optional)
@@ -41,5 +53,6 @@ After installing `Miniconda <https://conda.io/miniconda.html>`_ or `Anaconda <ht
 Release Environment
 -------------------
 
-Release environments are not supported at this point in time.
-Development environments can be deployed in the meantime.
+* C++ tools can be built as Debug/Release.
+* Python tools are currently only tested in development mode.
+  Python release environments will be supported in the future.

@@ -16,7 +16,7 @@ def setup_config() -> configparser.ConfigParser:
     Load information contained in `setup.cfg`.
     """
     sphinx_src_dir = pathlib.Path(__file__).parent
-    setup_path = sphinx_src_dir / '..' / '..' / 'setup.cfg'
+    setup_path = sphinx_src_dir / '..' / 'setup.cfg'
     setup_path = setup_path.resolve(strict=True)
 
     with setup_path.open(mode='r') as f:
@@ -30,7 +30,7 @@ def pkg_info() -> Mapping:
     Load information contained in `PKG-INFO`.
     """
     sphinx_src_dir = pathlib.Path(__file__).parent
-    info_path = sphinx_src_dir / '..' / '..' / 'pypeline.egg-info' / 'PKG-INFO'
+    info_path = sphinx_src_dir / '..' / 'pypeline.egg-info' / 'PKG-INFO'
     info_path = info_path.resolve(strict=True)
 
     # Pattern definitions

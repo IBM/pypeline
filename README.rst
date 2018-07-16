@@ -13,4 +13,4 @@ signal processing toolkit to design and deploy holistic imaging pipelines.
 
 Installation
 ------------
-See ``doc/source/general/install``
+See ``doc/general/install.rst``
