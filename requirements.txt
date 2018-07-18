@@ -12,7 +12,6 @@
 # and `conda_requirements.txt`.
 
 astropy == 3.0.*
-pyproj == 1.9.*
 flake8 == 3.5.*
 ipython == 6.4.*
 matplotlib == 2.2.*
@@ -20,6 +19,8 @@ numexpr == 2.6.*
 numpy == 1.14.*
 pandas == 0.23.*
 plotly == 2.7.*
+pybind11 == 2.2.*
+pyproj == 1.9.*
 pytest == 3.6.*
 python-casacore == 2.2.*
 scikit-learn == 0.19.*
