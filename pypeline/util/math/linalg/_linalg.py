@@ -1,14 +1,9 @@
 # ##############################################################################
-# linalg.py
-# =========
+# _linalg.py
+# ==========
 # Author : Sepand KASHANI [sep@zurich.ibm.com]
 # ##############################################################################
 
-"""
-Linear algebra routines.
-"""
-
-import astropy.units as u
 import numpy as np
 import scipy.linalg as linalg
 
@@ -180,117 +175,3 @@ def eigh(A, B=None, tau=1, N=None):
             V = np.concatenate((V, np.zeros((M, N - K))), axis=1)
 
     return D, V
-
-
-@chk.check(dict(axis=chk.require_all(chk.has_reals, chk.has_shape((3,))),
-                angle=chk.is_angle))
-def rot(axis, angle):
-    """
-    3D rotation matrix.
-
-    Parameters
-    ----------
-    axis : array-like(float)
-        (3,) rotation axis.
-    angle : :py:class:`~astropy.units.Quantity`
-        signed rotation angle.
-
-    Returns
-    -------
-    :py:class:`~numpy.ndarray`
-        (3, 3) rotation matrix.
-
-    Examples
-    --------
-    .. testsetup::
-
-       import astropy.units as u
-       from pypeline.util.math.linalg import rot
-
-    .. doctest::
-
-       >>> R = rot([0, 0, 1], 90 * u.deg)
-       >>> np.around(R, 2)
-       array([[ 0., -1.,  0.],
-              [ 1.,  0.,  0.],
-              [ 0.,  0.,  1.]])
-
-       >>> R = rot([1, 0, 0], - 1 * u.rad)
-       >>> np.around(R, 2)
-       array([[ 1.  ,  0.  ,  0.  ],
-              [ 0.  ,  0.54,  0.84],
-              [ 0.  , -0.84,  0.54]])
-    """
-    axis = np.array(axis, copy=False)
-    angle = angle.to_value(u.rad)
-
-    a, b, c = axis / linalg.norm(axis)
-    ct, st = np.cos(angle), np.sin(angle)
-
-    p00 = a ** 2 + (b ** 2 + c ** 2) * ct
-    p11 = b ** 2 + (a ** 2 + c ** 2) * ct
-    p22 = c ** 2 + (a ** 2 + b ** 2) * ct
-    p01 = a * b * (1 - ct) - c * st
-    p10 = a * b * (1 - ct) + c * st
-    p12 = b * c * (1 - ct) - a * st
-    p21 = b * c * (1 - ct) + a * st
-    p20 = a * c * (1 - ct) - b * st
-    p02 = a * c * (1 - ct) + b * st
-
-    R = np.array([[p00, p01, p02],
-                  [p10, p11, p12],
-                  [p20, p21, p22]])
-    return R
-
-
-@chk.check('R', chk.require_all(chk.has_reals, chk.has_shape((3, 3))))
-def z_rot2angle(R):
-    """
-    Determine rotation angle from Z-axis rotation matrix.
-
-    Parameters
-    ----------
-    R : array-like(float)
-        (3, 3) rotation matrix around the Z-axis.
-
-    Returns
-    -------
-    :py:class:`~astropy.units.Quantity`
-        signed rotation angle.
-
-    Examples
-    --------
-    .. testsetup::
-
-       import numpy as np
-       from pypeline.util.math.linalg import z_rot2angle
-
-    .. doctest::
-
-       >>> R = np.eye(3)
-       >>> angle = z_rot2angle(R)
-       >>> np.around(angle, 2)
-       <Quantity 0. rad>
-
-       >>> R = [[0, -1, 0],
-       ...      [1,  0, 0],
-       ...      [0,  0, 1]]
-       >>> angle = z_rot2angle(R)
-       >>> np.around(angle, 2)
-       <Quantity 1.57 rad>
-    """
-    R = np.array(R, copy=False)
-
-    if not np.allclose(R[[0, 1, 2, 2, 2], [2, 2, 2, 0, 1]],
-                       np.r_[0, 0, 1, 0, 0]):
-        raise ValueError('Parameter[R] is not a rotation matrix '
-                         'around the Z-axis.')
-
-    ct, st = np.clip([R[0, 0], R[1, 0]], -1, 1)
-    if st >= 0:  # In quadrants I or II
-        theta = np.arccos(ct)
-    else:  # In quadrants III or IV
-        theta = -np.arccos(ct)
-
-    angle = theta * u.rad
-    return angle
