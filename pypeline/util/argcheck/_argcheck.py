@@ -1,12 +1,8 @@
 # #############################################################################
-# argcheck.py
-# ===========
+# _argcheck.py
+# ============
 # Author : Sepand KASHANI [sep@zurich.ibm.com]
 # #############################################################################
-
-"""
-Helper functions to ease argument checking.
-"""
 
 import collections.abc as abc
 import functools
