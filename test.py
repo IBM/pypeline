@@ -53,7 +53,8 @@ def run_test(test_name):
                             stdin=None,
                             stdout=sys.stdout,
                             stderr=sys.stderr,
-                            shell=True)
+                            shell=True,
+                            cwd=project_root_dir)
     return status
 
 
