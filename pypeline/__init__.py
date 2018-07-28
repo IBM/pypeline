@@ -14,6 +14,7 @@ config : :py:class:`~configparser.ConfigParser`
 """
 
 import configparser
+import os
 import pathlib
 
 import pkg_resources as pkg
@@ -28,11 +29,13 @@ def ___load_config():
     with open(cfg_path, mode='r') as f:
         cfg.read_file(f)
 
-    # Overwrite defaults with user's config file
-    u_cfg_path = pathlib.Path.home() / '.pypeline' / 'pypeline.cfg'
-    if u_cfg_path.exists():
-        cfg.read(u_cfg_path)
-        print(f'Loaded user config from {u_cfg_path}.')
+    running_tests = bool(os.environ.get('PYPELINE_RUNNING_TESTS', False))
+    if not running_tests:
+        # Let user override defaults with his config file.
+        u_cfg_path = pathlib.Path.home() / '.pypeline' / 'pypeline.cfg'
+        if u_cfg_path.exists():
+            cfg.read(u_cfg_path)
+            print(f'Loaded user config from {u_cfg_path}.')
 
     return cfg
 

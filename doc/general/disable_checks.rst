@@ -48,7 +48,3 @@ If you know your Pypeline scripts are correct (i.e., they execute without error)
       >>> # Modify pypeline.cfg to disable checks.
       >>> import pypeline
       >>> pypeline.reload_config()
-
-.. warning::
-
-   Some tests will *not* pass if ``ignore_checks = True``.
