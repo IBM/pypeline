@@ -2,20 +2,24 @@ pypeline.util.array
 ===================
 
 .. automodule:: pypeline.util.array
-   :special-members: __init__
-   
-   
-   
 
-   
-   
+
    .. rubric:: Classes
 
    .. autosummary::
-   
-      LabeledMatrix
-   
-   
 
-   
-   
+      LabeledMatrix
+
+
+   .. rubric:: Functions
+
+   .. autosummary::
+
+      cluster_layers
+
+
+
+   .. autofunction:: cluster_layers
+
+   .. autoclass:: LabeledMatrix
+      :special-members: __init__

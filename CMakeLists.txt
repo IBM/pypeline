@@ -76,4 +76,6 @@ target_link_libraries(pypeline Eigen3::Eigen
 add_executable(test test.cpp)
 target_link_libraries(test pypeline)
 
-# Python Extension Modules ----------------------------------------------------
+## Python Extension Modules ---------------------------------------------------
+pybind11_add_module  (_pypeline_util_array_pybind11 pypeline/util/array/_array_pybind11.cpp)
+target_link_libraries(_pypeline_util_array_pybind11 PRIVATE pypeline)

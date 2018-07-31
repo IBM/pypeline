@@ -1,12 +1,8 @@
 # #############################################################################
-# array.py
-# ========
+# _array.py
+# =========
 # Author : Sepand KASHANI [sep@zurich.ibm.com]
 # #############################################################################
-
-"""
-Tools and utilities for manipulating arrays.
-"""
 
 import numpy as np
 import pandas as pd
@@ -190,7 +186,7 @@ class LabeledMatrix:
                 axis=chk.is_integer,
                 index_spec=chk.accept_any(chk.is_integer,
                                           chk.is_instance(slice))))
-def _index(x, axis, index_spec):
+def index(x, axis, index_spec):
     """
     Form indexing tuple for NumPy arrays.
 
@@ -214,12 +210,12 @@ def _index(x, axis, index_spec):
     --------
     .. testsetup::
 
-       from pypeline.util.array import _index
+       from pypeline.util.array import index
 
     .. doctest::
 
        >>> x = np.arange(5 * 4).reshape(5, 4)
-       >>> idx = _index(x, 0, 3)
+       >>> idx = index(x, 0, 3)
        >>> x[idx] = 0
        >>> print(x)
       [[ 0  1  2  3]
@@ -231,7 +227,7 @@ def _index(x, axis, index_spec):
     .. doctest::
 
        >>> x = np.arange(5 * 4).reshape(5, 4)
-       >>> idx = _index(x, 1, slice(2))
+       >>> idx = index(x, 1, slice(2))
        >>> x[idx] = 0
        >>> print(x)
       [[ 0  0  2  3]
@@ -246,39 +242,3 @@ def _index(x, axis, index_spec):
     indexer = [slice(None)] * x.ndim
     indexer[axis] = index_spec
     return tuple(indexer)
-
-
-@chk.check(dict(x=chk.is_array_like,
-                idx=chk.has_integers,
-                N=chk.is_integer,
-                axis=chk.is_integer))
-def _cluster_layers(x, idx, N, axis):
-    """
-    Additive tensor compression along an axis.
-
-    Parameters
-    ----------
-    x : array-like
-        (..., K, ...) array.
-    idx : array-like(int)
-        (K,) cluster indices.
-    N : int
-        Total number of levels along compression axis.
-    axis : int
-        Dimension along which to compress.
-
-    Returns
-    -------
-    :py:class:`~numpy.ndarray`
-        (..., N, ...) array
-    """
-    x = np.array(x, copy=False)
-    idx = np.array(idx, copy=False)
-
-    y_shape = list(x.shape)
-    y_shape[axis] = N
-    y = np.zeros(y_shape, dtype=x.dtype)
-
-    for x_id, y_id in enumerate(idx):
-        y[_index(y, axis, y_id)] += x[_index(x, axis, x_id)]
-    return y

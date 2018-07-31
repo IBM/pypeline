@@ -188,8 +188,8 @@ class Spatial_IMFS_Block(bim.IntegratingMultiFieldSynthesizerBlock):
         stat_lsq = stat_std * D.reshape(-1, 1, 1)
 
         stat = np.stack([stat_std, stat_lsq], axis=0)
-        stat = array._cluster_layers(stat, cluster_idx,
-                                     N=self._N_level, axis=1)
+        stat = array.cluster_layers(stat, cluster_idx,
+                                    N=self._N_level, axis=1)
 
         self._update(stat)
         return stat

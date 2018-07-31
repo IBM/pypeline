@@ -382,8 +382,8 @@ def czt(x, A, W, M, axis=-1):
     n = np.arange(L)
     y = np.zeros(sh_Y, dtype=complex)
     y_mod = (A ** -n[:N]) * np.float_power(W, (n[:N] ** 2) / 2)
-    y[array._index(y, axis, slice(N))] = x
-    y[array._index(y, axis, slice(N))] *= y_mod.reshape(sh_N)
+    y[array.index(y, axis, slice(N))] = x
+    y[array.index(y, axis, slice(N))] *= y_mod.reshape(sh_N)
     Y = fftpack.fft(y, axis=axis)
 
     v = np.zeros(L, dtype=complex)
@@ -395,9 +395,9 @@ def czt(x, A, W, M, axis=-1):
     G *= V
     g = fftpack.ifft(G, axis=axis)
     g_mod = np.float_power(W, (n[:M] ** 2) / 2)
-    g[array._index(g, axis, slice(M))] *= g_mod.reshape(sh_M)
+    g[array.index(g, axis, slice(M))] *= g_mod.reshape(sh_M)
 
-    X = g[array._index(g, axis, slice(M))]
+    X = g[array.index(g, axis, slice(M))]
     return X
 
 
@@ -552,8 +552,8 @@ def fs_interp(x_FS, T, a, b, M, axis=-1, real_x=False):
     E = np.arange(M)
 
     if real_x:  # Real-valued functions.
-        x0_FS = x_FS[array._index(x_FS, axis, slice(N, N + 1))]
-        xp_FS = x_FS[array._index(x_FS, axis, slice(N + 1, N_FS))]
+        x0_FS = x_FS[array.index(x_FS, axis, slice(N, N + 1))]
+        xp_FS = x_FS[array.index(x_FS, axis, slice(N + 1, N_FS))]
         C = np.reshape(W ** E, sh) / A
 
         x = czt(xp_FS, A, W, M, axis=axis)
