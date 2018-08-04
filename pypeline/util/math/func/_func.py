@@ -1,12 +1,8 @@
 # #############################################################################
-# func.py
-# =======
+# _func.py
+# ========
 # Author : Sepand KASHANI [sep@zurich.ibm.com]
 # #############################################################################
-
-"""
-1d functions not available in `SciPy <https://www.scipy.org/>`_.
-"""
 
 import warnings
 
