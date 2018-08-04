@@ -8,8 +8,8 @@
 Installation
 ============
 
-Pypeline relies on the `PyData <https://pydata.org>`_ and `NumFOCUS <https://www.numfocus.org/>`_ stacks.
-Due to strong non-Python dependencies required to achieve high performance, we highly recommend the use of `conda <https://conda.io/docs/>`_ packages when available.
+Pypeline modules are written in Python3 and C++17.
+Due to strong non-Python dependencies required to achieve high performance, we highly recommend the use of `conda <https://conda.io/docs/>`_ to install everything.
 
 Pypeline is developed and tested on x86_64 systems running Linux.
 Aside from :py:mod:`pypeline.phased_array.util.io`, Pypeline should also run correctly on ppc64le Linux platforms and OSX, but we provide no support for this.

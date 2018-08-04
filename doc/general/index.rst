@@ -12,4 +12,5 @@ General
    :maxdepth: 1
 
    install
+   programming_guide
    disable_checks
