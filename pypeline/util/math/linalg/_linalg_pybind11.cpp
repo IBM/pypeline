@@ -6,8 +6,8 @@
 
 #include "pybind11/pybind11.h"
 
-#include "pypeline/util/math/linalg.hpp"
 #include "pypeline/util/cpp_py3_interop.hpp"
+#include "pypeline/util/math/linalg.hpp"
 
 namespace cpp_py3_interop = pypeline::util::cpp_py3_interop;
 namespace linalg = pypeline::util::math::linalg;
@@ -30,14 +30,18 @@ pybind11::array_t<double> py_rot(pybind11::array_t<T> axis,
 }
 
 PYBIND11_MODULE(_pypeline_util_math_linalg_pybind11, m) {
-    m.def("z_rot2angle", &py_z_rot2angle<float>,  pybind11::arg("R").noconvert());
-    m.def("z_rot2angle", &py_z_rot2angle<double>, pybind11::arg("R").noconvert(),
+    m.def("z_rot2angle",
+          &py_z_rot2angle<float>,
+          pybind11::arg("R").noconvert());
+    m.def("z_rot2angle",
+          &py_z_rot2angle<double>,
+          pybind11::arg("R").noconvert(),
           pybind11::doc(R"EOF(
 Determine rotation angle from Z-axis rotation matrix.
 
 Parameters
 ----------
-R : array-like(float)
+R : :py:class:`~numpy.ndarray`
     (3, 3) rotation matrix around the Z-axis.
 
 Returns
@@ -67,16 +71,20 @@ Examples
    1.57
 )EOF"));
 
-    m.def("rot", &py_rot<float>,  pybind11::arg("axis").noconvert(),
-                                  pybind11::arg("angle"));
-    m.def("rot", &py_rot<double>, pybind11::arg("axis").noconvert(),
-                                  pybind11::arg("angle"),
+    m.def("rot",
+          &py_rot<float>,
+          pybind11::arg("axis").noconvert(),
+          pybind11::arg("angle"));
+    m.def("rot",
+          &py_rot<double>,
+          pybind11::arg("axis").noconvert(),
+          pybind11::arg("angle"),
           pybind11::doc(R"EOF(
 3D rotation matrix.
 
 Parameters
 ----------
-axis : array-like(float)
+axis : :py:class:`~numpy.ndarray`
     (3,) rotation axis.
 angle : float
     Signed rotation angle [rad].
@@ -107,4 +115,3 @@ Examples
            [ 0.  , -0.84,  0.54]])
 )EOF"));
 }
-

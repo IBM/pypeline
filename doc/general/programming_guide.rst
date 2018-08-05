@@ -20,5 +20,5 @@ C++ functions taking NumPy arrays as parameters use the buffer protocol to read 
 These tensor proxys can then be transparently used on the C++-side to perform numerical operations.
 
 * C++ functions that *do not* modify the input arrays have no limitations whatsoever.
-* C++ functions that *do* modify the input arrays must take note that in-place operations will only work if the NumPy array ``A`` given as parameter owns its memory, i.e., if ``A.base == None``.
+* C++ functions that *do* modify the input arrays must take note that in-place operations will only work on contiguous NumPy arrays.
   It is the responsibility of the user to guarantee this when calling a C++ function as Pypeline makes no checks on this front for you.

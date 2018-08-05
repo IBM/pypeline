@@ -61,13 +61,13 @@ set (CMAKE_CXX_FLAGS_DEBUG   "${CMAKE_CXX_FLAGS} -g -Og")
 set (CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS} -mfma -mavx -O3 -march=native")
 
 ### BUILD Targets =============================================================
-file(GLOB_RECURSE pypeline_cpp_files
+file(GLOB_RECURSE libpypeline_files
      LIST_DIRECTORIES false
-     "pypeline/*.cpp")
-list(FILTER pypeline_cpp_files EXCLUDE REGEX ".*_pybind11.cpp")
+     "${PYPELINE_INCLUDE_DIRS}/pypeline/*.hpp")
 
 ## Pypeline C++ Linkable Library ----------------------------------------------
-add_library(pypeline SHARED ${pypeline_cpp_files})
+add_library(pypeline SHARED ${libpypeline_files})
+set_target_properties(pypeline PROPERTIES LINKER_LANGUAGE CXX)
 target_link_libraries(pypeline Eigen3::Eigen
                                ${MKL_LIBRARIES}
                                OpenMP::OpenMP_CXX)
@@ -77,11 +77,11 @@ add_executable(test test.cpp)
 target_link_libraries(test pypeline)
 
 ## Python Extension Modules ---------------------------------------------------
-pybind11_add_module  (_pypeline_util_array_pybind11 pypeline/util/array/_array_pybind11.cpp)
+pybind11_add_module  (_pypeline_util_array_pybind11 ${PROJECT_SOURCE_DIR}/pypeline/util/array/_array_pybind11.cpp)
 target_link_libraries(_pypeline_util_array_pybind11 PRIVATE pypeline)
 
-pybind11_add_module  (_pypeline_util_math_linalg_pybind11 pypeline/util/math/linalg/_linalg_pybind11.cpp)
+pybind11_add_module  (_pypeline_util_math_linalg_pybind11 ${PROJECT_SOURCE_DIR}/pypeline/util/math/linalg/_linalg_pybind11.cpp)
 target_link_libraries(_pypeline_util_math_linalg_pybind11 PRIVATE pypeline)
 
-pybind11_add_module  (_pypeline_util_math_func_pybind11 pypeline/util/math/func/_func_pybind11.cpp)
+pybind11_add_module  (_pypeline_util_math_func_pybind11 ${PROJECT_SOURCE_DIR}/pypeline/util/math/func/_func_pybind11.cpp)
 target_link_libraries(_pypeline_util_math_func_pybind11 PRIVATE pypeline)

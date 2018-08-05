@@ -14,7 +14,6 @@ import scipy.special as sp
 import pypeline.core as core
 import pypeline.util.argcheck as chk
 
-
 class Tukey(core.Block):
     r"""
     Parameterized Tukey function.

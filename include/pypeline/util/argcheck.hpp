@@ -11,6 +11,10 @@
 #ifndef PYPELINE_UTIL_ARGCHECK_HPP
 #define PYPELINE_UTIL_ARGCHECK_HPP
 
+#include <array>
+#include <complex>
+#include <type_traits>
+
 namespace pypeline::util::argcheck {
     /*
      * Return true if array has specified rank.
@@ -39,8 +43,10 @@ namespace pypeline::util::argcheck {
      *    argcheck::has_rank(x, 1);  // false
      *    argcheck::has_rank(x, 2);  // true
      */
-    template<typename E>
-    bool has_rank(E &&x, const size_t rank);
+    template <typename E>
+    bool has_rank(E &&x, const size_t rank) {
+        return x.dimension() == rank;
+    }
 
     /*
      * Return true if array has specified shape.
@@ -72,15 +78,29 @@ namespace pypeline::util::argcheck {
      *    argcheck::has_shape(x, shape1);  // true
      *    argcheck::has_shape(x, shape2);  // false
      */
-    template<typename E, size_t rank>
-    bool has_shape(E &&x, const std::array <size_t, rank> &shape);
+    template <typename E, size_t rank>
+    bool has_shape(E &&x, const std::array <size_t, rank> &shape) {
+        auto shape_x = x.shape();
+        size_t rank_x = x.dimension();
+
+        if (shape.size() == rank_x) {
+            for (size_t i = 0; i < rank_x; ++i) {
+                if (((size_t) shape_x[i]) != shape[i]) {
+                    return false;
+                }
+            }
+            return true;
+        } else {
+            return false;
+        }
+    }
 
     /*
      * Return true if array contains [float, double, long double].
      *
      * Parameters
      * ----------
-     * x : xt::xexpression
+     * xt::xexpression
      *     Array to test.
      *
      * Returns
@@ -108,15 +128,18 @@ namespace pypeline::util::argcheck {
      *    argcheck::has_floats(xt::ones<cdouble    >({3, 3}));  // false
      *    argcheck::has_floats(xt::ones<cldouble   >({3, 3}));  // false
      */
-    template<typename E>
-    bool has_floats(E &&x);
+    template <typename E>
+    bool has_floats(E &&) {
+        using T = typename std::decay_t<E>::value_type;
+        return std::is_floating_point<T>::value;
+    }
 
     /*
      * Return true if array contains std::complex<[float, double, long double]>.
      *
      * Parameters
      * ----------
-     * x : xt::xexpression
+     * xt::xexpression
      *     Array to test.
      *
      * Returns
@@ -144,10 +167,17 @@ namespace pypeline::util::argcheck {
      *    argcheck::has_complex(xt::ones<cdouble    >({3, 3}));  // true
      *    argcheck::has_complex(xt::ones<cldouble   >({3, 3}));  // true
      */
-    template<typename E>
-    bool has_complex(E &&x);
-}
+    template <typename E>
+    bool has_complex(E &&) {
+        using T = typename std::decay_t<E>::value_type;
+        using cfloat = std::complex<float>;
+        using cdouble = std::complex<double>;
+        using cldouble = std::complex<long double>;
 
-#include "_argcheck.tpp"
+        return (std::is_same<T, cfloat>::value ||
+                std::is_same<T, cdouble>::value ||
+                std::is_same<T, cldouble>::value);
+    }
+}
 
 #endif //PYPELINE_UTIL_ARGCHECK_HPP
