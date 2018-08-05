@@ -21,7 +21,7 @@ set (PYBIND11_CPP_STANDARD       -std=c++17)
 set (PYTHON_EXECUTABLE           "$ENV{CONDA_PREFIX}/bin/python3")
 
 ### Automatic Header/Library Discovery ========================================
-find_package(Eigen3       REQUIRED NO_MODULE)
+find_package(Eigen3       REQUIRED)
 find_package(MKL          REQUIRED)
 find_package(OpenMP       REQUIRED)
 find_package(pybind11     REQUIRED)
@@ -29,6 +29,8 @@ find_package(xsimd        REQUIRED)
 find_package(xtensor      REQUIRED)
 
 message(STATUS "")
+message(STATUS "Eigen3 Discovery ============================================")
+message(STATUS "EIGEN3_INCLUDE_DIRS:   ${EIGEN3_INCLUDE_DIRS}")
 message(STATUS "MKL Discovery ===============================================")
 message(STATUS "MKL_INCLUDE_DIRS:      ${MKL_INCLUDE_DIRS}")
 message(STATUS "MKL_LIBRARIES:         ${MKL_LIBRARIES}")
@@ -40,7 +42,8 @@ message(STATUS "")
 
 ### Custom Header Search Paths ================================================
 set (PYPELINE_INCLUDE_DIRS ${PROJECT_SOURCE_DIR}/include/)
-include_directories(BEFORE ${MKL_INCLUDE_DIRS}
+include_directories(BEFORE ${EIGEN3_INCLUDE_DIRS}
+                           ${MKL_INCLUDE_DIRS}
                            ${pybind11_INCLUDE_DIRS}
                            ${xsimd_INCLUDE_DIRS}
                            ${xtensor_INCLUDE_DIRS}
@@ -68,8 +71,7 @@ file(GLOB_RECURSE libpypeline_files
 ## Pypeline C++ Linkable Library ----------------------------------------------
 add_library(pypeline SHARED ${libpypeline_files})
 set_target_properties(pypeline PROPERTIES LINKER_LANGUAGE CXX)
-target_link_libraries(pypeline Eigen3::Eigen
-                               ${MKL_LIBRARIES}
+target_link_libraries(pypeline ${MKL_LIBRARIES}
                                OpenMP::OpenMP_CXX)
 
 ## C++ Executables ------------------------------------------------------------
