@@ -8,10 +8,10 @@
 Special functions.
 """
 
-# import _pypeline_util_math_func_pybind11 as __cpp
+import _pypeline_util_math_func_pybind11 as __cpp
 
 from . import _func as __py
 
 SphericalDirichlet = __py.SphericalDirichlet
 
-Tukey = __py.Tukey
+Tukey = __cpp.Tukey
