@@ -87,3 +87,6 @@ target_link_libraries(_pypeline_util_math_linalg_pybind11 PRIVATE pypeline)
 
 pybind11_add_module  (_pypeline_util_math_func_pybind11 ${PROJECT_SOURCE_DIR}/pypeline/util/math/func/_func_pybind11.cpp)
 target_link_libraries(_pypeline_util_math_func_pybind11 PRIVATE pypeline)
+
+pybind11_add_module  (_pypeline_util_math_sphere_pybind11 ${PROJECT_SOURCE_DIR}/pypeline/util/math/sphere/_sphere_pybind11.cpp)
+target_link_libraries(_pypeline_util_math_sphere_pybind11 PRIVATE pypeline)
