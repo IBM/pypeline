@@ -313,8 +313,8 @@ class Kent(Distribution):
         self._g3 = np.cross(self._g1, self._g2)
 
         # Buffered attributes
-        iv_threshold = sp.iv_threshold(k)
-        j = np.arange((iv_threshold - 0.5) // 2 + 2)
+        ive_threshold = sp.ive_threshold(k)
+        j = np.arange((ive_threshold - 0.5) // 2 + 2)
         self._cst = (np.sqrt(8 * np.pi / k) *
                      np.sum(special.beta(j + 0.5, 0.5) *
                             (beta ** (2 * j)) *

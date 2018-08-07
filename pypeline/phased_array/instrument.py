@@ -289,7 +289,7 @@ class InstrumentGeometryBlock(core.Block):
 
            >>> instr = MwaBlock()
            >>> instr.nyquist_rate(freq=145 * u.MHz)
-           8910
+           8753
         """
         wps = pypeline.config.getfloat('phased_array', 'wps') * (u.m / u.s)
         wl = (wps / freq).to_value(u.m)
@@ -298,7 +298,7 @@ class InstrumentGeometryBlock(core.Block):
         baseline = linalg.norm(XYZ[:, np.newaxis, :] -
                                XYZ[np.newaxis, :, :], axis=-1)
 
-        N = sp.spherical_jn_threshold((2 * np.pi / wl) * baseline.max())
+        N = sp.spherical_jn_series_threshold((2 * np.pi / wl) * baseline.max())
         return N
 
 
@@ -629,7 +629,7 @@ class EarthBoundInstrumentGeometryBlock(InstrumentGeometryBlock):
            >>> obs_start = atime.Time('J2000')
            >>> obs_end = obs_start + 4 * u.h
            >>> instr.bfsf_kernel_bandwidth(freq, obs_start, obs_end)
-           22061
+           21783
         """
         wps = pypeline.config.getfloat('phased_array', 'wps') * (u.m / u.s)
         wl = (wps / freq).to_value(u.m)
@@ -644,7 +644,7 @@ class EarthBoundInstrumentGeometryBlock(InstrumentGeometryBlock):
         XY_baseline = linalg.norm(bfsf_XY[:, np.newaxis, :] -
                                   bfsf_XY[np.newaxis, :, :], axis=-1)
 
-        N = sp.jv_threshold((2 * np.pi / wl) * XY_baseline.max())
+        N = sp.jv_series_threshold((2 * np.pi / wl) * XY_baseline.max())
         return 2 * N + 1
 
 
