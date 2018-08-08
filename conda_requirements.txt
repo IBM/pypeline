@@ -33,4 +33,4 @@ sphinx == 1.7.*
 sphinx_rtd_theme == 0.4.*
 tqdm == 4.23.*
 xsimd == 6.1.*
-xtensor == 0.16.*
+xtensor == 0.17.*
