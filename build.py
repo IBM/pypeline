@@ -21,6 +21,8 @@ Examples
 --------
 python3 pypeline_build --doc
 python3 pypeline_build --lib=Debug
+                       --C_compiler /usr/bin/clang
+                       --CXX_compiler /usr/bin/clang++
                                  """,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
 group = parser.add_mutually_exclusive_group(required=True)
@@ -33,6 +35,17 @@ group.add_argument('--doc',
                          'used after an initial invocation of the script '
                          'using --lib.'),
                    action='store_true')
+parser.add_argument('--C_compiler',
+                    help='C compiler executable. Use system default if unspecified.',
+                    type=str,
+                    required=False)
+parser.add_argument('--CXX_compiler',
+                    help='C++ compiler executable. Use system default if unspecified.',
+                    type=str,
+                    required=False)
+parser.add_argument('--OpenMP',
+                    help='Use OpenMP',
+                    action='store_true')
 parser.add_argument('--print',
                     help=('Only print commands that would have been executed '
                           'given specified options.'),
@@ -48,7 +61,11 @@ if __name__ == '__main__':
                      f'rm -rf "${{PYPELINE_CPP_BUILD_DIR}}"',
                      f'mkdir --parents "${{PYPELINE_CPP_BUILD_DIR}}"',
                      f'cd "${{PYPELINE_CPP_BUILD_DIR}}"',
-                     f'cmake -DCMAKE_BUILD_TYPE={args.lib} "{project_root_dir}"',
+                     (f'cmake -DCMAKE_BUILD_TYPE={args.lib} ' +
+                      (f'-DCMAKE_C_COMPILER="{args.C_compiler}" ' if (args.C_compiler is not None) else '') +
+                      (f'-DCMAKE_CXX_COMPILER="{args.CXX_compiler}" ' if (args.CXX_compiler is not None) else '') +
+                      f'-DPYPELINE_USE_OPENMP={str(args.OpenMP).upper()} ' +
+                      f'"{project_root_dir}"'),
                      'make',
                      f'cd "{project_root_dir}"',
                      f'python3 "{project_root_dir}/setup.py" develop'])

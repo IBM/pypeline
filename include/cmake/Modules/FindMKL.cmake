@@ -27,13 +27,43 @@ set(CMAKE_FIND_LIBRARY_SUFFIXES .so)
 find_library(MKL_INTERFACE_LIBRARY mkl_intel_lp64
              PATHS                 "${MKL_ROOT}/lib/")
 ## Threading layer ------------------------------------------------------------
-find_library(MKL_THREADING_LIBRARY mkl_gnu_thread
-             PATHS                 "${MKL_ROOT}/lib/")
+if(${PYPELINE_USE_OPENMP})
+    if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        find_library(MKL_THREADING_LIBRARY mkl_intel_thread
+                     PATHS                 "${MKL_ROOT}/lib/")
+    elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+        find_library(MKL_THREADING_LIBRARY mkl_gnu_thread
+                     PATHS                 "${MKL_ROOT}/lib/")
+    else(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        message(FATAL_ERROR "Unknown compiler.")
+    endif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+else(${PYPELINE_USE_OPENMP})
+    find_library(MKL_THREADING_LIBRARY mkl_sequential
+                 PATHS                 "${MKL_ROOT}/lib/")
+endif(${PYPELINE_USE_OPENMP})
+
 ## Computational layer --------------------------------------------------------
 find_library(MKL_CORE_LIBRARY mkl_core
              PATHS            "${MKL_ROOT}/lib/")
 ## RTL layer ------------------------------------------------------------------
-find_library(MKL_RTL_LIBRARY gomp)
+if(${PYPELINE_USE_OPENMP})
+    if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        find_library(MKL_RTL_LIBRARY iomp5)
+    elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+        find_library(MKL_RTL_LIBRARY gomp)
+    else(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        message(FATAL_ERROR "Unknown compiler.")
+    endif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+else(${PYPELINE_USE_OPENMP})
+    set(MKL_RTL_LIBRARY "")
+endif(${PYPELINE_USE_OPENMP})
+
+message(STATUS "*************************************************************")
+message(STATUS "MKL_INTERFACE_LIBRARY : ${MKL_INTERFACE_LIBRARY}")
+message(STATUS "MKL_THREADING_LIBRARY : ${MKL_THREADING_LIBRARY}")
+message(STATUS "MKL_CORE_LIBRARY : ${MKL_CORE_LIBRARY}")
+message(STATUS "MKL_RTL_LIBRARY : ${MKL_RTL_LIBRARY}")
+message(STATUS "*************************************************************")
 
 set(MKL_LIBRARY ${MKL_INTERFACE_LIBRARY} ${MKL_THREADING_LIBRARY} ${MKL_CORE_LIBRARY} ${MKL_RTL_LIBRARY})
 

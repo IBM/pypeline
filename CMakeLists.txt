@@ -71,8 +71,11 @@ file(GLOB_RECURSE libpypeline_files
 ## Pypeline C++ Linkable Library ----------------------------------------------
 add_library(pypeline SHARED ${libpypeline_files})
 set_target_properties(pypeline PROPERTIES LINKER_LANGUAGE CXX)
-target_link_libraries(pypeline ${MKL_LIBRARIES}
-                               OpenMP::OpenMP_CXX)
+if(${PYPELINE_USE_OPENMP})
+    target_link_libraries(pypeline ${MKL_LIBRARIES} OpenMP::OpenMP_CXX)
+else(${PYPELINE_USE_OPENMP})
+    target_link_libraries(pypeline ${MKL_LIBRARIES})
+endif(${PYPELINE_USE_OPENMP})
 
 ## C++ Executables ------------------------------------------------------------
 add_executable(test test.cpp)
