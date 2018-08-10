@@ -4,7 +4,6 @@ pypeline.util.math.fourier
 .. automodule:: pypeline.util.math.fourier
 
 
-
    .. rubric:: Functions
 
    .. autosummary::
@@ -19,8 +18,12 @@ pypeline.util.math.fourier
 
 
 
+   .. autofunction:: ffs_sample
 
+   .. autofunction:: ffs
 
+   .. autofunction:: iffs
 
+   .. autofunction:: czt
 
-
+   .. autofunction:: fs_interp
