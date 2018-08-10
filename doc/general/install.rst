@@ -8,7 +8,7 @@
 Installation
 ============
 
-Pypeline modules are written in Python3 and C++17.
+Pypeline modules are written in Python3 and C++14.
 Due to strong non-Python dependencies required to achieve high performance, we recommend the use of `conda <https://conda.io/docs/>`_ to install everything.
 
 Pypeline is developed and tested on x86_64 systems running Linux.
@@ -35,6 +35,6 @@ To launch a Python3 shell containing Pypeline, run ``pypeline.sh``.
 Remarks
 -------
 
-* Pypeline is internally tested with GCC8.1.1 and Clang 6.0.1.
+* Pypeline is internally tested with GCC 5.4.1, 7.3.1, 8.1.1 and Clang 6.0.1.
 * If building with ``--OpenMP``, Cmake may incorrectly link ``libpypeline.so`` with a version of OpenMP shipped with `conda` instead of the system's OpenMP shared library.
   In case the compilation stage above fails, inspect Cmake's log files for OpenMP ambiguities.

@@ -21,7 +21,7 @@
 
 #include "pypeline/util/argcheck.hpp"
 
-namespace pypeline::util::math::sphere {
+namespace pypeline { namespace util { namespace math { namespace sphere {
     /*
      * Polar coordinates to Cartesian coordinates.
      *
@@ -44,6 +44,7 @@ namespace pypeline::util::math::sphere {
      * --------
      * .. literal_block::
      *
+     *    #include <tuple>
      *    #include "xtensor/xarray.hpp"
      *    #include "xtensor/xbuilder.hpp"
      *    #include "xtensor/xstrided_view.hpp"
@@ -54,7 +55,8 @@ namespace pypeline::util::math::sphere {
      *    auto colat = xt::ones<double>({1, 5, 1});
      *    auto lon = xt::reshape_view(xt::linspace<double>(0, M_PI, 4), {1, 1, 4});
      *
-     *    auto [x, y, z] = sphere::pol2cart(r, colat, lon);
+     *    xt::xarray<double> x, y, z;
+     *    std::tie(x, y, z) = sphere::pol2cart(r, colat, lon);
      */
     template <typename E1, typename E2, typename E3>
     auto pol2cart(E1 &&r, E2 &&colat, E3 &&lon) {
@@ -74,9 +76,9 @@ namespace pypeline::util::math::sphere {
         }
 
         xt::xarray<double> sin_colat {xt::sin(colat)};
-        xt::xarray<double> x = r * sin_colat * xt::cos(lon);
-        xt::xarray<double> y = r * sin_colat * xt::sin(lon);
-        xt::xarray<double> z = r * xt::cos(colat);
+        xt::xarray<double> x {r * sin_colat * xt::cos(lon)};
+        xt::xarray<double> y {r * sin_colat * xt::sin(lon)};
+        xt::xarray<double> z {r * xt::cos(colat)};
 
         return std::make_tuple(x, y, z);
     }
@@ -103,6 +105,7 @@ namespace pypeline::util::math::sphere {
      * --------
      * .. literal_block::
      *
+     *    #include <tuple>
      *    #include "xtensor/xarray.hpp"
      *    #include "xtensor/xbuilder.hpp"
      *    #include "xtensor/xstrided_view.hpp"
@@ -113,7 +116,8 @@ namespace pypeline::util::math::sphere {
      *    auto lat = xt::ones<double>({1, 5, 1});
      *    auto lon = xt::reshape_view(xt::linspace<double>(0, M_PI, 4), {1, 1, 4});
      *
-     *    auto [x, y, z] = sphere::eq2cart(r, colat, lon);
+     *    xt::xarray<double> x, y, z;
+     *    std::tie(x, y, z) = sphere::eq2cart(r, colat, lon);
      */
     template <typename E1, typename E2, typename E3>
     auto eq2cart(E1 &&r, E2 &&lat, E3 &&lon) {
@@ -133,9 +137,9 @@ namespace pypeline::util::math::sphere {
         }
 
         xt::xarray<double> cos_lat {xt::cos(lat)};
-        xt::xarray<double> x = r * cos_lat * xt::cos(lon);
-        xt::xarray<double> y = r * cos_lat * xt::sin(lon);
-        xt::xarray<double> z = r * xt::sin(lat);
+        xt::xarray<double> x {r * cos_lat * xt::cos(lon)};
+        xt::xarray<double> y {r * cos_lat * xt::sin(lon)};
+        xt::xarray<double> z {r * xt::sin(lat)};
 
         return std::make_tuple(x, y, z);
     }
@@ -162,6 +166,7 @@ namespace pypeline::util::math::sphere {
      * --------
      * .. literal_block::
      *
+     *    #include <tuple>
      *    #include "xtensor/xarray.hpp"
      *    #include "xtensor/xbuilder.hpp"
      *    #include "pypeline/util/math/sphere.hpp"
@@ -171,7 +176,8 @@ namespace pypeline::util::math::sphere {
      *    auto y = xt::zeros<double>({3, 5, 1});
      *    auto z = 5 * xt::ones<double>({1, 1, 4});
      *
-     *    auto [r, colat, lon] = sphere::cart2pol(x, y, z);
+     *    xt::xarray<double> r, colat, lon;
+     *    std::tie(r, colat, lon) = sphere::cart2pol(x, y, z);
      */
     template <typename E1, typename E2, typename E3>
     auto cart2pol(E1 &&x, E2 &&y, E3 &&z) {
@@ -219,6 +225,7 @@ namespace pypeline::util::math::sphere {
      * --------
      * .. literal_block::
      *
+     *    #include <tuple>
      *    #include "xtensor/xarray.hpp"
      *    #include "xtensor/xbuilder.hpp"
      *    #include "pypeline/util/math/sphere.hpp"
@@ -228,7 +235,8 @@ namespace pypeline::util::math::sphere {
      *    auto y = xt::zeros<double>({3, 5, 1});
      *    auto z = 5 * xt::ones<double>({1, 1, 4});
      *
-     *    auto [r, lat, lon] = sphere::cart2eq(x, y, z);
+     *    xt::xarray<double> r, lat, lon;
+     *    std::tie(r, lat, lon) = sphere::cart2eq(x, y, z);
      */
     template <typename E1, typename E2, typename E3>
     auto cart2eq(E1 &&x, E2 &&y, E3 &&z) {
@@ -305,6 +313,6 @@ namespace pypeline::util::math::sphere {
         xt::xarray<double> colat {(0.5 * M_PI) - lat};
         return colat;
     }
-}
+}}}}
 
 #endif //PYPELINE_UTIL_MATH_SPHERE_HPP

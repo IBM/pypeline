@@ -22,7 +22,7 @@
 
 #include "pypeline/util/argcheck.hpp"
 
-namespace pypeline::util::math::func {
+namespace pypeline { namespace util { namespace math { namespace func {
     /*
      * Parameterized Tukey function.
      *
@@ -139,6 +139,6 @@ namespace pypeline::util::math::func {
             const double m_beta = 0;
             const double m_alpha = 0;
     };
-}
+}}}}
 
 #endif //PYPELINE_UTIL_MATH_FUNC_HPP

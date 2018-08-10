@@ -20,7 +20,7 @@
 #include "xtensor/xarray.hpp"
 #include "xtensor/xadapt.hpp"
 
-namespace pypeline::util::array {
+namespace pypeline { namespace util { namespace array {
     /*
      * Form indexing structure for Xtensor containers.
      *
@@ -155,6 +155,6 @@ namespace pypeline::util::array {
 
         return y;
     }
-}
+}}}
 
 #endif //PYPELINE_UTIL_ARRAY_HPP

@@ -15,7 +15,7 @@
 #include <complex>
 #include <type_traits>
 
-namespace pypeline::util::argcheck {
+namespace pypeline { namespace util { namespace argcheck {
     /*
      * Return true if array has specified rank.
      *
@@ -178,6 +178,6 @@ namespace pypeline::util::argcheck {
                 std::is_same<T, cdouble>::value ||
                 std::is_same<T, cldouble>::value);
     }
-}
+}}}
 
 #endif //PYPELINE_UTIL_ARGCHECK_HPP

@@ -22,7 +22,7 @@
 
 #include "pypeline/util/argcheck.hpp"
 
-namespace pypeline::util::math::linalg {
+namespace pypeline { namespace util { namespace math { namespace linalg {
     /*
      * Determine rotation angle from Z-axis rotation matrix.
      *
@@ -71,8 +71,13 @@ namespace pypeline::util::math::linalg {
             throw std::runtime_error(msg);
         }
 
-        double cos_angle = std::clamp<double>(R(0, 0), -1, 1);
-        double sin_angle = std::clamp<double>(R(1, 0), -1, 1);
+        /*
+         * Replace [sin,cos]_angle as given below when moving to C++17.
+         * double cos_angle = std::clamp<double>(R(0, 0), -1, 1);
+         * double sin_angle = std::clamp<double>(R(1, 0), -1, 1);
+         */
+        double cos_angle = (R(0, 0) > 1) ? 1 : ((R(0, 0) < -1) ? -1 : R(0, 0));
+        double sin_angle = (R(1, 0) > 1) ? 1 : ((R(1, 0) < -1) ? -1 : R(1, 0));
 
         double angle = 0;
         if (sin_angle >= 0) {  // In quadrants I or II
@@ -152,6 +157,6 @@ namespace pypeline::util::math::linalg {
                                   {p20, p21, p22}};
         return R;
     }
-}
+}}}}
 
 #endif //PYPELINE_UTIL_MATH_LINALG_HPP

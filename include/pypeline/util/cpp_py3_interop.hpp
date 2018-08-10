@@ -22,7 +22,7 @@
 #include "pybind11/numpy.h"
 #include "xtensor/xadapt.hpp"
 
-namespace pypeline::util::cpp_py3_interop {
+namespace pypeline { namespace util { namespace cpp_py3_interop {
     /*
      * Reference C++ tensor from Python3 as NumPy array.
      *
@@ -295,7 +295,7 @@ namespace pypeline::util::cpp_py3_interop {
     }
 
     std::vector<size_t> cpp_index_convention(const size_t N,
-                                             const std::vector<int>& index) {
+                                             const std::vector<int> &index) {
         std::vector<size_t> cpp_index(index.size());
         for (size_t i = 0; i < index.size(); ++i) {
             cpp_index[i] = cpp_index_convention(N, index[i]);
@@ -303,6 +303,6 @@ namespace pypeline::util::cpp_py3_interop {
 
         return cpp_index;
     }
-}
+}}}
 
 #endif //PYPELINE_UTIL_CPP_PY3_INTEROP_HPP
