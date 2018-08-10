@@ -11,7 +11,7 @@ project(pypeline
 
 set (CMAKE_VERBOSE_MAKEFILE ON)
 set (CMAKE_MODULE_PATH      ${CMAKE_MODULE_PATH}
-                            "${PROJECT_SOURCE_DIR}/include/cmake/Modules/")
+                            "${PROJECT_SOURCE_DIR}/include/cmake/")
 
 ### C++/Python Standards ======================================================
 set (CMAKE_CXX_STANDARD          17)
