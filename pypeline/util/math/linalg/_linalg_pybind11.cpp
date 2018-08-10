@@ -4,6 +4,8 @@
 // Author : Sepand KASHANI [sep@zurich.ibm.com]
 // ############################################################################
 
+#include <utility>
+
 #include "pybind11/pybind11.h"
 
 #include "pypeline/util/cpp_py3_interop.hpp"
@@ -14,7 +16,7 @@ namespace linalg = pypeline::util::math::linalg;
 
 template <typename T>
 double py_z_rot2angle(pybind11::array_t<T> R) {
-    auto R_view = cpp_py3_interop ::numpy_to_xview<T>(R);
+    const auto& R_view = cpp_py3_interop ::numpy_to_xview<T>(R);
 
     double angle = linalg::z_rot2angle(R_view);
     return angle;
@@ -23,10 +25,10 @@ double py_z_rot2angle(pybind11::array_t<T> R) {
 template <typename T>
 pybind11::array_t<double> py_rot(pybind11::array_t<T> axis,
                                  const double angle) {
-    auto axis_view = cpp_py3_interop::numpy_to_xview<T>(axis);
+    const auto& axis_view = cpp_py3_interop::numpy_to_xview<T>(axis);
 
     auto R = linalg::rot(axis_view, angle);
-    return cpp_py3_interop::xtensor_to_numpy(R);
+    return cpp_py3_interop::xtensor_to_numpy(std::move(R));
 }
 
 PYBIND11_MODULE(_pypeline_util_math_linalg_pybind11, m) {

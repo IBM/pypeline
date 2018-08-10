@@ -4,7 +4,11 @@
 // Author : Sepand KASHANI [sep@zurich.ibm.com]
 // ############################################################################
 
+#include <tuple>
+#include <utility>
+
 #include "pybind11/pybind11.h"
+#include "xtensor/xarray.hpp"
 #include "xtensor/xtensor.hpp"
 
 #include "pypeline/util/cpp_py3_interop.hpp"
@@ -19,14 +23,15 @@ std::tuple<pybind11::array_t<T>,
            pybind11::array_t<T>> py_pol2cart(pybind11::array_t<T> r,
                                              pybind11::array_t<T> colat,
                                              pybind11::array_t<T> lon) {
-        auto r_view = cpp_py3_interop::numpy_to_xview<T>(r);
-        auto colat_view = cpp_py3_interop::numpy_to_xview<T>(colat);
-        auto lon_view = cpp_py3_interop::numpy_to_xview<T>(lon);
+        const auto& r_view = cpp_py3_interop::numpy_to_xview<T>(r);
+        const auto& colat_view = cpp_py3_interop::numpy_to_xview<T>(colat);
+        const auto& lon_view = cpp_py3_interop::numpy_to_xview<T>(lon);
 
-        const auto& [x, y, z] = sphere::pol2cart(r_view, colat_view, lon_view);
-        auto xyz = std::make_tuple(cpp_py3_interop::xtensor_to_numpy(x),
-                                   cpp_py3_interop::xtensor_to_numpy(y),
-                                   cpp_py3_interop::xtensor_to_numpy(z));
+        xt::xarray<double> x, y, z;
+        std::tie(x, y, z) = sphere::pol2cart(r_view, colat_view, lon_view);
+        auto xyz = std::make_tuple(cpp_py3_interop::xtensor_to_numpy(std::move(x)),
+                                   cpp_py3_interop::xtensor_to_numpy(std::move(y)),
+                                   cpp_py3_interop::xtensor_to_numpy(std::move(z)));
         return xyz;
 }
 
@@ -37,13 +42,14 @@ std::tuple<pybind11::array_t<T>,
                                              pybind11::array_t<T> colat,
                                              pybind11::array_t<T> lon) {
         xt::xtensor<double, 1> _r {r};
-        auto colat_view = cpp_py3_interop::numpy_to_xview<T>(colat);
-        auto lon_view = cpp_py3_interop::numpy_to_xview<T>(lon);
+        const auto& colat_view = cpp_py3_interop::numpy_to_xview<T>(colat);
+        const auto& lon_view = cpp_py3_interop::numpy_to_xview<T>(lon);
 
-        const auto& [x, y, z] = sphere::pol2cart(_r, colat_view, lon_view);
-        auto xyz = std::make_tuple(cpp_py3_interop::xtensor_to_numpy(x),
-                                   cpp_py3_interop::xtensor_to_numpy(y),
-                                   cpp_py3_interop::xtensor_to_numpy(z));
+        xt::xarray<double> x, y, z;
+        std::tie(x, y, z) = sphere::pol2cart(_r, colat_view, lon_view);
+        auto xyz = std::make_tuple(cpp_py3_interop::xtensor_to_numpy(std::move(x)),
+                                   cpp_py3_interop::xtensor_to_numpy(std::move(y)),
+                                   cpp_py3_interop::xtensor_to_numpy(std::move(z)));
         return xyz;
 }
 
@@ -57,7 +63,8 @@ std::tuple<double,
         xt::xtensor<double, 1> _colat {colat};
         xt::xtensor<double, 1> _lon {lon};
 
-        const auto& [x, y, z] = sphere::pol2cart(_r, _colat, _lon);
+        xt::xarray<double> x, y, z;
+        std::tie(x, y, z) = sphere::pol2cart(_r, _colat, _lon);
         auto xyz = std::make_tuple(x(0), y(0), z(0));
         return xyz;
 }
@@ -68,14 +75,15 @@ std::tuple<pybind11::array_t<T>,
            pybind11::array_t<T>> py_eq2cart(pybind11::array_t<T> r,
                                             pybind11::array_t<T> lat,
                                             pybind11::array_t<T> lon) {
-        auto r_view = cpp_py3_interop::numpy_to_xview<T>(r);
-        auto lat_view = cpp_py3_interop::numpy_to_xview<T>(lat);
-        auto lon_view = cpp_py3_interop::numpy_to_xview<T>(lon);
+        const auto& r_view = cpp_py3_interop::numpy_to_xview<T>(r);
+        const auto& lat_view = cpp_py3_interop::numpy_to_xview<T>(lat);
+        const auto& lon_view = cpp_py3_interop::numpy_to_xview<T>(lon);
 
-        const auto& [x, y, z] = sphere::eq2cart(r_view, lat_view, lon_view);
-        auto xyz = std::make_tuple(cpp_py3_interop::xtensor_to_numpy(x),
-                                   cpp_py3_interop::xtensor_to_numpy(y),
-                                   cpp_py3_interop::xtensor_to_numpy(z));
+        xt::xarray<double> x, y, z;
+        std::tie(x, y, z) = sphere::eq2cart(r_view, lat_view, lon_view);
+        auto xyz = std::make_tuple(cpp_py3_interop::xtensor_to_numpy(std::move(x)),
+                                   cpp_py3_interop::xtensor_to_numpy(std::move(y)),
+                                   cpp_py3_interop::xtensor_to_numpy(std::move(z)));
         return xyz;
 }
 
@@ -86,13 +94,14 @@ std::tuple<pybind11::array_t<T>,
                                             pybind11::array_t<T> lat,
                                             pybind11::array_t<T> lon) {
         xt::xtensor<double, 1> _r {r};
-        auto lat_view = cpp_py3_interop::numpy_to_xview<T>(lat);
-        auto lon_view = cpp_py3_interop::numpy_to_xview<T>(lon);
+        const auto& lat_view = cpp_py3_interop::numpy_to_xview<T>(lat);
+        const auto& lon_view = cpp_py3_interop::numpy_to_xview<T>(lon);
 
-        const auto& [x, y, z] = sphere::eq2cart(_r, lat_view, lon_view);
-        auto xyz = std::make_tuple(cpp_py3_interop::xtensor_to_numpy(x),
-                                   cpp_py3_interop::xtensor_to_numpy(y),
-                                   cpp_py3_interop::xtensor_to_numpy(z));
+        xt::xarray<double> x, y, z;
+        std::tie(x, y, z) = sphere::eq2cart(_r, lat_view, lon_view);
+        auto xyz = std::make_tuple(cpp_py3_interop::xtensor_to_numpy(std::move(x)),
+                                   cpp_py3_interop::xtensor_to_numpy(std::move(y)),
+                                   cpp_py3_interop::xtensor_to_numpy(std::move(z)));
         return xyz;
 }
 
@@ -106,7 +115,8 @@ std::tuple<double,
         xt::xtensor<double, 1> _lat {lat};
         xt::xtensor<double, 1> _lon {lon};
 
-        const auto& [x, y, z] = sphere::eq2cart(_r, _lat, _lon);
+        xt::xarray<double> x, y, z;
+        std::tie(x, y, z) = sphere::eq2cart(_r, _lat, _lon);
         auto xyz = std::make_tuple(x(0), y(0), z(0));
         return xyz;
 }
@@ -117,14 +127,15 @@ std::tuple<pybind11::array_t<T>,
            pybind11::array_t<T>> py_cart2pol(pybind11::array_t<T> x,
                                              pybind11::array_t<T> y,
                                              pybind11::array_t<T> z) {
-    auto x_view = cpp_py3_interop::numpy_to_xview<T>(x);
-    auto y_view = cpp_py3_interop::numpy_to_xview<T>(y);
-    auto z_view = cpp_py3_interop::numpy_to_xview<T>(z);
+    const auto& x_view = cpp_py3_interop::numpy_to_xview<T>(x);
+    const auto& y_view = cpp_py3_interop::numpy_to_xview<T>(y);
+    const auto& z_view = cpp_py3_interop::numpy_to_xview<T>(z);
 
-    const auto& [r, colat, lon] = sphere::cart2pol(x_view, y_view, z_view);
-    auto pol = std::make_tuple(cpp_py3_interop::xtensor_to_numpy(r),
-                               cpp_py3_interop::xtensor_to_numpy(colat),
-                               cpp_py3_interop::xtensor_to_numpy(lon));
+    xt::xarray<double> r, colat, lon;
+    std::tie(r, colat, lon) = sphere::cart2pol(x_view, y_view, z_view);
+    auto pol = std::make_tuple(cpp_py3_interop::xtensor_to_numpy(std::move(r)),
+                               cpp_py3_interop::xtensor_to_numpy(std::move(colat)),
+                               cpp_py3_interop::xtensor_to_numpy(std::move(lon)));
     return pol;
 }
 
@@ -138,7 +149,8 @@ std::tuple<double,
     xt::xtensor<double, 1> _y {y};
     xt::xtensor<double, 1> _z {z};
 
-    const auto& [r, colat, lon] = sphere::cart2pol(_x, _y, _z);
+    xt::xarray<double> r, colat, lon;
+    std::tie(r, colat, lon) = sphere::cart2pol(_x, _y, _z);
     auto pol = std::make_tuple(r(0), colat(0), lon(0));
     return pol;
 }
@@ -149,14 +161,15 @@ std::tuple<pybind11::array_t<T>,
            pybind11::array_t<T>> py_cart2eq(pybind11::array_t<T> x,
                                             pybind11::array_t<T> y,
                                             pybind11::array_t<T> z) {
-    auto x_view = cpp_py3_interop::numpy_to_xview<T>(x);
-    auto y_view = cpp_py3_interop::numpy_to_xview<T>(y);
-    auto z_view = cpp_py3_interop::numpy_to_xview<T>(z);
+    const auto& x_view = cpp_py3_interop::numpy_to_xview<T>(x);
+    const auto& y_view = cpp_py3_interop::numpy_to_xview<T>(y);
+    const auto& z_view = cpp_py3_interop::numpy_to_xview<T>(z);
 
-    const auto& [r, lat, lon] = sphere::cart2eq(x_view, y_view, z_view);
-    auto eq = std::make_tuple(cpp_py3_interop::xtensor_to_numpy(r),
-                              cpp_py3_interop::xtensor_to_numpy(lat),
-                              cpp_py3_interop::xtensor_to_numpy(lon));
+    xt::xarray<double> r, lat, lon;
+    std::tie(r, lat, lon) = sphere::cart2eq(x_view, y_view, z_view);
+    auto eq = std::make_tuple(cpp_py3_interop::xtensor_to_numpy(std::move(r)),
+                              cpp_py3_interop::xtensor_to_numpy(std::move(lat)),
+                              cpp_py3_interop::xtensor_to_numpy(std::move(lon)));
     return eq;
 }
 
@@ -170,40 +183,41 @@ std::tuple<double,
     xt::xtensor<double, 1> _y {y};
     xt::xtensor<double, 1> _z {z};
 
-    const auto& [r, lat, lon] = sphere::cart2eq(_x, _y, _z);
+    xt::xarray<double> r, lat, lon;
+    std::tie(r, lat, lon) = sphere::cart2eq(_x, _y, _z);
     auto eq = std::make_tuple(r(0), lat(0), lon(0));
     return eq;
 }
 
 template <typename T>
 pybind11::array_t<T> py_colat2lat(pybind11::array_t<T> colat) {
-    auto colat_view = cpp_py3_interop::numpy_to_xview<T>(colat);
+    const auto& colat_view = cpp_py3_interop::numpy_to_xview<T>(colat);
 
-    auto lat = sphere::colat2lat(colat_view);
-    return cpp_py3_interop::xtensor_to_numpy(lat);
+    const auto& lat = sphere::colat2lat(colat_view);
+    return cpp_py3_interop::xtensor_to_numpy(std::move(lat));
 }
 
 template <typename T>
 double py_colat2lat(double colat) {
     xt::xtensor<double, 1> _colat {colat};
 
-    auto lat = sphere::colat2lat(_colat);
+    const auto& lat = sphere::colat2lat(_colat);
     return lat(0);
 }
 
 template <typename T>
 pybind11::array_t<T> py_lat2colat(pybind11::array_t<T> lat) {
-    auto lat_view = cpp_py3_interop::numpy_to_xview<T>(lat);
+    const auto& lat_view = cpp_py3_interop::numpy_to_xview<T>(lat);
 
-    auto colat = sphere::lat2colat(lat_view);
-    return cpp_py3_interop::xtensor_to_numpy(colat);
+    const auto& colat = sphere::lat2colat(lat_view);
+    return cpp_py3_interop::xtensor_to_numpy(std::move(colat));
 }
 
 template <typename T>
 double py_lat2colat(double lat) {
     xt::xtensor<double, 1> _lat {lat};
 
-    auto colat = sphere::lat2colat(_lat);
+    const auto& colat = sphere::lat2colat(_lat);
     return colat(0);
 }
 

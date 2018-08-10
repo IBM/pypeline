@@ -8,6 +8,7 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include <utility>
 
 #include "pybind11/pybind11.h"
 #include "pybind11/stl.h"
@@ -24,17 +25,17 @@ pybind11::array_t<T> py_cluster_layers(pybind11::array_t<T> x,
                                        std::vector<int> idx,
                                        const int N,
                                        const int axis) {
-    auto xview = cpp_py3_interop::numpy_to_xview<T>(x);
+    const auto& xview = cpp_py3_interop::numpy_to_xview<T>(x);
     if (N <= 0) {
         std::string msg = "Parameter[N] must be positive.";
         throw std::runtime_error(msg);
     }
     size_t cpp_N = N;
-    auto cpp_idx = cpp_py3_interop::cpp_index_convention(cpp_N, idx);
-    auto cpp_axis = cpp_py3_interop::cpp_index_convention(xview.dimension(), axis);
+    const auto& cpp_idx = cpp_py3_interop::cpp_index_convention(cpp_N, idx);
+    const auto& cpp_axis = cpp_py3_interop::cpp_index_convention(xview.dimension(), axis);
 
-    auto y = array::cluster_layers(xview, cpp_idx, cpp_N, cpp_axis);
-    return cpp_py3_interop::xtensor_to_numpy(y);
+    const auto& y = array::cluster_layers(xview, cpp_idx, cpp_N, cpp_axis);
+    return cpp_py3_interop::xtensor_to_numpy(std::move(y));
 }
 
 PYBIND11_MODULE(_pypeline_util_array_pybind11, m) {

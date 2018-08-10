@@ -18,10 +18,10 @@ namespace func = pypeline::util::math::func;
 template <typename T>
 pybind11::array_t<double> py_Tukey___call__(const func::Tukey& tukey,
                                             pybind11::array_t<T> x) {
-    auto xview = cpp_py3_interop::numpy_to_xview<T>(x);
+    const auto& xview = cpp_py3_interop::numpy_to_xview<T>(x);
 
     auto amplitude = const_cast<func::Tukey&>(tukey)(xview);
-    return cpp_py3_interop::xtensor_to_numpy(amplitude);
+    return cpp_py3_interop::xtensor_to_numpy(std::move(amplitude));
 }
 
 template <typename T>

@@ -14,10 +14,10 @@ set (CMAKE_MODULE_PATH      ${CMAKE_MODULE_PATH}
                             "${PROJECT_SOURCE_DIR}/include/cmake/")
 
 ### C++/Python Standards ======================================================
-set (CMAKE_CXX_STANDARD          17)
-set (CMAKE_CXX_EXTENSIONS        OFF)  # Force c++1[7z] instead of gnu++1[7z]
-set (CMAKE_CXX_STANDARD_REQUIRED ON)   # Fail if no c++17 compiler available
-set (PYBIND11_CPP_STANDARD       -std=c++17)
+set (CMAKE_CXX_STANDARD          14)
+set (CMAKE_CXX_EXTENSIONS        OFF)  # Force c++1[4y] instead of gnu++1[4y]
+set (CMAKE_CXX_STANDARD_REQUIRED ON)   # Fail if no c++14 compiler available
+set (PYBIND11_CPP_STANDARD       -std=c++14)
 set (PYTHON_EXECUTABLE           "$ENV{CONDA_PREFIX}/bin/python3")
 
 ### Automatic Header/Library Discovery ========================================
