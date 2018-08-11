@@ -24,13 +24,13 @@ namespace pypeline { namespace util { namespace array {
     /*
      * Form indexing structure for Xtensor containers.
      *
-     * Given an array `x`, generates the vector that has :cpp:`xt::all()` in
-     * each axis except `axis`, where `idx_spec` is used instead.
+     * Given an array's rank, generate the vector that has :cpp:`xt::all()`
+     * in each axis except `axis`, where `idx_spec` is used instead.
      *
      * Parameters
      * ----------
-     * x : xt::xexpression
-     *     Array to index.
+     * rank : size_t
+     *     Rank of array to index.
      * axis : size_t
      *     Dimension along which to apply `idx_spec`.
      * idx_spec : size_t or xt::xslice
@@ -41,7 +41,7 @@ namespace pypeline { namespace util { namespace array {
      * Returns
      * -------
      * idx_struct : xt::xtstrided_slice_vector
-     *     Second argument to :cpp:`xt::strided_view(x, _)`.
+     *     Second argument to :cpp:`xt::strided_view(xt::xcontainer, _)`.
      *
      * Examples
      * --------
@@ -56,17 +56,17 @@ namespace pypeline { namespace util { namespace array {
      *                                            {3, 4, 5});
      *
      *    namespace array = pypeline::util::array;
-     *    auto idx = array::index(x, 2, xt::range(0, 5, 2));
+     *    auto idx = array::index(x.dimension(), 2, xt::range(0, 5, 2));
      *    auto y = xt::strided_view(x, idx);
      */
-    template <typename E, typename I>
-    xt::xstrided_slice_vector index(E &&x, const size_t axis, I &&idx_spec) {
-        if (axis >= x.dimension()) {
-            std::string msg = "Parameter[axis] must be lie in {0, ..., x.dimension()-1}.";
+    template <typename I>
+    xt::xstrided_slice_vector index(const size_t rank, const size_t axis, I &&idx_spec) {
+        if (axis >= rank) {
+            std::string msg = "Parameter[axis] must be lie in {0, ..., rank-1}.";
             throw std::runtime_error(msg);
         }
 
-        xt::xstrided_slice_vector idx_struct(x.dimension());
+        xt::xstrided_slice_vector idx_struct(rank);
         std::fill(idx_struct.begin(), idx_struct.end(), xt::all());
         idx_struct[axis] = idx_spec;
 
@@ -144,10 +144,10 @@ namespace pypeline { namespace util { namespace array {
         xt::xarray<T> y = xt::zeros<T>(shape_y);
 
         for (size_t i = 0; i < idx.size(); ++i) {
-            auto idx_x = index(x, axis, i);
+            auto idx_x = index(x.dimension(), axis, i);
             auto view_x = xt::strided_view(x, idx_x);
 
-            auto idx_y = index(y, axis, idx[i]);
+            auto idx_y = index(y.dimension(), axis, idx[i]);
             auto view_y = xt::strided_view(y, idx_y);
 
             view_y.plus_assign(view_x);
