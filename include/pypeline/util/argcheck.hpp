@@ -13,6 +13,7 @@
 
 #include <array>
 #include <complex>
+#include <cstdlib>
 #include <type_traits>
 
 namespace pypeline { namespace util { namespace argcheck {
@@ -177,6 +178,74 @@ namespace pypeline { namespace util { namespace argcheck {
         return (std::is_same<T, cfloat>::value ||
                 std::is_same<T, cdouble>::value ||
                 std::is_same<T, cldouble>::value);
+    }
+
+    /*
+     * Return true if scalar is even-valued.
+     *
+     * Parameters
+     * ----------
+     * x : int
+     *
+     * Returns
+     * -------
+     * is_even : bool
+     *
+     * Examples
+     * --------
+     * .. literal_block::
+     *
+     *    #include "pypeline/util/argcheck.hpp"
+     *
+     *    namespace argcheck = pypeline::util::argcheck;
+     *    argcheck::is_even(-3);  // false
+     *    argcheck::is_even(-2);  // true
+     *    argcheck::is_even(-1);  // false
+     *    argcheck::is_even( 0);  // true
+     *    argcheck::is_even( 1);  // false
+     *    argcheck::is_even( 2);  // true
+     *    argcheck::is_even( 3);  // false
+     */
+    bool is_even(const int x) {
+        if (std::div(x, 2).rem == 0) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    /*
+     * Return true if scalar is odd-valued.
+     *
+     * Parameters
+     * ----------
+     * x : int
+     *
+     * Returns
+     * -------
+     * is_odd : bool
+     *
+     * Examples
+     * --------
+     * .. literal_block::
+     *
+     *    #include "pypeline/util/argcheck.hpp"
+     *
+     *    namespace argcheck = pypeline::util::argcheck;
+     *    argcheck::is_odd(-3);  // true
+     *    argcheck::is_odd(-2);  // false
+     *    argcheck::is_odd(-1);  // true
+     *    argcheck::is_odd( 0);  // false
+     *    argcheck::is_odd( 1);  // true
+     *    argcheck::is_odd( 2);  // false
+     *    argcheck::is_odd( 3);  // true
+     */
+    bool is_odd(const int x) {
+        if (std::div(x, 2).rem == 0) {
+            return false;
+        } else {
+            return true;
+        }
     }
 }}}
 
