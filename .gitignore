@@ -44,3 +44,12 @@ doc/build/
 
 ### C/C++ template ============================================================
 *.so
+
+### C/C++ dependency-related ==================================================
+dependencies/
+include/eigen3
+include/xtl
+include/xsimd
+include/xtensor
+include/pybind11
+include/fftw*

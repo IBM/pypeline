@@ -23,7 +23,6 @@ numexpr == 2.6.*
 numpy == 1.14.*
 pandas == 0.23.*
 plotly == 2.7.*
-pybind11 == 2.2.*
 pyproj == 1.9.*
 pytest == 3.6.*
 python-casacore == 2.2.*
@@ -32,5 +31,3 @@ scipy == 1.1.*
 sphinx == 1.7.*
 sphinx_rtd_theme == 0.4.*
 tqdm == 4.23.*
-xsimd == 6.1.*
-xtensor == 0.17.*

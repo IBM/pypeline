@@ -13,7 +13,7 @@
 
 #include <complex>
 
-#include "Eigen/Eigen"
+#include "eigen3/Eigen/Eigen"
 
 using cfloat_t = std::complex<float>;
 using cdouble_t = std::complex<double>;

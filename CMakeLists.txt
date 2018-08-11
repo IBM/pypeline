@@ -10,8 +10,9 @@ project(pypeline
         LANGUAGES C CXX)
 
 set (CMAKE_VERBOSE_MAKEFILE ON)
-set (CMAKE_MODULE_PATH      ${CMAKE_MODULE_PATH}
-                            "${PROJECT_SOURCE_DIR}/include/cmake/")
+set (CMAKE_PREFIX_PATH      "${PROJECT_SOURCE_DIR}/cmake"
+                            "${PROJECT_SOURCE_DIR}/lib64/cmake"
+                            "${PROJECT_SOURCE_DIR}/lib64/eigen3/cmake")
 
 ### C++/Python Standards ======================================================
 set (CMAKE_CXX_STANDARD          14)
@@ -21,33 +22,21 @@ set (PYBIND11_CPP_STANDARD       -std=c++14)
 set (PYTHON_EXECUTABLE           "$ENV{CONDA_PREFIX}/bin/python3")
 
 ### Automatic Header/Library Discovery ========================================
-find_package(Eigen3       REQUIRED)
-find_package(MKL          REQUIRED)
-find_package(OpenMP       REQUIRED)
-find_package(pybind11     REQUIRED)
-find_package(xsimd        REQUIRED)
-find_package(xtensor      REQUIRED)
+find_package(OpenMP           REQUIRED)                                       # Provides target OpenMP::OpenMP_CXX
+find_package(Eigen3    3.3.5  REQUIRED NO_MODULE NO_SYSTEM_ENVIRONMENT_PATH)  # Provides target Eigen3::Eigen
+find_package(pybind11  2.2.3  REQUIRED NO_MODULE NO_SYSTEM_ENVIRONMENT_PATH)
+find_package(xsimd     6.1.5  REQUIRED NO_MODULE NO_SYSTEM_ENVIRONMENT_PATH)
+find_package(xtensor   0.17.1 REQUIRED NO_MODULE NO_SYSTEM_ENVIRONMENT_PATH)
 
-message(STATUS "")
-message(STATUS "Eigen3 Discovery ============================================")
-message(STATUS "EIGEN3_INCLUDE_DIRS:   ${EIGEN3_INCLUDE_DIRS}")
-message(STATUS "MKL Discovery ===============================================")
-message(STATUS "MKL_INCLUDE_DIRS:      ${MKL_INCLUDE_DIRS}")
-message(STATUS "MKL_LIBRARIES:         ${MKL_LIBRARIES}")
-message(STATUS "PyBind11 Discovery ==========================================")
-message(STATUS "PYBIND11_CPP_STANDARD: ${PYBIND11_CPP_STANDARD}")
-message(STATUS "PYTHON_EXECUTABLE:     ${PYTHON_EXECUTABLE}")
-message(STATUS "=============================================================")
-message(STATUS "")
+# We provide custom module files for the following packages.
+find_package(MKL              REQUIRED NO_MODULE NO_SYSTEM_ENVIRONMENT_PATH)
+find_package(FFTW3            REQUIRED NO_MODULE NO_SYSTEM_ENVIRONMENT_PATH)
+find_package(FFTW3f           REQUIRED NO_MODULE NO_SYSTEM_ENVIRONMENT_PATH)
 
 ### Custom Header Search Paths ================================================
-set (PYPELINE_INCLUDE_DIRS ${PROJECT_SOURCE_DIR}/include/)
-include_directories(BEFORE ${EIGEN3_INCLUDE_DIRS}
-                           ${MKL_INCLUDE_DIRS}
-                           ${pybind11_INCLUDE_DIRS}
-                           ${xsimd_INCLUDE_DIRS}
-                           ${xtensor_INCLUDE_DIRS}
-                           ${PYPELINE_INCLUDE_DIRS})
+# All Pypeline C++ code have their dependency headers (except MKL) under include/, so no need to specify each of them individually.
+include_directories(BEFORE "${PROJECT_SOURCE_DIR}/include/"
+                           "${MKL_INCLUDE_DIRS}")
 
 ### Debug/Release Macro Definitions ===========================================
 add_definitions(-DEIGEN_USE_MKL_ALL)  # Eigen MKL acceleration
@@ -66,15 +55,17 @@ set (CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS} -mfma -mavx -O3 -march=native")
 ### BUILD Targets =============================================================
 file(GLOB_RECURSE libpypeline_files
      LIST_DIRECTORIES false
-     "${PYPELINE_INCLUDE_DIRS}/pypeline/*.hpp")
+     "${PROJECT_SOURCE_DIR}/include/pypeline/*.hpp")
 
 ## Pypeline C++ Linkable Library ----------------------------------------------
 add_library(pypeline SHARED ${libpypeline_files})
 set_target_properties(pypeline PROPERTIES LINKER_LANGUAGE CXX)
+target_link_libraries(pypeline Eigen3::Eigen
+                               ${FFTW3_LIBRARIES}
+                               ${FFTW3f_LIBRARIES}
+                               ${MKL_LIBRARIES})
 if(${PYPELINE_USE_OPENMP})
-    target_link_libraries(pypeline ${MKL_LIBRARIES} OpenMP::OpenMP_CXX)
-else(${PYPELINE_USE_OPENMP})
-    target_link_libraries(pypeline ${MKL_LIBRARIES})
+    target_link_libraries(pypeline OpenMP::OpenMP_CXX)
 endif(${PYPELINE_USE_OPENMP})
 
 ## C++ Executables ------------------------------------------------------------
@@ -96,3 +87,13 @@ target_link_libraries(_pypeline_util_math_sphere_pybind11 PRIVATE pypeline)
 
 pybind11_add_module  (_pypeline_util_math_fourier_pybind11 ${PROJECT_SOURCE_DIR}/pypeline/util/math/fourier/_fourier_pybind11.cpp)
 target_link_libraries(_pypeline_util_math_fourier_pybind11 PRIVATE pypeline)
+
+### Install Build Targets to lib64/ ===========================================
+install(TARGETS  pypeline
+                _pypeline_util_array_pybind11
+                _pypeline_util_math_linalg_pybind11
+                _pypeline_util_math_func_pybind11
+                _pypeline_util_math_sphere_pybind11
+                _pypeline_util_math_fourier_pybind11
+        LIBRARY
+        DESTINATION "${PROJECT_SOURCE_DIR}/lib64/")
