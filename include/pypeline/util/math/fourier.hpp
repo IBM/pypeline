@@ -11,6 +11,8 @@
 #ifndef PYPELINE_UTIL_MATH_FOURIER_HPP
 #define PYPELINE_UTIL_MATH_FOURIER_HPP
 
+#include <algorithm>
+#include <cmath>
 #include <complex>
 #include <stdexcept>
 #include <string>
@@ -22,6 +24,9 @@
 #include "fftw3.h"
 #include "xtensor/xtensor.hpp"
 #include "xtensor/xadapt.hpp"
+#include "xtensor/xcomplex.hpp"
+#include "xtensor/xmath.hpp"
+#include "xtensor/xbuilder.hpp"
 #include "xtensor/xstrided_view.hpp"
 
 #include "pypeline/util/argcheck.hpp"
@@ -34,10 +39,9 @@ namespace pypeline { namespace util { namespace math { namespace fourier {
     };
 
     /*
-     * Signal sample positions for :cpp:func:`ffs` and :cpp:class:`FFS`.
+     * Signal sample positions for :cpp:class:`FFTW_FFS`.
      *
-     * Return the coordinates at which a signal must be sampled to use
-     * :cpp:func:`ffs` and :cpp:class:`FFS`.
+     * Return the coordinates at which a signal must be sampled to use :cpp:class:`FFTW_FFS`.
      *
      * Parameters
      * ----------
@@ -63,7 +67,7 @@ namespace pypeline { namespace util { namespace math { namespace fourier {
      * The sampling points :math:`t[n] \in \mathbb{R}` at which :math:`\phi`
      * must be evaluated to compute the Fourier Series coefficients
      * :math:`\left\{ \phi_{k}^{FS}, k = -2, \ldots, 2 \right\}` with
-     * :cpp:func:`ffs` or :cpp:class:`FFS` are obtained as follows:
+     * :cpp:class:`FFTW_FFS` are obtained as follows:
      *
      * .. literal_block::
      *
@@ -79,7 +83,7 @@ namespace pypeline { namespace util { namespace math { namespace fourier {
      *
      * See Also
      * --------
-     * :cpp:func:`ffs`, :cpp:class:`FFS`
+     * :cpp:class:`FFTW_FFS`
      */
     xt::xtensor<double, 1> ffs_sample(const double T,
                                       const size_t N_FS,
@@ -451,6 +455,368 @@ namespace pypeline { namespace util { namespace math { namespace fourier {
                 // Correct FFTW's lack of scaling during iFFTs.
                 const xt::xtensor<T, 1> N {static_cast<T>(m_shape[m_axis])};
                 view_in().multiplies_assign(1 / N);
+            }
+    };
+
+    /*
+     * FFTW wrapper to compute Fourier Series coefficients from signal samples.
+     *
+     * This object automatically allocates input/output buffers and provides a
+     * tensor interface to the underlying memory using xtensor views.
+     *
+     * Examples
+     * --------
+     * Let :math:`\phi(t)` be a shifted Dirichlet kernel of period :math:`T` and
+     * bandwidth :math:`N_{FS} = 2 N + 1`:
+     *
+     * .. math::
+     *
+     *    \phi(t) = \sum_{k = -N}^{N} \exp\left( j \frac{2 \pi}{T} k (t - T_{c}) \right)
+     *            = \frac{\sin\left( N_{FS} \pi [t - T_{c}] / T \right)}{\sin\left( \pi [t - T_{c}] / T \right)}.
+     *
+     * It's Fourier Series (FS) coefficients :math:`\phi_{k}^{FS}` can be analytically
+     * evaluated using the shift-modulation theorem:
+     *
+     * .. math::
+     *
+     *    \phi_{k}^{FS} =
+     *    \begin{cases}
+     *        \exp\left( -j \frac{2 \pi}{T} k T_{c} \right) & -N \le k \le N, \\
+     *        0 & \text{otherwise}.
+     *    \end{cases}
+     *
+     * Being bandlimited, we can use :cpp:class:`FFTW_FFS` and :cpp:func:`ffs_sample`
+     * to numerically evaluate :math:`\{\phi_{k}^{FS}, k = -N, \ldots, N\}`:
+     *
+     * .. literal_block::
+     *
+     *    #include <complex>
+     *    #include <cmath>
+     *    #include <vector>
+     *    #include "xtensor/xarray.hpp"
+     *    #include "xtensor/xbuilder.hpp"
+     *    #include "xtensor/xmath.hpp"
+     *    #include "xtensor/xindex_view.hpp"
+     *    #include "pypeline/util/math/fourier.hpp"
+     *    namespace fourier = pypeline::util::math::fourier;
+     *
+     *    // Compute samples from a shifted Dirichlet kernel.
+     *    xt::xarray<double> dirichlet(xt::xarray<double> x,
+     *                                 const double T,
+     *                                 const double T_c,
+     *                                 const size_t N_FS) {
+     *        xt::xarray<double> y {x - T_c};
+     *
+     *        xt::xarray<double> numerator {xt::zeros<double>({x.size()})};
+     *        xt::xarray<double> denominator {xt::zeros<double>({x.size()})};
+     *
+     *        xt::xarray<bool> nan_mask {xt::isclose(xt::fmod(y, M_PI), 0)};
+     *        xt::filter(numerator, ~nan_mask) = xt::sin((N_FS * M_PI / T) * xt::filter(y, ~nan_mask));
+     *        xt::filter(denominator, ~nan_mask) = xt::sin((M_PI / T) * xt::filter(y, ~nan_mask));
+     *        xt::filter(numerator, nan_mask) = N_FS * xt::cos((N_FS * M_PI / T) * xt::filter(y, nan_mask));
+     *        xt::filter(denominator, nan_mask) = xt::cos((M_PI / T) * xt::filter(y, nan_mask));
+     *
+     *        xt::xarray<double> vals {numerator / denominator};
+     *        return vals;
+     *    }
+     *
+     *    // Analytical FS coefficients of a shifted Dirichlet kernel.
+     *    xt::xarray<std::complex<double>> dirichlet_FS_theory(const double T,
+     *                                                         const double T_c,
+     *                                                         const size_t N_FS) {
+     *        const size_t N = (N_FS - 1) / 2;
+     *        std::complex<double> _1j(0, 1);
+     *
+     *        std::complex<double> base = exp(-_1j * (2 * M_PI * T_c) / T);
+     *        xt::xarray<double> exponent {xt::arange<int>(-N, N+1)};
+     *
+     *        xt::xarray<std::complex<double>> kernel {xt::pow(base, exponent)};
+     *        return kernel;
+     *    }
+     *
+     *    const double T = M_PI;
+     *    const double T_c = M_E;
+     *    const size_t N_FS = 15;
+     *    const size_t N_samples = 16;  // N_samples >= N_FS, but choose highly-
+     *                                  // composite for best performance.
+     *
+     *    const std::vector<size_t> shape_transform {N_samples};
+     *    const size_t axis_transform = 0;
+     *    const bool inplace = false;
+     *    const size_t N_threads = 1;
+     *    const fourier::planning_effort effort = fourier::planning_effort::NONE;
+     *
+     *    xt::xarray<double> sample_points {fourier::ffs_sample(T, N_FS, T_c, N_samples)};  // sample signal in the right order.
+     *    xt::xarray<double> diric_samples {dirichlet(sample_points, T, T_c, N_FS)};
+     *    xt::xarray<std::complex<double>> diric_FS_exact {dirichlet_FS_theory(T, T_c, N_FS)};
+     *
+     *    fourier::FFTW_FFS<double> transform(shape_transform,
+     *                                        axis_transform,
+     *                                        T, T_c, N_FS,
+     *                                        inplace, N_threads, effort);
+     *    transform.view_in() = diric_samples;  // Copy Dirichlet samples to input buffer.
+     *    transform.ffs();                      // Perform Fast-Fourier-Series transform.
+     *    xt::xarray<std::complex<double>> diric_FS {transform.view_out()};  // Array indices {0, ..., N_FS-1} along
+     *                                                                       // transform axis hold the FS coefficients.
+     *
+     *    // If you compare `diric_FS_exact` and `diric_FS`, they match perfectly.
+     *
+     * See Also
+     * --------
+     * :cpp:func:`ffs_sample`
+     */
+    template <typename TT>
+    class FFTW_FFS {
+        private:
+            size_t m_axis = 0;
+            std::vector<size_t> m_shape {};
+            FFTW_FFT<TT> m_transform;
+            xt::xarray<std::complex<TT>> m_mod_1;
+            xt::xarray<std::complex<TT>> m_mod_2;
+
+            void compute_modulation_vectors(const double T,
+                                            const double T_c,
+                                            const size_t N_FS) {
+                const size_t N_samples = m_shape[m_axis];
+                const size_t M = N_samples / 2;
+                const size_t N = N_FS / 2;
+                std::complex<TT> _1j(0, 1);
+
+                std::complex<TT> B_2 = exp(-_1j * TT(2 * M_PI / N_samples));
+                xt::xtensor<TT, 1> E_1 {xt::concatenate(std::make_tuple(
+                                             xt::arange<int>(-N, N + 1),
+                                             xt::zeros<int>({N_samples - N_FS})))};
+
+                namespace argcheck = pypeline::util::argcheck;
+                std::complex<TT> B_1;
+                xt::xtensor<TT, 1> E_2;
+                if (argcheck::is_odd(N_samples)) {
+                    B_1 = exp(_1j * TT((2 * M_PI / T) * T_c));
+                    E_2 = xt::concatenate(std::make_tuple(
+                              xt::arange<int>(0, M + 1),
+                              xt::arange<int>(-M, 0)));
+                } else {
+                    B_1 = exp(_1j * TT((2 * M_PI / T) *
+                                       (T_c + (T / (2 * N_samples)))));
+                    E_2 = xt::concatenate(std::make_tuple(
+                              xt::arange<int>(0, M),
+                              xt::arange<int>(-M, 0)));
+                }
+
+                std::vector<size_t> shape_view(m_shape.size());
+                std::fill(shape_view.begin(), shape_view.end(), 1);
+                shape_view[m_axis] = N_samples;
+
+                m_mod_1 = xt::reshape_view(xt::pow(B_1, -E_1), std::vector<size_t> {shape_view});
+                m_mod_2 = xt::reshape_view(xt::pow(B_2, -(N * E_2)), std::vector<size_t> {shape_view});
+            }
+
+        public:
+            /*
+             * Parameters
+             * ----------
+             * shape : std::vector<size_t>
+             *     Dimensions of the input/output arrays.
+             * axis : size_t
+             *     Dimension along which function samples are stored.
+             * T : double
+             *     Function period.
+             * T_c : double
+             *     Period mid-point.
+             * N_FS : int
+             *     Function bandwidth.
+             * inplace : bool
+             *     Perform in-place transforms.
+             *     If enabled, only one array will be internally allocated.
+             * N_threads : size_t
+             *     Number of threads to use.
+             * effort : planning_effort
+             *
+             * Notes
+             * -----
+             * Input and output buffers are initialized to 0 by default.
+             */
+            FFTW_FFS(const std::vector<size_t> &shape,
+                     const size_t axis,
+                     const double T,
+                     const double T_c,
+                     const size_t N_FS,
+                     const bool inplace,
+                     const size_t N_threads,
+                     const planning_effort effort):
+                m_axis(axis), m_shape(shape),
+                m_transform(shape, axis, inplace, N_threads, effort) {
+                namespace argcheck = pypeline::util::argcheck;
+                if (T <= 0) {
+                    std::string msg = "Parameter[T] must be positive.";
+                    throw std::runtime_error(msg);
+                }
+                if (!argcheck::is_odd(N_FS)) {
+                    std::string msg = "Parameter[N_FS] must be odd-valued.";
+                    throw std::runtime_error(msg);
+                }
+                const size_t N_samples = shape[axis];
+                if (!((3 <= N_FS) && (N_FS <= N_samples))) {
+                    std::string msg = "Parameter[N_FS] must lie in {3, ..., shape[axis]}.";
+                    throw std::runtime_error(msg);
+                }
+
+                compute_modulation_vectors(T, T_c, N_FS);
+            }
+
+            /*
+             * Returns
+             * -------
+             * data_in : std::complex<TT>*
+             *     Pointer to input array.
+             */
+            std::complex<TT>* data_in() {
+                return m_transform.data_in();
+            }
+
+            /*
+             * Returns
+             * -------
+             * data_out : std::complex<TT>*
+             *     Pointer to output array.
+             *     If `inplace` was set to true, then ``data_in() == data_out()``.
+             */
+            std::complex<TT>* data_out() {
+                return m_transform.data_out();
+            }
+
+            /*
+             * Returns
+             * -------
+             * shape : std::vector<size_t>
+             *     Dimensions of the input buffers.
+             */
+            std::vector<size_t> shape() {
+                return m_shape;
+            }
+
+            /*
+             * Returns
+             * -------
+             * view_in : xt::xstrided_view
+             *     View on the input array.
+             */
+            auto view_in() {
+                size_t N_cells = 1;
+                for (size_t len_dim : m_shape) {N_cells *= len_dim;}
+
+                auto view_in = xt::reshape_view(xt::adapt(data_in(), N_cells, xt::no_ownership()),
+                                                std::vector<size_t>{m_shape});
+                return view_in;
+            }
+
+            /*
+             * Returns
+             * -------
+             * view_out : xt::xstrided_view
+             *     View on the output array.
+             */
+            auto view_out() {
+                size_t N_cells = 1;
+                for (size_t len_dim : m_shape) {N_cells *= len_dim;}
+
+                auto view_out = xt::reshape_view(xt::adapt(data_out(), N_cells, xt::no_ownership()),
+                                                 std::vector<size_t>{m_shape});
+                return view_out;
+            }
+
+            /*
+             * Transform input buffer using 1D-FFS, result available in output buffer.
+             *
+             * It is assumed the input buffer contains function samples in the
+             * same order specified by :cpp:func:`ffs_sample` along dimension `axis`.
+             *
+             * The output buffer will contain coefficients
+             * :math:`\left[ x_{-N}^{FS}, \ldots, x_{N}^{FS}, 0, \ldots, 0 \right] \in \mathbb{C}^{N_samples}`.
+             */
+            void ffs() {
+                view_in().multiplies_assign(m_mod_2);
+                m_transform.fft();
+
+                const bool out_of_place = (data_in() != data_out());
+                if (out_of_place) {
+                    // Undo in-place modulation by `m_mod_2`.
+                    view_in().multiplies_assign(xt::conj(m_mod_2));
+                }
+
+                const TT N_samples = m_shape[m_axis];
+                view_out().multiplies_assign(m_mod_1 / N_samples);
+            }
+
+            /*
+             * Transform output buffer using 1D-FFS, result available in input buffer.
+             *
+             * It is assumed the output buffer contains function samples in the
+             * same order specified by :cpp:func:`ffs_sample` along dimension `axis`.
+             *
+             * The input buffer will contain coefficients
+             * :math:`\left[ x_{-N}^{FS}, \ldots, x_{N}^{FS}, 0, \ldots, 0 \right] \in \mathbb{C}^{N_samples}`.
+             */
+            void ffs_r() {
+                view_out().multiplies_assign(m_mod_2);
+                m_transform.fft_r();
+
+                const bool out_of_place = (data_in() != data_out());
+                if (out_of_place) {
+                    // Undo in-place modulation by `m_mod_2`.
+                    view_out().multiplies_assign(xt::conj(m_mod_2));
+                }
+
+                const TT N_samples = m_shape[m_axis];
+                view_in().multiplies_assign(m_mod_1 / N_samples);
+            }
+
+            /*
+             * Transform input buffer using 1D-iFFS, result available in output buffer.
+             *
+             * It is assumed the input buffer contains FS coefficients ordered as
+             * :math:`\left[ x_{-N}^{FS}, \ldots, x_{N}^{FS}, 0, \ldots, 0 \right] \in \mathbb{C}^{N_{samples}}`.
+             * along dimension `axis`.
+             *
+             * The output buffer will contain the original function samples in
+             * the same order specified by :cpp:func:`ffs_sample`.
+             */
+            void iffs() {
+                view_in().multiplies_assign(xt::conj(m_mod_1));
+                m_transform.ifft();
+
+                const bool out_of_place = (data_in() != data_out());
+                if (out_of_place) {
+                    // Undo in-place modulataion by `m_mod_1`.
+                    view_in().multiplies_assign(m_mod_1);
+                }
+
+                const TT N_samples = m_shape[m_axis];
+                view_out().multiplies_assign(xt::conj(m_mod_2) * N_samples);
+            }
+
+            /*
+             * Transform output buffer using 1D-iFFS, result available in input buffer.
+             *
+             * It is assumed the output buffer contains FS coefficients ordered as
+             * :math:`\left[ x_{-N}^{FS}, \ldots, x_{N}^{FS}, 0, \ldots, 0 \right] \in \mathbb{C}^{N_{samples}}`.
+             * along dimension `axis`.
+             *
+             * The input buffer will contain the original function samples in
+             * the same order specified by :cpp:func:`ffs_sample`.
+             */
+            void iffs_r() {
+                view_out().multiplies_assign(xt::conj(m_mod_1));
+                m_transform.ifft_r();
+
+                const bool out_of_place = (data_in() != data_out());
+                if (out_of_place) {
+                    // Undo in-place modulataion by `m_mod_1`.
+                    view_out().multiplies_assign(m_mod_1);
+                }
+
+                const TT N_samples = m_shape[m_axis];
+                view_in().multiplies_assign(xt::conj(m_mod_2) * N_samples);
             }
     };
 }}}}
