@@ -86,7 +86,7 @@ namespace pypeline { namespace util { namespace argcheck {
 
         if (shape.size() == rank_x) {
             for (size_t i = 0; i < rank_x; ++i) {
-                if (((size_t) shape_x[i]) != shape[i]) {
+                if(static_cast<size_t>(shape_x[i]) != shape[i]) {
                     return false;
                 }
             }

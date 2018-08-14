@@ -105,13 +105,13 @@ namespace pypeline { namespace util { namespace math { namespace fourier {
 
         xt::xtensor<double, 1> sample_points;
         if (argcheck::is_odd(N_s)) {
-            size_t M = (N_s - 1) / 2;
+            int M = (static_cast<int>(N_s) - 1) / 2;
             auto idx = xt::concatenate(std::make_tuple(
                            xt::arange<int>(0, M + 1),
                            xt::arange<int>(-M, 0)));
             sample_points = T_c + (T / (2 * M + 1)) * idx;
         } else {
-            size_t M = N_s / 2;
+            int M = static_cast<int>(N_s) / 2;
             auto idx = xt::concatenate(std::make_tuple(
                            xt::arange<int>(0, M),
                            xt::arange<int>(-M, 0)));
@@ -434,7 +434,7 @@ namespace pypeline { namespace util { namespace math { namespace fourier {
 
                 // Correct FFTW's lack of scaling during iFFTs.
                 const xt::xtensor<T, 1> N {static_cast<T>(m_shape[m_axis])};
-                view_out().multiplies_assign(1 / N);
+                view_out().multiplies_assign(1.0 / N);
             }
 
             /*
@@ -454,7 +454,7 @@ namespace pypeline { namespace util { namespace math { namespace fourier {
 
                 // Correct FFTW's lack of scaling during iFFTs.
                 const xt::xtensor<T, 1> N {static_cast<T>(m_shape[m_axis])};
-                view_in().multiplies_assign(1 / N);
+                view_in().multiplies_assign(1.0 / N);
             }
     };
 
@@ -577,9 +577,9 @@ namespace pypeline { namespace util { namespace math { namespace fourier {
             void compute_modulation_vectors(const double T,
                                             const double T_c,
                                             const size_t N_FS) {
-                const size_t N_samples = m_shape[m_axis];
-                const size_t M = N_samples / 2;
-                const size_t N = N_FS / 2;
+                const int N_samples = static_cast<int>(m_shape[m_axis]);
+                const int M = N_samples / 2;
+                const int N = static_cast<int>(N_FS) / 2;
                 std::complex<TT> _1j(0, 1);
 
                 std::complex<TT> B_2 = exp(-_1j * TT(2 * M_PI / N_samples));
@@ -608,7 +608,7 @@ namespace pypeline { namespace util { namespace math { namespace fourier {
                 shape_view[m_axis] = N_samples;
 
                 m_mod_1 = xt::reshape_view(xt::pow(B_1, -E_1), std::vector<size_t> {shape_view});
-                m_mod_2 = xt::reshape_view(xt::pow(B_2, -(N * E_2)), std::vector<size_t> {shape_view});
+                m_mod_2 = xt::reshape_view(xt::pow(B_2, -N * E_2), std::vector<size_t> {shape_view});
             }
 
         public:
@@ -744,7 +744,7 @@ namespace pypeline { namespace util { namespace math { namespace fourier {
                     view_in().multiplies_assign(xt::conj(m_mod_2));
                 }
 
-                const TT N_samples = m_shape[m_axis];
+                const TT N_samples = static_cast<int>(m_shape[m_axis]);
                 view_out().multiplies_assign(m_mod_1 / N_samples);
             }
 
@@ -767,7 +767,7 @@ namespace pypeline { namespace util { namespace math { namespace fourier {
                     view_out().multiplies_assign(xt::conj(m_mod_2));
                 }
 
-                const TT N_samples = m_shape[m_axis];
+                const TT N_samples = static_cast<int>(m_shape[m_axis]);
                 view_in().multiplies_assign(m_mod_1 / N_samples);
             }
 
@@ -791,7 +791,7 @@ namespace pypeline { namespace util { namespace math { namespace fourier {
                     view_in().multiplies_assign(m_mod_1);
                 }
 
-                const TT N_samples = m_shape[m_axis];
+                const TT N_samples = static_cast<int>(m_shape[m_axis]);
                 view_out().multiplies_assign(xt::conj(m_mod_2) * N_samples);
             }
 
@@ -815,7 +815,7 @@ namespace pypeline { namespace util { namespace math { namespace fourier {
                     view_out().multiplies_assign(m_mod_1);
                 }
 
-                const TT N_samples = m_shape[m_axis];
+                const TT N_samples = static_cast<int>(m_shape[m_axis]);
                 view_in().multiplies_assign(xt::conj(m_mod_2) * N_samples);
             }
     };
