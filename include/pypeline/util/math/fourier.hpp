@@ -39,6 +39,139 @@ namespace pypeline { namespace util { namespace math { namespace fourier {
     };
 
     /*
+     * Find FFTW transform lengths that are speed-optimal.
+     *
+     * The method used is surely not the fastest, but the 'slow' search speed is
+     * inconsequential if only used in startup code.
+     *
+     * The result is available in <= 3[s] for lengths <= 50000.
+     *
+     * Examples
+     * --------
+     * .. literal_block::
+     *
+     *    #include "pypeline/util/math/fourier.hpp"
+     *    namespace fourier = pypeline::util::math::fourier;
+     *
+     *    const size_t N = 97;
+     *    const size_t N_best = fourier::FFTW_size_finder(N).next_fast_len();  // 100
+     *
+     */
+    class FFTW_size_finder {
+        private:
+            size_t m_N_orig = 0;
+            size_t m_N_best = 0;
+
+            bool fast_FFTW_factors_only(std::vector<size_t> base) {
+                // It is assumed base was generated from factorize().
+                if (xt::all(xt::adapt(base) <= size_t(7))) {
+                    return true;
+                } else {
+                    return false;
+                }
+            }
+
+            bool is_prime(const size_t N) {
+                if (N == 0) {
+                    return false;
+                } else if (N <= 3) {
+                    return true;
+                } else {
+                    const size_t lim = static_cast<size_t>(sqrt(double(N)) + 1);
+                    for (size_t i = 2; i < lim; ++i) {
+                        if (N % i == 0) {
+                            return false;
+                        }
+                    }
+                    return true;
+                }
+            }
+
+            size_t next_prime(const size_t N) {
+                size_t i = 1;
+                while (!is_prime(N + i)) {
+                    i += 1;
+                }
+                return N + i;
+            }
+
+            std::tuple<std::vector<size_t>,
+                       std::vector<size_t>> factorize(const size_t N) {
+                std::vector<size_t> base;
+                std::vector<size_t> exponent;
+
+                size_t p = 1;
+                while (p < N) {
+                    p = next_prime(p);
+                    if (N % p == 0) {
+                        base.push_back(p);
+
+                        size_t k = 1;
+                        while (N % static_cast<size_t>(pow(p, k + 1)) == 0) {
+                            k += 1;
+                        }
+                        exponent.push_back(k);
+                    }
+                }
+
+                return std::make_tuple(base, exponent);
+            }
+
+            size_t find_next_fast_len(const size_t N) {
+                std::vector<size_t> base, exponent;
+                std::tie(base, exponent) = factorize(N);
+
+                if (!fast_FFTW_factors_only(base)) {
+                    std::vector<size_t> base_new, exponent_new;
+
+                    size_t i = 0;
+                    do {
+                        ++i;
+                        std::tie(base_new, exponent_new) = factorize(N + i);
+                    } while (!fast_FFTW_factors_only(base_new));
+
+                    base = base_new;
+                    exponent = exponent_new;
+                }
+
+                // (base, exponent) contain decomposition of best N.
+                size_t N_best = 1;
+                for (size_t i = 0; i < base.size(); ++i) {
+                    auto factor = pow(base[i], exponent[i]);
+                     N_best *= static_cast<size_t>(factor);
+                }
+                return N_best;
+            }
+
+        public:
+            /*
+             * Parameters
+             * ----------
+             * N : size_t
+             *     Length to start searching from.
+             */
+            FFTW_size_finder(const size_t N):
+                m_N_orig(N) {
+                if (N < 2) {
+                    std::string msg = "Parameter[N] cannot be {0, 1}.";
+                    throw std::runtime_error(msg);
+                }
+
+                m_N_best = find_next_fast_len(m_N_orig);
+            }
+
+            /*
+             * Returns
+             * -------
+             * N_best : size_t
+             *     Most efficient transform length >= `N`.
+             */
+            size_t next_fast_len() {
+                return m_N_best;
+            }
+    };
+
+    /*
      * Signal sample positions for :cpp:class:`FFTW_FFS`.
      *
      * Return the coordinates at which a signal must be sampled to use :cpp:class:`FFTW_FFS`.
