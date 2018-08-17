@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # #############################################################################
 # pypeline.sh
@@ -8,12 +8,12 @@
 
 # Setup Pypeline environment + launch shell.
 
-abs_script_dir="$(echo "${PWD}" | python3 -c "
+abs_script_dir="$(echo "${BASH_SOURCE}" | python3 -c "
 import pathlib;
 import sys;
 
 file_path = sys.stdin.readline();
-abs_cwd = pathlib.Path(file_path).absolute();
+abs_cwd = pathlib.Path(file_path).parent.absolute();
 
 print(abs_cwd);
 ")"
