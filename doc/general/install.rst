@@ -37,19 +37,21 @@ Aside from Intel MKL, versions of these libraries shipped with `conda <https://c
 
 After installing `Miniconda <https://conda.io/miniconda.html>`_ or `Anaconda <https://www.anaconda.com/download/#linux>`_, run the following::
 
+    $ PYPELINE_C_COMPILER=<path_to_executable>
+    $ PYPELINE_CXX_COMPILER=<path_to_executable>
     $ cd <pypeline_dir>/
     $ conda create --name=pypeline_dev   \
                    --channel=defaults    \
                    --channel=conda-forge \
                    --file=conda_requirements.txt
-    $ python3 build.py  --download_dependencies
-    $ python3 build.py  --install_dependencies               \
-                       [--C_compiler=<path_to_executable>]   \
-                       [--CXX_compiler=<path_to_executable>]
-    $ python3 build.py  --lib={Debug, Release}               \
-                       [--C_compiler=<path_to_executable>]   \
-                       [--CXX_compiler=<path_to_executable>] \
-                       [--OpenMP]
+    $ python3 build.py --download_dependencies
+    $ python3 build.py --install_dependencies                    \
+                       --C_compiler="${PYPELINE_C_COMPILER}"     \
+                       --CXX_compiler="${PYPELINE_CXX_COMPILER}"
+    $ python3 build.py --lib={Debug, Release}                    \
+                       --C_compiler="${PYPELINE_C_COMPILER}"     \
+                       --CXX_compiler="${PYPELINE_CXX_COMPILER}" \
+                      [--OpenMP]
     $ python3 test.py         # Run test suite (optional, recommended)
     $ python3 build.py --doc  # Generate documentation (optional)
 
@@ -66,3 +68,5 @@ Remarks
 * The ``--install_dependencies`` command above will automatically download and install all C++ dependencies listed in the table.
   If the libraries are already available on the system and you wish to use them instead of the ones we provide, then you will have to modify ``CMakeLists.txt`` and configuration files under ``cmake/`` accordingly.
 * Aside from :py:mod:`pypeline.phased_array.util.io`, Pypeline should also run correctly on ppc64le Linux platforms and OSX, but we provide no support for this.
+* ``pypeline.sh`` sets up the required environment variables to access built libraries and setup key components such as OpenMP thread-count and MKL precision preferences.
+  It is highly recommended to check the ``load_pypeline_env()`` function in this file and tailor some environment variables to your system.
