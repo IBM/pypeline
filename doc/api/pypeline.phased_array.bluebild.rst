@@ -12,4 +12,3 @@ pypeline.phased\_array.bluebild
    ~pypeline.phased_array.bluebild.data_processor
    ~pypeline.phased_array.bluebild.field_synthesizer
    ~pypeline.phased_array.bluebild.imager
-

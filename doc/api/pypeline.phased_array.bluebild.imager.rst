@@ -4,11 +4,6 @@ pypeline.phased\_array.bluebild.imager
 .. automodule:: pypeline.phased_array.bluebild.imager
    :special-members: __init__, __call__
 
-
-
-
-
-
    .. rubric:: Classes
 
    .. autosummary::
@@ -16,9 +11,6 @@ pypeline.phased\_array.bluebild.imager
       IntegratingMultiFieldSynthesizerBlock
 
 
-
-
-   
    .. rubric:: Modules
 
    .. autosummary::

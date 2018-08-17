@@ -11,7 +11,6 @@ Measurement Set (MS) readers and tools.
 import pathlib
 
 import astropy.coordinates as coord
-import astropy.table as tb
 import astropy.time as time
 import astropy.units as u
 import casacore.tables as ct
@@ -86,6 +85,11 @@ class MeasurementSet:
     """
     MS file reader.
 
+    A *Measurement Set* is a directory containing:
+
+    * a binary file holding the ``MAIN`` table with visibilities;
+    * other binary files with auxiliary information.
+
     This class contains the high-level interface all sub-classes must implement.
 
     Focus is given to reading MS files from phased-arrays for the moment (i.e, not dish arrays).
@@ -125,7 +129,6 @@ class MeasurementSet:
         :py:class:`~astropy.coordinates.SkyCoord`
             Observed field's center.
         """
-
         if self._field_center is None:
             # Following the MS file specification from https://casa.nrao.edu/casadocs/casa-5.1.0/reference-material/measurement-set, the FIELD sub-table contains REFERENCE_DIR which (for interferometers) gives the field's direction.
             # It is generally encoded in (lon[rad], lat[rad]) format and given in ICRS coordinates, reason why the TIME field present in the FIELD sub-table is not needed.
@@ -147,11 +150,8 @@ class MeasurementSet:
 
         Returns
         -------
-        :py:class:`~astropy.table.QTable`
-            (N_channel, 2) table with columns
-
-            * CHANNEL_ID : int
-            * FREQUENCY : :py:class:`~astropy.units.Quantity`
+        :py:class:`~numpy.ndarray`
+            (N_channel,) frequencies given in [Hz].
         """
         if self._channels is None:
             # Following the MS file specification from https://casa.nrao.edu/casadocs/casa-5.1.0/reference-material/measurement-set, the SPECTRAL_WINDOW sub-table contains CHAN_FREQ which gives the center frequency for each channel.
@@ -161,10 +161,7 @@ class MeasurementSet:
                      f'{self._msf}::SPECTRAL_WINDOW')
             table = ct.taql(query)
 
-            f = table.getcell('CHAN_FREQ', 0).flatten() * u.Hz
-            f_id = range(len(f))
-            self._channels = tb.QTable(dict(CHANNEL_ID=f_id,
-                                            FREQUENCY=f))
+            self._channels = table.getcell('CHAN_FREQ', 0).flatten()
 
         return self._channels
 
@@ -175,11 +172,8 @@ class MeasurementSet:
 
         Returns
         -------
-        :py:class:`~astropy.table.QTable`
-            (N_time, 2) table with columns
-
-            * TIME_ID : int
-            * TIME : :py:class:`~astropy.time.Time`
+        :py:class:`~astropy.time.Time`
+            (N_time,) observation times.
         """
         if self._time is None:
             # Following the MS file specification from https://casa.nrao.edu/casadocs/casa-5.1.0/reference-material/measurement-set, the MAIN table contains TIME which gives the integration midpoints.
@@ -192,11 +186,9 @@ class MeasurementSet:
             query = f'select * from {self._msf}'
             table = ct.taql(query)
 
-            t = time.Time(np.unique(table.calc('MJD(TIME)')), format='mjd',
-                          scale='utc')
-            t_id = range(len(t))
-            self._time = tb.QTable(dict(TIME_ID=t_id,
-                                        TIME=t))
+            self._time = time.Time(np.unique(table.calc('MJD(TIME)')),
+                                   format='mjd',
+                                   scale='utc')
 
         return self._time
 
@@ -223,7 +215,7 @@ class MeasurementSet:
         """
         raise NotImplementedError
 
-    @chk.check(dict(channel_id=chk.accept_any(chk.has_integers,
+    @chk.check(dict(channel_id=chk.accept_any(chk.is_integer,
                                               chk.is_instance(slice)),
                     time_id=chk.accept_any(chk.is_integer,
                                            chk.is_instance(slice)),
@@ -234,10 +226,10 @@ class MeasurementSet:
 
         Parameters
         ----------
-        channel_id : array-like(int) or slice
-            Several CHANNEL_IDs from :py:attr:`~pypeline.phased_array.util.io.ms.MeasurementSet.channels`.
+        channel_id : int or slice
+            Indices of channels from :py:attr:`~pypeline.phased_array.util.io.ms.MeasurementSet.channels`.
         time_id : int or slice
-            Several TIME_IDs from :py:attr:`~pypeline.phased_array.util.io.ms.MeasurementSet.time`.
+            Indices of observation times from :py:attr:`~pypeline.phased_array.util.io.ms.MeasurementSet.time`.
         column : str
             Column name from MAIN table where visibility data resides.
 
@@ -247,17 +239,21 @@ class MeasurementSet:
         -------
         iterable
 
-            Generator object returning (time, freq, S) triplets with:
+            Generator object returning (t_idx, freq_idx, S) triplets with:
 
-            * time (:py:class:`~astropy.time.Time`): moment the visibility was formed;
-            * freq (:py:class:`~astropy.units.Quantity`): center frequency of the visibility;
+            * t_idx (int): index such that ``self.time[t_idx]`` gives the moment the visibility was formed;
+            * f_idx (int): index such that ``self.channels[f_idx]`` gives the center frequency of the visibility;
             * S (:py:class:`~pypeline.phased_array.util.data_gen.visibility.VisibilityMatrix`)
         """
         if column not in ct.taql(f'select * from {self._msf}').colnames():
             raise ValueError(f'column={column} does not exist '
                              f'in {self._msf}::MAIN.')
 
-        channel_id = self.channels['CHANNEL_ID'][channel_id]
+        if chk.is_integer(channel_id):
+            channel_id = slice(channel_id, channel_id + 1, 1)
+        N_channel = len(self.channels)
+        channel_id = np.arange(N_channel)[channel_id]  # We need this to be an iterable for what follows.
+
         if chk.is_integer(time_id):
             time_id = slice(time_id, time_id + 1, 1)
         N_time = len(self.time)
@@ -274,7 +270,8 @@ class MeasurementSet:
                  f'limit {time_start}:{time_stop}:{time_step})')
         table = ct.taql(query)
 
-        for sub_table in table.iter('TIME', sort=True):
+        time_idx = np.arange(N_time)[time_id]
+        for t_idx, sub_table in zip(time_idx, table.iter('TIME', sort=True)):
             beam_id_0 = sub_table.getcol('ANTENNA1')  # (N_entry,)
             beam_id_1 = sub_table.getcol('ANTENNA2')  # (N_entry,)
             data_flag = sub_table.getcol('FLAG')  # (N_entry, N_channel, 4)
@@ -295,7 +292,10 @@ class MeasurementSet:
                                   columns=channel_id,
                                   index=S_full_idx)
 
-            # Drop rows of `S_full` corresponding to unwanted beams.
+            # Drop rows of `S_full` corresponding to unwanted beams: the output
+            # of ``self.instrument`` may return device configurations that
+            # contain less beams than provided in the MS file (because we only
+            # want to image a subset of the data.)
             beam_id = np.unique(self.instrument
                                 ._layout
                                 .index
@@ -322,14 +322,11 @@ class MeasurementSet:
                  .sort_index(level=['B_0', 'B_1']))
 
             # Break S into columns and stream out
-            t = time.Time(sub_table.calc('MJD(TIME)')[0],
-                          format='mjd', scale='utc')
-            f = self.channels['FREQUENCY']
             beam_idx = pd.Index(beam_id, name='BEAM_ID')
-            for ch_id in channel_id:
-                v = _series2array(S[ch_id].rename('S', inplace=True))
+            for f_idx in channel_id:
+                v = _series2array(S[f_idx].rename('S', inplace=True))
                 visibility = vis.VisibilityMatrix(v, beam_idx)
-                yield t, f[ch_id], visibility
+                yield t_idx, f_idx, visibility
 
 
 def _series2array(visibility: pd.Series) -> np.ndarray:
@@ -391,7 +388,7 @@ class LofarMeasurementSet(MeasurementSet):
         :py:class:`~pypeline.phased_array.instrument.EarthBoundInstrumentGeometryBlock`
             Instrument position computer.
         """
-        if self._geometry is None:
+        if self._instrument is None:
             # Following the LOFAR MS file specification from https://www.astron.nl/lofarwiki/lib/exe/fetch.php?media=public:documents:ms2_description_for_lofar_2.08.00.pdf, the special LOFAR_ANTENNA_FIELD sub-table must be used due to the hierarchical design of LOFAR.
             # Some remarks on the required fields:
             # - ANTENNA_ID: equivalent to STATION_ID field in `InstrumentGeometry.index[0]`.

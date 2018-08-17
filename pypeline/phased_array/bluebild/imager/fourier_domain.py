@@ -1,5 +1,5 @@
 # #############################################################################
-# spatial_domain.py
+# fourier_domain.py
 # =================
 # Author : Sepand KASHANI [sep@zurich.ibm.com]
 # #############################################################################
@@ -45,6 +45,7 @@ class Fourier_IMFS_Block(bim.IntegratingMultiFieldSynthesizerBlock):
        from pypeline.phased_array.util.data_gen.visibility import VisibilityGeneratorBlock
        from pypeline.phased_array.util.grid import ea_grid
        from pypeline.util.math.sphere import pol2cart
+       from scipy.constants import speed_of_light
 
        np.random.seed(0)
 
@@ -54,8 +55,9 @@ class Fourier_IMFS_Block(bim.IntegratingMultiFieldSynthesizerBlock):
        # Observation
        >>> obs_start = atime.Time(56879.54171302732, scale='utc', format='mjd')
        >>> field_center = coord.SkyCoord(218 * u.deg, 34.5 * u.deg)
-       >>> field_of_view = 5 * u.deg
-       >>> frequency = 145 * u.MHz
+       >>> field_of_view = np.radians(5)
+       >>> frequency = 145e6
+       >>> wl = speed_of_light / frequency
 
        # instrument
        >>> N_station = 24
@@ -66,8 +68,8 @@ class Fourier_IMFS_Block(bim.IntegratingMultiFieldSynthesizerBlock):
        # Visibility generation
        >>> sky_model=from_tgss_catalog(field_center, field_of_view, N_src=10)
        >>> vis = VisibilityGeneratorBlock(sky_model,
-       ...                                T=8 * u.s,
-       ...                                fs=196 * u.kHz,
+       ...                                T=8,
+       ...                                fs=196e3,
        ...                                SNR=np.inf)
 
        ### Energy-level imaging ============================================
@@ -75,8 +77,8 @@ class Fourier_IMFS_Block(bim.IntegratingMultiFieldSynthesizerBlock):
        >>> t_img = obs_start + np.arange(200) * 8 * u.s  # fine-grained snapshots
        >>> obs_start, obs_end = t_img[0], t_img[-1]
        >>> R = dev.icrs2bfsf_rot(obs_start, obs_end)
-       >>> N_FS = dev.bfsf_kernel_bandwidth(frequency, obs_start, obs_end)
-       >>> T_kernel = 10 * u.deg
+       >>> N_FS = dev.bfsf_kernel_bandwidth(wl, obs_start, obs_end)
+       >>> T_kernel = np.radians(10)
 
        # Pixel grid: make sure to generate it in BFSF coordinates by applying R.
        >>> px_colat, px_lon = ea_grid(direction=np.dot(R, field_center.transform_to('icrs').cartesian.xyz.value),
@@ -85,13 +87,13 @@ class Fourier_IMFS_Block(bim.IntegratingMultiFieldSynthesizerBlock):
 
        >>> I_dp = IntensityFieldDataProcessorBlock(N_eig=7,  # assumed obtained from IntensityFieldParameterEstimator.infer_parameters()
        ...                                         cluster_centroids=[124.927,  65.09 ,  38.589,  23.256])
-       >>> I_mfs = Fourier_IMFS_Block(frequency, px_colat, px_lon,
+       >>> I_mfs = Fourier_IMFS_Block(wl, px_colat, px_lon,
        ...                            N_FS, T_kernel, R, N_level=4)
        >>> for t in ProgressBar(t_img):
        ...     XYZ = dev(t)
-       ...     W = mb(XYZ, frequency)
-       ...     S = vis(XYZ, W, frequency)
-       ...     G = gram(XYZ, W, frequency)
+       ...     W = mb(XYZ, wl)
+       ...     S = vis(XYZ, W, wl)
+       ...     G = gram(XYZ, W, wl)
        ...
        ...     D, V, c_idx = I_dp(S, G)
        ...
@@ -128,30 +130,30 @@ class Fourier_IMFS_Block(bim.IntegratingMultiFieldSynthesizerBlock):
     .. image:: _img/bluebild_FourierIMFSBlock_integrate_example.png
     """
 
-    @chk.check(dict(freq=chk.is_frequency,
-                    grid_colat=chk.has_angles,
-                    grid_lon=chk.has_angles,
+    @chk.check(dict(wl=chk.is_real,
+                    grid_colat=chk.has_reals,
+                    grid_lon=chk.has_reals,
                     N_FS=chk.is_odd,
-                    T=chk.is_angle,
+                    T=chk.is_real,
                     R=chk.require_all(chk.has_shape([3, 3]),
                                       chk.has_reals),
                     N_level=chk.is_integer,
                     precision=chk.is_integer))
-    def __init__(self, freq, grid_colat, grid_lon, N_FS, T, R, N_level,
+    def __init__(self, wl, grid_colat, grid_lon, N_FS, T, R, N_level,
                  precision=64):
         """
         Parameters
         ----------
-        freq : :py:class:`~astropy.units.Quantity`
-            Frequency of observations.
-        grid_colat : :py:class:`~astropy.units.Quantity`
-            (N_height, 1) BFSF polar angles.
-        grid_lon : :py:class:`~astropy.units.Quantity`
-            (1, N_width) equi-spaced BFSF azimuthal angles.
+        wl : float
+            Wave-length [m] of observations.
+        grid_colat : :py:class:`~numpy.ndarray`
+            (N_height, 1) BFSF polar angles [rad].
+        grid_lon : :py:class:`~numpy.ndarray`
+            (1, N_width) equi-spaced BFSF azimuthal angles [rad].
         N_FS : int
             :math:`2\pi`-periodic kernel bandwidth. (odd-valued)
-        T : :py:class:`~astropy.units.Quantity`
-            Kernel periodicity to use for imaging.
+        T : float
+            Kernel periodicity [rad] to use for imaging.
         R : array-like(float)
             (3, 3) ICRS -> BFSF rotation matrix.
         N_level : int
@@ -182,8 +184,7 @@ class Fourier_IMFS_Block(bim.IntegratingMultiFieldSynthesizerBlock):
             raise ValueError('Parameter[N_level] must be positive.')
         self._N_level = N_level
 
-        self._synthesizer = psd.FourierFieldSynthesizerBlock(
-            freq, grid_colat, grid_lon, N_FS, T, R, precision)
+        self._synthesizer = psd.FourierFieldSynthesizerBlock(wl, grid_colat, grid_lon, N_FS, T, R, precision)
 
     @chk.check(dict(D=chk.has_reals,
                     V=chk.has_complex,
@@ -240,9 +241,10 @@ class Fourier_IMFS_Block(bim.IntegratingMultiFieldSynthesizerBlock):
         lsq : :py:class:`~pypeline.phased_array.util.io.image.SphericalImage`
             (N_level, N_height, N_width) least-squares energy-levels.
         """
-        bfsf_grid = sph.pol2cart(1,
-                                 self._synthesizer._grid_colat,
-                                 self._synthesizer._grid_lon)
+        bfsf_x, bfsf_y, bfsf_z = sph.pol2cart(1,
+                                              self._synthesizer._grid_colat,
+                                              self._synthesizer._grid_lon)
+        bfsf_grid = np.stack([bfsf_x, bfsf_y, bfsf_z], axis=0)
         icrs_grid = np.tensordot(self._synthesizer._R.T,
                                  bfsf_grid,
                                  axes=1)

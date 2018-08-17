@@ -18,7 +18,6 @@ Only simple beamformers are included here: more advanced variants can be found i
 import collections.abc as abc
 
 import astropy.coordinates as coord
-import astropy.units as u
 import numpy as np
 import pandas as pd
 import scipy.sparse as sparse
@@ -121,24 +120,22 @@ class BeamWeights(array.LabeledMatrix):
               [0.+12.j, 0.+13.j, 0.+14.j]])
     """
 
-    @chk.check(dict(data=chk.accept_any(chk.has_complex, sparse.isspmatrix),
+    @chk.check(dict(data=chk.accept_any(chk.has_reals,
+                                        chk.has_complex,
+                                        sparse.isspmatrix),
                     ant_idx=instrument.is_antenna_index,
                     beam_idx=is_beam_index))
     def __init__(self, data, ant_idx, beam_idx):
         """
         Parameters
         ----------
-        data : array-like(complex)
+        data : :py:class:`~numpy.ndarray`
             (N_antenna, N_beam) beamforming weights.
         ant_idx
             (N_antenna,) index.
         beam_idx
             (N_beam,) index.
         """
-        if sparse.isspmatrix(data):
-            if not np.issubdtype(data.dtype, np.complexfloating):
-                raise ValueError('Parameter[data] must be complex-valued.')
-
         N_antenna, N_beam = len(ant_idx), len(beam_idx)
         if not chk.has_shape((N_antenna, N_beam))(data):
             raise ValueError('Parameters[data, ant_idx, beam_idx] are not '
@@ -252,8 +249,8 @@ class MatchedBeamformerBlock(BeamformerBlock):
                                          F_Z=focus_dir[2]))
 
     @chk.check(dict(XYZ=chk.is_instance(instrument.InstrumentGeometry),
-                    freq=chk.is_frequency))
-    def __call__(self, XYZ, freq):
+                    wl=chk.is_real))
+    def __call__(self, XYZ, wl):
         """
         Determine beamweights to apply to each (antenna, beam) pair.
 
@@ -261,8 +258,8 @@ class MatchedBeamformerBlock(BeamformerBlock):
         ----------
         XYZ : :py:class:`~pypeline.phased_array.instrument.InstrumentGeometry`
             (N_antenna, 3) ICRS instrument geometry.
-        freq : :py:class:`~astropy.units.Quantity`
-            Frequency at which to generate beamweights.
+        wl : float
+            Wave-length [m] at which to generate beamweights.
 
         Returns
         -------
@@ -275,6 +272,7 @@ class MatchedBeamformerBlock(BeamformerBlock):
 
            from pypeline.phased_array.instrument import LofarBlock
            from pypeline.phased_array.beamforming import MatchedBeamformerBlock
+           from scipy.constants import speed_of_light
            import astropy.units as u
            import astropy.time as atime
            import astropy.coordinates as coord
@@ -289,7 +287,8 @@ class MatchedBeamformerBlock(BeamformerBlock):
            >>> mb = MatchedBeamformerBlock(mb_cfg)
 
            >>> XYZ = instr(atime.Time('J2000'))
-           >>> W = mb(XYZ, freq=145 * u.MHz)
+           >>> freq = 145e6
+           >>> W = mb(XYZ, wl=speed_of_light / freq)
 
         When using radio telescopes, W is generally sparse:
 
@@ -303,8 +302,8 @@ class MatchedBeamformerBlock(BeamformerBlock):
 
         .. image:: _img/mb_weights_mask_example.png
         """
-        wps = pypeline.config.getfloat('phased_array', 'wps') * (u.m / u.s)
-        wl = (wps / freq).to_value(u.m)
+        if wl <= 0:
+            raise ValueError('Parameter[wl] must be positive.')
 
         xyz = XYZ.as_frame()
         xyz = (xyz - xyz.mean()) / wl

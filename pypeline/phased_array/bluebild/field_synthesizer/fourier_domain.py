@@ -8,14 +8,12 @@
 Field synthesizers that work in Fourier Series domain.
 """
 
-import astropy.units as u
 import numexpr as ne
 import numpy as np
 import scipy.fftpack as fftpack
 import scipy.linalg as linalg
 import scipy.sparse as sparse
 
-import pypeline
 import pypeline.phased_array.bluebild.field_synthesizer as synth
 import pypeline.phased_array.bluebild.field_synthesizer.spatial_domain as fsd
 import pypeline.util.argcheck as chk
@@ -51,6 +49,7 @@ class FourierFieldSynthesizerBlock(synth.FieldSynthesizerBlock):
        from pypeline.phased_array.util.data_gen.visibility import VisibilityGeneratorBlock
        from pypeline.phased_array.util.grid import ea_grid
        from pypeline.util.math.sphere import pol2cart
+       from scipy.constants import speed_of_light
 
        np.random.seed(0)
 
@@ -60,8 +59,9 @@ class FourierFieldSynthesizerBlock(synth.FieldSynthesizerBlock):
        # Observation
        >>> obs_start = atime.Time(56879.54171302732, scale='utc', format='mjd')
        >>> field_center = coord.SkyCoord(218 * u.deg, 34.5 * u.deg)
-       >>> field_of_view = 5 * u.deg
-       >>> frequency = 145 * u.MHz
+       >>> field_of_view = np.radians(5)
+       >>> frequency = 145e6
+       >>> wl = speed_of_light / frequency
 
        # instrument
        >>> N_station = 24
@@ -72,8 +72,8 @@ class FourierFieldSynthesizerBlock(synth.FieldSynthesizerBlock):
        # Visibility generation
        >>> sky_model=from_tgss_catalog(field_center, field_of_view, N_src=10)
        >>> vis = VisibilityGeneratorBlock(sky_model,
-       ...                                T=8 * u.s,
-       ...                                fs=196 * u.kHz,
+       ...                                T=8,
+       ...                                fs=196e3,
        ...                                SNR=np.inf)
 
        ### Energy-level imaging ============================================
@@ -81,8 +81,8 @@ class FourierFieldSynthesizerBlock(synth.FieldSynthesizerBlock):
        >>> t_img = obs_start + np.arange(200) * 8 * u.s  # fine-grained snapshots
        >>> obs_start, obs_end = t_img[0], t_img[-1]
        >>> R = dev.icrs2bfsf_rot(obs_start, obs_end)
-       >>> N_FS = dev.bfsf_kernel_bandwidth(frequency, obs_start, obs_end)
-       >>> T_kernel = 10 * u.deg
+       >>> N_FS = dev.bfsf_kernel_bandwidth(wl, obs_start, obs_end)
+       >>> T_kernel = np.radians(10)
 
        # Pixel grid: make sure to generate it in BFSF coordinates by applying R.
        >>> px_colat, px_lon = ea_grid(direction=np.dot(R, field_center.transform_to('icrs').cartesian.xyz.value),
@@ -91,13 +91,13 @@ class FourierFieldSynthesizerBlock(synth.FieldSynthesizerBlock):
 
        >>> I_dp = IntensityFieldDataProcessorBlock(N_eig=7,  # assumed obtained from IntensityFieldParameterEstimator.infer_parameters()
        ...                                         cluster_centroids=[124.927,  65.09 ,  38.589,  23.256])
-       >>> I_fs = FourierFieldSynthesizerBlock(frequency, px_colat, px_lon,
+       >>> I_fs = FourierFieldSynthesizerBlock(wl, px_colat, px_lon,
        ...                                     N_FS, T_kernel, R)
        >>> for t in ProgressBar(t_img):
        ...     XYZ = dev(t)
-       ...     W = mb(XYZ, frequency)
-       ...     S = vis(XYZ, W, frequency)
-       ...     G = gram(XYZ, W, frequency)
+       ...     W = mb(XYZ, wl)
+       ...     S = vis(XYZ, W, wl)
+       ...     G = gram(XYZ, W, wl)
        ...
        ...     D, V, c_idx = I_dp(S, G)
        ...
@@ -105,7 +105,7 @@ class FourierFieldSynthesizerBlock(synth.FieldSynthesizerBlock):
        ...     field_stat = I_fs(V, XYZ.data, W.data)
 
        # (N_eig, N_height, N_width) energy levels
-       # These are the actual field values. Depending on the implementation of FieldSynthesizerBlock, `field_stat` and `field` may differ.
+       # Depending on the implementation of FieldSynthesizerBlock, `field_stat` and `field` may differ.
        >>> field = I_fs.synthesize(field_stat)
 
     In the example above, individual snapshots were not added together, hence the final image is just the last field snapshot and can be quite noisy:
@@ -114,7 +114,9 @@ class FourierFieldSynthesizerBlock(synth.FieldSynthesizerBlock):
 
        from pypeline.phased_array.util.io.image import SphericalImage
        # Transform grid to ICRS coordinates before plotting.
-       px_grid = np.tensordot(R.T, pol2cart(1, px_colat, px_lon), axes=1)
+       px_grid = np.tensordot(R.T,
+                              np.stack(pol2cart(1, px_colat, px_lon), axis=0),
+                              axes=1)
        I_snapshot = SphericalImage(data=field, grid=px_grid)
 
        ax = I_snapshot.draw(index=slice(None),  # Collapse all energy levels
@@ -126,29 +128,29 @@ class FourierFieldSynthesizerBlock(synth.FieldSynthesizerBlock):
     .. image:: _img/bluebild_FourierFieldSynthesizer_snapshot_example.png
     """
 
-    @chk.check(dict(freq=chk.is_frequency,
-                    grid_colat=chk.has_angles,
-                    grid_lon=chk.has_angles,
+    @chk.check(dict(wl=chk.is_real,
+                    grid_colat=chk.has_reals,
+                    grid_lon=chk.has_reals,
                     N_FS=chk.is_odd,
-                    T=chk.is_angle,
+                    T=chk.is_real,
                     R=chk.require_all(chk.has_shape([3, 3]),
                                       chk.has_reals),
                     precision=chk.is_integer))
-    def __init__(self, freq, grid_colat, grid_lon, N_FS, T, R, precision=64):
+    def __init__(self, wl, grid_colat, grid_lon, N_FS, T, R, precision=64):
         """
         Parameters
         ----------
-        freq : :py:class:`~astropy.units.Quantity`
-            Frequency of observations.
-        grid_colat : :py:class:`~astropy.units.Quantity`
-            (N_height, 1) BFSF polar angles.
-        grid_lon : :py:class:`~astropy.units.Quantity`
-            (1, N_width) equi-spaced BFSF azimuthal angles.
+        wl : float
+            Wave-length [m] of observations.
+        grid_colat : :py:class:`~numpy.ndarray`
+            (N_height, 1) BFSF polar angles [rad].
+        grid_lon : :py:class:`~numpy.ndarray`
+            (1, N_width) equi-spaced BFSF azimuthal angles [rad].
         N_FS : int
             :math:`2\pi`-periodic kernel bandwidth. (odd-valued)
-        T : :py:class:`~astropy.units.Quantity`
-            Kernel periodicity to use for imaging.
-        R : array-like(float)
+        T : float
+            Kernel periodicity [rad] to use for imaging.
+        R : :py:class:`~numpy.ndarray`
             (3, 3) ICRS -> BFSF rotation matrix.
         precision : int
             Numerical accuracy of floating-point operations.
@@ -172,16 +174,17 @@ class FourierFieldSynthesizerBlock(synth.FieldSynthesizerBlock):
         else:
             raise ValueError('Parameter[precision] must be 32 or 64.')
 
-        wps = pypeline.config.getfloat('phased_array', 'wps') * (u.m / u.s)
-        self._wl = (wps / freq).to_value(u.m)
+        if wl <= 0:
+            raise ValueError('Parameter[wl] must be positive.')
+        self._wl = wl
 
         if N_FS <= 0:
             raise ValueError('Parameter[N_FS] must be positive.')
 
-        if not (0 < T <= 360 * u.deg):
+        if not (0 < T <= 2 * np.pi):
             raise ValueError(f'Parameter[T] is out of bounds.')
 
-        if not u.isclose(T, 360 * u.deg):  # PeriodicSynthesis
+        if not np.isclose(T, 2 * np.pi):  # PeriodicSynthesis
             self._alpha_window = 0.1
             T_min = (1 + self._alpha_window) * grid_lon.ptp()
             if T < T_min:
@@ -194,25 +197,20 @@ class FourierFieldSynthesizerBlock(synth.FieldSynthesizerBlock):
             self._Tc = (T_start + T_end) / 2
             self._mps = lon_start - (T_start + 0.5 * T * aw)  # max_phase_shift
 
-            N_FS_trunc = N_FS / (2 * np.pi) * T.to_value(u.rad)
+            N_FS_trunc = N_FS / (2 * np.pi) * T
             N_FS_trunc = int(np.ceil(N_FS_trunc))
             N_FS_trunc += 1 if chk.is_even(N_FS_trunc) else 0
             self._NFS = N_FS_trunc
         else:  # No PeriodicSynthesis, but set params to still work.
             self._alpha_window = 0
-            self._T = 360 * u.deg
-            self._Tc = 180 * u.deg
-            self._mps = 360 * u.deg  # max_phase_shift
+            self._T = 2 * np.pi
+            self._Tc = np.pi
+            self._mps = 2 * np.pi  # max_phase_shift
             self._NFS = N_FS
 
-        self._grid_colat = u.Quantity(grid_colat)
-        self._grid_lon = u.Quantity(grid_lon)
+        self._grid_colat = np.array(grid_colat)
+        self._grid_lon = np.array(grid_lon)
         self._R = np.array(R)
-
-        # Transform angles to radians to simplify later steps.
-        self._T = self._T.to_value(u.rad)
-        self._Tc = self._Tc.to_value(u.rad)
-        self._mps = self._mps.to_value(u.rad)
 
         # Buffered state
         self._FSk = None  # (N_antenna, N_height, N_FS+Q) FS coefficients
@@ -304,8 +302,8 @@ class FourierFieldSynthesizerBlock(synth.FieldSynthesizerBlock):
         field_FS = fourier.ffs(stat, self._T, self._Tc, self._NFS, axis=2)
         field = fourier.fs_interp(field_FS[:, :, :self._NFS],
                                   T=self._T,
-                                  a=self._grid_lon[0, 0].to_value(u.rad),
-                                  b=self._grid_lon[0, -1].to_value(u.rad),
+                                  a=self._grid_lon[0, 0],
+                                  b=self._grid_lon[0, -1],
                                   M=self._grid_lon.size,
                                   axis=2,
                                   real_x=True)
@@ -325,7 +323,7 @@ class FourierFieldSynthesizerBlock(synth.FieldSynthesizerBlock):
         Returns
         -------
         theta : float
-            Angular shift (radians) such that ``dot(_XYZk, R(theta).T) == XYZ``.
+            Angular shift [rad] such that ``dot(_XYZk, R(theta).T) == XYZ``.
         """
         R_T, *_ = linalg.lstsq(self._XYZk[:, :2], XYZ[:, :2])
 
@@ -333,7 +331,7 @@ class FourierFieldSynthesizerBlock(synth.FieldSynthesizerBlock):
         R[:2, :2] = R_T.T
         theta = pylinalg.z_rot2angle(R)
 
-        return theta.to_value(u.rad)
+        return theta
 
     def _regen_required(self, shift):
         lhs = np.radians(-0.1)  # Slightly below 0 due to numerical rounding
@@ -355,9 +353,10 @@ class FourierFieldSynthesizerBlock(synth.FieldSynthesizerBlock):
         """
         N_samples = fftpack.next_fast_len(self._NFS)
         lon_smpl = fourier.ffs_sample(self._T, self._NFS, self._Tc, N_samples)
-        pix_smpl = sph.pol2cart(1,
-                                self._grid_colat,
-                                lon_smpl.reshape(1, -1) * u.rad)
+        px_x, px_y, px_z = sph.pol2cart(1,
+                                        self._grid_colat,
+                                        lon_smpl.reshape(1, -1))
+        pix_smpl = np.stack([px_x, px_y, px_z], axis=0)
 
         N_antenna = len(XYZ)
         N_height = len(self._grid_colat)

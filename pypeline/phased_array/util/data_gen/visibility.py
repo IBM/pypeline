@@ -1,6 +1,6 @@
 # #############################################################################
-# data_gen.py
-# ===========
+# visibility.py
+# =============
 # Author : Sepand KASHANI [sep@zurich.ibm.com]
 # #############################################################################
 
@@ -11,10 +11,8 @@ Due to the high data-rates emanating from antennas, raw antenna time-series are 
 Instead, signals from different antennas are correlated together to form *visibility* matrices.
 """
 
-import astropy.units as u
 import numpy as np
 
-import pypeline
 import pypeline.core as core
 import pypeline.phased_array.beamforming as beamforming
 import pypeline.phased_array.instrument as instrument
@@ -56,7 +54,7 @@ class VisibilityMatrix(array.LabeledMatrix):
         """
         Parameters
         ----------
-        data : array-like(real, complex)
+        data : :py:class:`~numpy.ndarray`
             (N_beam, N_beam) visibility coefficients.
         beam_idx
             (N_beam,) index.
@@ -79,8 +77,8 @@ class VisibilityGeneratorBlock(core.Block):
     """
 
     @chk.check(dict(sky_model=chk.is_instance(sky.SkyEmission),
-                    T=chk.is_duration,
-                    fs=chk.is_frequency,
+                    T=chk.is_real,
+                    fs=chk.is_real,
                     SNR=chk.is_real))
     def __init__(self, sky_model, T, fs, SNR):
         """
@@ -88,22 +86,28 @@ class VisibilityGeneratorBlock(core.Block):
         ----------
         sky_model : :py:class:`~pypeline.phased_array.util.data_gen.sky.SkyEmission`
             Source model from which to generate data.
-        T : :py:class:`~astropy.units.Quantity`
-            Integration time.
-        fs : :py:class:`~astropy.units.Quantity`
-            Sampling rate.
+        T : float
+            Integration time [s].
+        fs : float
+            Sampling rate [Hz].
         SNR : float
             Signal-to-Noise-Ratio (dB).
         """
         super().__init__()
-        self._N_sample = int((T * fs).to_value(u.dimensionless_unscaled)) + 1
+
+        if T <= 0:
+            raise ValueError('Parameter[T] must be positive.')
+        if fs <= 0:
+            raise ValueError('Parameter[fs] must be positive.')
+
+        self._N_sample = int(T * fs) + 1
         self._SNR = 10 ** (SNR / 10)
         self._sky_model = sky_model
 
     @chk.check(dict(XYZ=chk.is_instance(instrument.InstrumentGeometry),
                     W=chk.is_instance(beamforming.BeamWeights),
-                    freq=chk.is_frequency))
-    def __call__(self, XYZ, W, freq):
+                    wl=chk.is_real))
+    def __call__(self, XYZ, W, wl):
         """
         Compute visibility matrix.
 
@@ -113,8 +117,8 @@ class VisibilityGeneratorBlock(core.Block):
             (N_antenna, 3) ICRS instrument geometry.
         W : :py:class:`~pypeline.phased_array.beamforming.BeamWeights`
             (N_antenna, N_beam) synthesis beamweights.
-        freq : :py:class:`~astropy.units.Quantity`
-            Frequency at which to generate visibilities.
+        wl : float
+            Wave-length [m] at which to generate visibilities.
 
         Returns
         -------
@@ -132,6 +136,7 @@ class VisibilityGeneratorBlock(core.Block):
            import astropy.coordinates as coord
            from pypeline.phased_array.util.data_gen.visibility import VisibilityGeneratorBlock
            from pypeline.phased_array.util.data_gen.sky import from_tgss_catalog
+           from scipy.constants import speed_of_light
 
         .. doctest::
 
@@ -145,27 +150,29 @@ class VisibilityGeneratorBlock(core.Block):
 
            # Configure visibility generator
            >>> sky_model = from_tgss_catalog(coord.SkyCoord(0 * u.deg, 90 * u.deg),
-           ...                               FoV=5 * u.deg,
+           ...                               FoV=np.radians(5),
            ...                               N_src=10)
            >>> S_gen = VisibilityGeneratorBlock(sky_model,
-           ...                                  T=8 * u.s,
-           ...                                  fs=196 * u.kHz,
+           ...                                  T=8,
+           ...                                  fs=196e3,
            ...                                  SNR=np.inf)
 
            # Generate data
            >>> XYZ = instr(atime.Time('J2000'))
-           >>> W = mb(XYZ, freq=145 * u.MHz)
-           >>> S = S_gen(XYZ, W, freq=145 * u.MHz)
+           >>> freq = 145e6
+           >>> wl = speed_of_light / freq
+           >>> W = mb(XYZ, wl)
+           >>> S = S_gen(XYZ, W, wl)
 
            # Only 10 sources & no noise, so rank(S) <= 10
            >>> np.linalg.matrix_rank(S.data) <= 10
            True
         """
+        if wl <= 0:
+            raise ValueError('Parameter[wl] must be positive.')
+
         if not XYZ.is_consistent_with(W, axes=[0, 0]):
             raise ValueError('Parameters[XYZ, W] are inconsistent.')
-
-        wps = pypeline.config.getfloat('phased_array', 'wps') * (u.m / u.s)
-        wl = (wps / freq).to_value(u.m)
 
         A = np.exp((1j * 2 * np.pi / wl) *
                    (self._sky_model.xyz @ XYZ.data.T))

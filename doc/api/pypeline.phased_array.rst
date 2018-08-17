@@ -12,4 +12,3 @@ pypeline.phased_array
    ~pypeline.phased_array.beamforming
    ~pypeline.phased_array.bluebild
    ~pypeline.phased_array.util
-

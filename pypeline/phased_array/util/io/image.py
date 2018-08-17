@@ -68,7 +68,6 @@ class SphericalImage:
     --------
     .. doctest::
 
-       import astropy.units as u
        import numpy as np
        import pypeline.phased_array.util.grid as grid
        import pypeline.phased_array.util.io.image as image
@@ -76,8 +75,10 @@ class SphericalImage:
        import pypeline.util.math.stat as stat
 
        # grid settings =======================
-       direction = sph.eq2cart(1, lat=30 * u.deg, lon=20 * u.deg).reshape(-1)
-       FoV = 60 * u.deg
+       direction = np.array(sph.eq2cart(1,
+                                        lat=np.radians(30),
+                                        lon=np.radians(20)))
+       FoV = np.radians(60)
        N_height, N_width = 256, 384
        px_grid = grid.uniform_grid(direction, FoV, size=[N_height, N_width])
 
@@ -138,8 +139,8 @@ class SphericalImage:
         """
         Parameters
         ----------
-        data : array-like(float)
-            multi-level data-cube.
+        data : :py:class:`~numpy.ndarray`
+            multi-level (real) data-cube.
 
             Possible shapes are:
 
@@ -147,7 +148,7 @@ class SphericalImage:
             * (N_image, N_height, N_width);
             * (N_points,);
             * (N_image, N_points).
-        grid : array-like(float)
+        grid : :py:class:`~numpy.ndarray`
             (3, ...) Cartesian coordinates of the sky on which the data points are defined.
 
             Possible shapes are:
@@ -233,7 +234,7 @@ class SphericalImage:
 
               $ ds9 <FITS_file>.fits[IMAGE]
 
-          WCS information is only available in external FITS viewers if using :py:class:`~pypeline.phased_array.util.io.image.EqualAngleImage` or :py:class:`~pypeline.phased_array.util.io.image.HEALPixImage`.
+          WCS information is only available in external FITS viewers if using :py:class:`~pypeline.phased_array.util.io.image.EqualAngleImage`.
         """
         primary_hdu = self._PrimaryHDU()
         image_hdu = self._ImageHDU()
@@ -254,8 +255,7 @@ class SphericalImage:
 
         # grid: stored as angles to reduce file size.
         _, colat, lon = sph.cart2pol(*self._grid)
-        coordinates = np.stack([colat.to_value(u.deg),
-                                lon.to_value(u.deg)], axis=0)
+        coordinates = np.stack([np.degrees(colat), np.degrees(lon)], axis=0)
 
         hdu = fits.PrimaryHDU(data=coordinates)
         for k, v in metadata.items():
@@ -290,12 +290,13 @@ class SphericalImage:
         I : :py:class:`~pypeline.phased_array.util.io.image.SphericalImage`
         """
         # PrimaryHDU: grid specification.
-        colat, lon = primary_hdu.data * u.deg
-        grid = sph.pol2cart(1, colat, lon)
+        colat, lon = primary_hdu.data
+        x, y, z = sph.pol2cart(1, np.radians(colat), np.radians(lon))
 
         # ImageHDU: extract data cube.
         data = image_hdu.data
 
+        grid = np.stack([x, y, z], axis=0)
         I = cls(data=data, grid=grid)
         return I
 
@@ -355,12 +356,16 @@ class SphericalImage:
             * (AEQD, LAEA, LCC, GNOM) are recommended for mapping portions of the sphere.
 
                 * LCC breaks down when mapping polar regions.
+                * GNOM breaks down when mapping large FoVs.
 
             * (ROBIN, HEALPIX) are recommended for mapping the entire sphere.
         catalog : :py:class:`~pypeline.phased_array.util.data_gen.sky.SkyEmission`
             Source catalog to overlay on top of images. (Default: no overlay)
         show_gridlines : bool
             Show RA/DEC gridlines. (Default: True)
+
+            It is possible for the gridlines to be plotted on the wrong range
+            when the grid crosses the 180W/E meridian.
         show_colorbar : bool
             Show colorbar. (Default: True)
         ax : :py:class:`~matplotlib.axes.Axes`
@@ -438,11 +443,8 @@ class SphericalImage:
         else:  # (3, N_points) grid
             grid_dir = np.mean(self._grid, axis=1)
         _, grid_lat, grid_lon = sph.cart2eq(*grid_dir)
-        grid_lat = (coord.Angle(grid_lat)
-                    .to_value(u.deg))
-        grid_lon = (coord.Angle(grid_lon)
-                    .wrap_at(180 * u.deg)
-                    .to_value(u.deg))
+        grid_lat = coord.Angle(grid_lat * u.rad).to_value(u.deg)
+        grid_lon = coord.Angle(grid_lon * u.rad).wrap_at(180 * u.deg).to_value(u.deg)
 
         p_name = projection.lower()
         if p_name == 'lcc':
@@ -530,11 +532,8 @@ class SphericalImage:
         # Some projections have unmappable regions or exhibit singularities at certain points.
         # These regions are colored white in contour plots by replacing their incorrect value (1e30) with NaN.
         _, grid_lat, grid_lon = sph.cart2eq(*self._grid)
-        grid_lat = (coord.Angle(grid_lat)
-                    .to_value(u.deg))
-        grid_lon = (coord.Angle(grid_lon)
-                    .wrap_at(180 * u.deg)
-                    .to_value(u.deg))
+        grid_lat = coord.Angle(grid_lat * u.rad).to_value(u.deg)
+        grid_lon = coord.Angle(grid_lon * u.rad).wrap_at(180 * u.deg).to_value(u.deg)
 
         grid_x, grid_y = projection(grid_lon, grid_lat, errcheck=False)
         grid_x[np.isclose(grid_x, 1e30)] = np.nan
@@ -663,11 +662,8 @@ class SphericalImage:
         plot_style.update(grid_kwargs)
 
         _, grid_lat, grid_lon = sph.cart2eq(*self._grid)
-        grid_lat = (coord.Angle(grid_lat)
-                    .to_value(u.deg))
-        grid_lon = (coord.Angle(grid_lon)
-                    .wrap_at(180 * u.deg)
-                    .to_value(u.deg))
+        grid_lat = coord.Angle(grid_lat * u.rad).to_value(u.deg)
+        grid_lon = coord.Angle(grid_lon * u.rad).wrap_at(180 * u.deg).to_value(u.deg)
 
         # RA curves
         meridian = dict()
@@ -735,11 +731,8 @@ class SphericalImage:
         """
         if catalog is not None:
             _, c_lat, c_lon = sph.cart2eq(*catalog.xyz.T)
-            c_lat = (coord.Angle(c_lat)
-                     .to_value(u.deg))
-            c_lon = (coord.Angle(c_lon)
-                     .wrap_at(180 * u.deg)
-                     .to_value(u.deg))
+            c_lat = coord.Angle(c_lat * u.rad).to_value(u.deg)
+            c_lon = coord.Angle(c_lon * u.rad).wrap_at(180 * u.deg).to_value(u.deg)
 
             c_x, c_y = projection(c_lon, c_lat, errcheck=False)
             c_x[np.isclose(c_x, 1e30)] = np.nan
@@ -777,23 +770,23 @@ class EqualAngleImage(SphericalImage):
     Specialized container for Equal-Angle sampled images on :math:`\mathbb{S}^{2}.`
     """
 
-    @chk.check(dict(colat=chk.has_angles,
-                    lon=chk.has_angles))
+    @chk.check(dict(colat=chk.has_reals,
+                    lon=chk.has_reals))
     def __init__(self, data, colat, lon):
         """
         Parameters
         ----------
-        data : array-like(float)
-            multi-level data-cube.
+        data : :py:class:`~numpy.ndarray`
+            multi-level (real) data-cube.
 
             Possible shapes are:
 
             * (N_height, N_width);
             * (N_image, N_height, N_width).
-        colat : :py:class:`~astropy.units.Quantity`
-            (N_height, 1) equi-spaced polar angles.
-        lon : :py:class:`~astropy.units.Quantity`
-            (1, N_width) equi-spaced azimuthal angles.
+        colat : :py:class:`~numpy.ndarray`
+            (N_height, 1) equi-spaced polar angles [rad].
+        lon : :py:class:`~numpy.ndarray`
+            (1, N_width) equi-spaced azimuthal angles [rad].
         """
         N_height = colat.size
         if not chk.has_shape([N_height, 1])(colat):
@@ -802,7 +795,7 @@ class EqualAngleImage(SphericalImage):
         if not chk.has_shape([1, N_width])(lon):
             raise ValueError('Parameter[lon] must have shape (1, N_width).')
 
-        grid = sph.pol2cart(1, colat, lon)
+        grid = np.stack(sph.pol2cart(1, colat, lon), axis=0)
         super().__init__(data, grid)
 
         # Reorder grid/data for longitude/colatitude to be in increasing order.
@@ -814,13 +807,13 @@ class EqualAngleImage(SphericalImage):
         # Make sure colat/lon were actually equi-spaced.
         lon = lon[0, lon_idx][0]
         lon_step = lon[1] - lon[0]
-        if not u.allclose(np.diff(lon), lon_step):
+        if not np.allclose(np.diff(lon), lon_step):
             raise ValueError('Parameter[lon] must be equi-spaced.')
         self._lon = lon.reshape(1, N_width)
 
         colat = colat[colat_idx, 0][:, 0]
         colat_step = colat[1] - colat[0]
-        if not u.allclose(np.diff(colat), colat_step):
+        if not np.allclose(np.diff(colat), colat_step):
             raise ValueError('Parameter[colat] must be equi-spaced.')
         self._colat = colat.reshape(N_height, 1)
 
@@ -841,8 +834,8 @@ class EqualAngleImage(SphericalImage):
                     'N_WIDTH': (N_width, 'N_columns')}
 
         # grid: store ogrid-style mesh in 1D form for compactness.
-        coordinates = np.r_[self._colat.to_value(u.deg).reshape(N_height),
-                            self._lon.to_value(u.deg).reshape(N_width)]
+        coordinates = np.r_[np.degrees(self._colat).reshape(N_height),
+                            np.degrees(self._lon).reshape(N_width)]
 
         hdu = fits.PrimaryHDU(data=coordinates)
         for k, v in metadata.items():
@@ -861,9 +854,9 @@ class EqualAngleImage(SphericalImage):
         #
         # * arrays are Fortran-ordered with indices starting at 1;
         # * angles (lon/lat) must be specified in degrees.
-        _, lat, lon = sph.pol2eq(1, self._colat, self._lon)
-        RA = lon.to_value(u.deg).reshape(-1)
-        DEC = lat.to_value(u.deg).reshape(-1)
+        lat, lon = sph.colat2lat(self._colat), self._lon
+        RA = np.degrees(lon).reshape(-1)
+        DEC = np.degrees(lat).reshape(-1)
 
         # Embed WCS header
         hdu = super()._ImageHDU()
@@ -897,24 +890,13 @@ class EqualAngleImage(SphericalImage):
         """
         # PrimaryHDU: grid specification.
         N_height = primary_hdu.header['N_HEIGHT']
-        colat = primary_hdu.data[:N_height].reshape(N_height, 1) * u.deg
+        colat = primary_hdu.data[:N_height].reshape(N_height, 1)
 
         N_width = primary_hdu.header['N_WIDTH']
-        lon = primary_hdu.data[-N_width:].reshape(1, N_width) * u.deg
+        lon = primary_hdu.data[-N_width:].reshape(1, N_width)
 
         # ImageHDU: extract data cube.
         data = image_hdu.data
 
-        I = cls(data=data, colat=colat, lon=lon)
+        I = cls(data=data, colat=np.radians(colat), lon=np.radians(lon))
         return I
-
-
-class HEALPixImage(SphericalImage):
-    """
-    Specialized container for HEALPix-sampled images on :math:`\mathbb{S}^{2}`.
-    """
-
-    def __init__(self):
-        """
-        """
-        raise NotImplementedError

@@ -83,6 +83,7 @@ class IntensityFieldParameterEstimator(ParameterEstimator):
        from pypeline.phased_array.util.gram import GramBlock
        from pypeline.phased_array.util.data_gen.sky import from_tgss_catalog
        from pypeline.phased_array.util.data_gen.visibility import VisibilityGeneratorBlock
+       from scipy.constants import speed_of_light
 
        np.random.seed(0)
 
@@ -92,8 +93,9 @@ class IntensityFieldParameterEstimator(ParameterEstimator):
        # Observation
        >>> obs_start = atime.Time(56879.54171302732, scale='utc', format='mjd')
        >>> field_center = coord.SkyCoord(218 * u.deg, 34.5 * u.deg)
-       >>> field_of_view = 5 * u.deg
-       >>> frequency = 145 * u.MHz
+       >>> field_of_view = np.radians(5)
+       >>> frequency = 145e6
+       >>> wl = speed_of_light / frequency
 
        # instrument
        >>> N_station = 24
@@ -103,8 +105,8 @@ class IntensityFieldParameterEstimator(ParameterEstimator):
 
        # Visibility generation
        >>> vis = VisibilityGeneratorBlock(sky_model=from_tgss_catalog(field_center, field_of_view, N_src=10),
-       ...                                T=8 * u.s,
-       ...                                fs=196 * u.kHz,
+       ...                                T=8,
+       ...                                fs=196e3,
        ...                                SNR=np.inf)
 
        ### Parameter estimation ============================================
@@ -112,9 +114,9 @@ class IntensityFieldParameterEstimator(ParameterEstimator):
        >>> t_est = obs_start + np.arange(20) * 400 * u.s  # sample visibilities throughout the 8h observation.
        >>> for t in t_est:
        ...    XYZ = dev(t)
-       ...    W = mb(XYZ, frequency)
-       ...    S = vis(XYZ, W, frequency)
-       ...    G = gram(XYZ, W, frequency)
+       ...    W = mb(XYZ, wl)
+       ...    S = vis(XYZ, W, wl)
+       ...    G = gram(XYZ, W, wl)
        ...
        ...    I_est.collect(S, G)  # Store S, G internally until full 8h interval has been sampled.
        ...

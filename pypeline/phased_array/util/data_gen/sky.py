@@ -59,7 +59,7 @@ class SkyEmission:
     """
     Container for storing position/intensity information of far-field sources.
 
-    todo:: model diffuse sources using the Kent distribution.
+    .. todo:: model diffuse sources using the Kent distribution.
 
     Examples
     --------
@@ -131,7 +131,7 @@ class SkyEmission:
 
 
 @chk.check(dict(direction=chk.is_instance(coord.SkyCoord),
-                FoV=chk.is_angle,
+                FoV=chk.is_real,
                 N_src=chk.is_integer))
 def from_tgss_catalog(direction, FoV, N_src):
     """
@@ -143,8 +143,8 @@ def from_tgss_catalog(direction, FoV, N_src):
     ----------
     direction : :py:class:`~astropy.coordinates.SkyCoord`
         Direction in the sky.
-    FoV : :py:class:`~astropy.units.Quantity`
-        Spherical angle of the sky centered at `direction` from which sources are extracted.
+    FoV : float
+        Spherical angle [rad] of the sky centered at `direction` from which sources are extracted.
     N_src : int
         Number of dominant sources to extract.
 
@@ -153,7 +153,7 @@ def from_tgss_catalog(direction, FoV, N_src):
     :py:class:`~pypeline.phased_array.util.data_gen.sky.SkyEmission`
         Sky model.
     """
-    if FoV.to_value(u.deg) <= 0:
+    if FoV <= 0:
         raise ValueError('Parameter[FoV] must be positive.')
 
     if N_src <= 0:
@@ -180,9 +180,9 @@ def from_tgss_catalog(direction, FoV, N_src):
     # Read catalog from disk path
     catalog_full = pd.read_table(disk_path)
 
-    lat = catalog_full.loc[:, 'DEC'].values * u.deg
-    lon = catalog_full.loc[:, 'RA'].values * u.deg
-    xyz = sph.eq2cart(1, lat, lon)
+    lat = np.radians(catalog_full.loc[:, 'DEC'].values)
+    lon = np.radians(catalog_full.loc[:, 'RA'].values)
+    xyz = np.stack(sph.eq2cart(1, lat, lon), axis=0)
     I = catalog_full.loc[:, 'Total_flux'].values * 1e-3  # mJy in catalog.
 
     # Reduce catalog to area of interest
@@ -202,7 +202,7 @@ def from_tgss_catalog(direction, FoV, N_src):
     I_region, xyz_region = I_region[idx], xyz_region[:, idx]
     _, lat_region, lon_region = sph.cart2eq(*xyz_region)
 
-    source_config = [(coord.SkyCoord(az, el, frame='icrs'), intensity)
+    source_config = [(coord.SkyCoord(az * u.rad, el * u.rad, frame='icrs'), intensity)
                      for el, az, intensity in
                      zip(lat_region, lon_region, I_region)]
     sky_model = SkyEmission(source_config)

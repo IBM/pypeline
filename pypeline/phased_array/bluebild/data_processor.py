@@ -67,7 +67,7 @@ class IntensityFieldDataProcessorBlock(DataProcessorBlock):
 
         super().__init__()
         self._N_eig = N_eig
-        self._cluster_centroids = np.array(cluster_centroids, copy=False)
+        self._cluster_centroids = np.array(cluster_centroids, dtype=float)
 
     @chk.check(dict(S=chk.is_instance(vis.VisibilityMatrix),
                     G=chk.is_instance(gram.GramMatrix)))

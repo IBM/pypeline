@@ -8,10 +8,5 @@ pypeline.phased\_array.util.io
 .. autosummary::
    :toctree:
 
-   ~pypeline.phased_array.util.io.image
+   ~pypeline.phased_array.util.io.image   
    ~pypeline.phased_array.util.io.ms
-
-
-
-
-

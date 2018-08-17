@@ -20,14 +20,12 @@ import pathlib
 
 import astropy.coordinates as coord
 import astropy.time as time
-import astropy.units as u
 import numpy as np
 import pandas as pd
 import pkg_resources as pkg
 import plotly.graph_objs as go
 import scipy.linalg as linalg
 
-import pypeline
 import pypeline.core as core
 import pypeline.util.argcheck as chk
 import pypeline.util.array as array
@@ -263,15 +261,15 @@ class InstrumentGeometryBlock(core.Block):
         """
         raise NotImplementedError
 
-    @chk.check('freq', chk.is_frequency)
-    def nyquist_rate(self, freq):
+    @chk.check('wl', chk.is_real)
+    def nyquist_rate(self, wl):
         """
         Order of imageable complex plane-waves.
 
         Parameters
         ----------
-        freq : :py:class:`~astropy.units.Quantity`
-            Frequency of observations.
+        wl : float
+            Wave-length [m] of observations.
 
         Returns
         -------
@@ -283,16 +281,18 @@ class InstrumentGeometryBlock(core.Block):
         .. testsetup::
 
            from pypeline.phased_array.instrument import MwaBlock
-           import astropy.units as u
+           from scipy.constants import speed_of_light
 
         .. doctest::
 
            >>> instr = MwaBlock()
-           >>> instr.nyquist_rate(freq=145 * u.MHz)
+           >>> freq = 145e6
+           >>> wl = speed_of_light / freq
+           >>> instr.nyquist_rate(wl)
            8753
         """
-        wps = pypeline.config.getfloat('phased_array', 'wps') * (u.m / u.s)
-        wl = (wps / freq).to_value(u.m)
+        if wl <= 0:
+            raise ValueError('Parameter[wl] must be positive.')
 
         XYZ = self._layout.values
         baseline = linalg.norm(XYZ[:, np.newaxis, :] -
@@ -352,6 +352,52 @@ class StationaryInstrumentGeometryBlock(InstrumentGeometryBlock):
                   [-0.044, -0.077,  0.095]])
         """
         return _as_InstrumentGeometry(self._layout)
+
+    @chk.check('wl', chk.is_real)
+    def bfsf_kernel_bandwidth(self, wl):
+        """
+        Bandwidth of :math:`2 \pi`-periodic complex plane-wave kernel in BFSF coordinates.
+
+        Parameters
+        ----------
+        wl : float
+            Wave-length [m] of observations.
+
+        Returns
+        -------
+        N_FS : int
+            Kernel bandwidth when evaluated in the BFSF reference frame.
+
+        Examples
+        --------
+        .. testsetup::
+
+           from pypeline.phased_array.instrument import PyramicBlock
+           from scipy.constants import speed_of_sound
+
+        .. doctest::
+
+           >>> instr = PyramicBlock()
+
+           >>> freq = 3500
+           >>> wl = speed_of_sound / freq
+           >>> instr.bfsf_kernel_bandwidth(wl)
+           67
+        """
+        if wl <= 0:
+            raise ValueError('Parameter[wl] must be positive.')
+
+        R = np.eye(3)  # Stationary instruments have (BFSF basis) = (Canonical basis)
+
+        icrs_XYZ = self.__call__().data
+        bfsf_XYZ = icrs_XYZ @ R.T
+        bfsf_XYZ -= np.mean(bfsf_XYZ, axis=0)
+        bfsf_XY = bfsf_XYZ[:, :2]
+        XY_baseline = linalg.norm(bfsf_XY[:, np.newaxis, :] -
+                                  bfsf_XY[np.newaxis, :, :], axis=-1)
+
+        N = sp.jv_series_threshold((2 * np.pi / wl) * XY_baseline.max())
+        return 2 * N + 1
 
 
 class PyramicBlock(StationaryInstrumentGeometryBlock):
@@ -592,17 +638,17 @@ class EarthBoundInstrumentGeometryBlock(InstrumentGeometryBlock):
         R /= linalg.norm(R, axis=1, keepdims=True)
         return R
 
-    @chk.check(dict(freq=chk.is_frequency,
+    @chk.check(dict(wl=chk.is_real,
                     obs_start=chk.is_instance(time.Time),
                     obs_end=chk.is_instance(time.Time)))
-    def bfsf_kernel_bandwidth(self, freq, obs_start, obs_end):
+    def bfsf_kernel_bandwidth(self, wl, obs_start, obs_end):
         """
         Bandwidth of :math:`2 \pi`-periodic complex plane-wave kernel in BFSF coordinates.
 
         Parameters
         ----------
-        freq : :py:class:`~astropy.units.Quantity`
-            Frequency of observations.
+        wl : float
+            Wave-length [m] of observations.
         obs_start : :py:class:`~astropy.time.Time`
             Start of the observation period.
         obs_end : :py:class:`~astropy.time.Time`
@@ -620,19 +666,21 @@ class EarthBoundInstrumentGeometryBlock(InstrumentGeometryBlock):
            from pypeline.phased_array.instrument import LofarBlock
            import astropy.time as atime
            import astropy.units as u
+           from scipy.constants import speed_of_light
 
         .. doctest::
 
            >>> instr = LofarBlock(N_station=48)
 
-           >>> freq = 145 * u.MHz
+           >>> freq = 145e6
+           >>> wl = speed_of_light / freq
            >>> obs_start = atime.Time('J2000')
            >>> obs_end = obs_start + 4 * u.h
-           >>> instr.bfsf_kernel_bandwidth(freq, obs_start, obs_end)
+           >>> instr.bfsf_kernel_bandwidth(wl, obs_start, obs_end)
            21783
         """
-        wps = pypeline.config.getfloat('phased_array', 'wps') * (u.m / u.s)
-        wl = (wps / freq).to_value(u.m)
+        if wl <= 0:
+            raise ValueError('Parameter[wl] must be positive.')
 
         R = self.icrs2bfsf_rot(obs_start, obs_end)
         obs_mid = obs_start + (obs_end - obs_start) / 2
@@ -754,7 +802,7 @@ class MwaBlock(EarthBoundInstrumentGeometryBlock):
             df_stations = []
             for st_id, st_cog in zip(station_id, xyz_station):
                 _, st_colat, st_lon = sph.cart2pol(*st_cog)
-                st_cog_unit = sph.pol2cart(1, st_colat, st_lon).reshape(-1)
+                st_cog_unit = np.array(sph.pol2cart(1, st_colat, st_lon))
 
                 R_1 = pylinalg.rot([0, 0, 1], st_lon)
                 R_2 = pylinalg.rot(axis=np.cross([0, 0, 1], st_cog_unit),
