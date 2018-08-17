@@ -6,13 +6,14 @@
 
 import warnings
 
-import astropy.units as u
 import numpy as np
 import scipy.interpolate as interpolate
 import scipy.special as sp
 
 import pypeline.core as core
 import pypeline.util.argcheck as chk
+import _pypeline_util_math_func_pybind11 as func
+
 
 class SphericalDirichlet(core.Block):
     r"""
@@ -105,10 +106,10 @@ class SphericalDirichlet(core.Block):
             N_samples = 10 ** 3
 
             # Find interval LHS after which samples will be evaluated exactly.
-            theta_max = 180 * u.deg
+            theta_max = np.pi
             while True:
                 x = np.linspace(0, theta_max, N_samples)
-                cx = np.cos(x).value
+                cx = np.cos(x)
                 cy = self._exact_kernel(cx)
                 zero_cross = np.diff(np.sign(cy))
                 N_cross = np.abs(np.sign(zero_cross)).sum()
@@ -118,13 +119,13 @@ class SphericalDirichlet(core.Block):
                 else:
                     break
 
-            window = Tukey(T=2 - 2 * np.cos(2 * theta_max.to_value(u.rad)),
-                           beta=1,
-                           alpha=0.5)
+            window = func.Tukey(T=2 - 2 * np.cos(2 * theta_max),
+                                beta=1,
+                                alpha=0.5)
 
             x = np.r_[np.linspace(np.cos(theta_max * 2), np.cos(theta_max),
                                   N_samples, endpoint=False),
-                      np.linspace(np.cos(theta_max), 1, N_samples)].value
+                      np.linspace(np.cos(theta_max), 1, N_samples)]
             y = self._exact_kernel(x) * window(x)
             self.__cs_interp = interpolate.interp1d(x, y,
                                                     kind='cubic',
@@ -138,7 +139,7 @@ class SphericalDirichlet(core.Block):
 
         Parameters
         ----------
-        x : float or array-like(float)
+        x : float or :py:class:`~numpy.ndarray`
             Values at which to compute :math:`K_{N}(x)`.
 
         Returns

@@ -4,14 +4,14 @@
 # Author : Sepand KASHANI [sep@zurich.ibm.com]
 # ##############################################################################
 
-import astropy.coordinates as coord
-import astropy.units as u
 import numpy as np
 import tqdm
 
 import pypeline.core as core
 import pypeline.util.argcheck as chk
 import pypeline.util.math.func as func
+import _pypeline_util_math_sphere_pybind11 as sph
+
 
 @chk.check('N', chk.is_integer)
 def ea_sample(N):
@@ -25,11 +25,11 @@ def ea_sample(N):
 
     Returns
     -------
-    colat : :py:class:`~astropy.units.Quantity`
-        (2N + 2, 1) polar angles.
+    colat : :py:class:`~numpy.ndarray`
+        (2N + 2, 1) polar angles [rad].
 
-    lon : :py:class:`~astropy.units.Quantity`
-        (1, 2N + 2) azimuthal angles.
+    lon : :py:class:`~numpy.ndarray`
+        (1, 2N + 2) azimuthal angles [rad].
 
     Examples
     --------
@@ -38,7 +38,6 @@ def ea_sample(N):
     .. testsetup::
 
        import numpy as np
-       import astropy.units as u
        from pypeline.util.math.sphere import ea_sample
 
     .. doctest::
@@ -46,7 +45,7 @@ def ea_sample(N):
        >>> N = 3
        >>> colat, lon = ea_sample(N)
 
-       >>> np.around(colat.to_value(u.rad), 2)
+       >>> np.around(colat, 2)
        array([[0.2 ],
               [0.59],
               [0.98],
@@ -55,7 +54,7 @@ def ea_sample(N):
               [2.16],
               [2.55],
               [2.95]])
-       >>> np.around(lon.to_value(u.rad), 2)
+       >>> np.around(lon, 2)
        array([[0.  , 0.79, 1.57, 2.36, 3.14, 3.93, 4.71, 5.5 ]])
 
 
@@ -78,8 +77,8 @@ def ea_sample(N):
     _2N2 = 2 * N + 2
     q, l = np.ogrid[:_2N2, :_2N2]
 
-    colat = (np.pi / _2N2) * (0.5 + q) * u.rad
-    lon = (2 * np.pi / _2N2) * l * u.rad
+    colat = (np.pi / _2N2) * (0.5 + q)
+    lon = (2 * np.pi / _2N2) * l
 
     return colat, lon
 
@@ -119,7 +118,7 @@ class EqualAngleInterpolator(core.Block):
 
        # Interpolate \gammaN from it's samples
        >>> colat, lon = ea_sample(N)
-       >>> r = pol2cart(1, colat, lon)
+       >>> r = np.stack(pol2cart(1, colat, lon), axis=0)
        >>> g_samples = gammaN(r, r0, N)
        >>> q, l = np.meshgrid(np.arange(colat.size),
        ...                    np.arange(lon.size),
@@ -146,12 +145,13 @@ class EqualAngleInterpolator(core.Block):
         r"""
         Parameters
         ----------
-        q : array-like(int)
+        q : :py:class:`~numpy.ndarray`
             (N_s,) polar indices of an order-`N` Equal-Angle grid.
-        l : array-like(int)
+        l : :py:class:`~numpy.ndarray`
             (N_s,) azimuthal indices of an order-`N` Equal-Angle grid.
-        f : array-like(float or complex)
-            (N_s,) samples of the zonal function at data-points.
+        f : :py:class:`~numpy.ndarray`
+            (N_s,) samples of the zonal function at data-points. (float or complex)
+
             :math:`L`-dimensional zonal functions are also supported by supplying an (N_s, L) array instead.
         N : int
             Order of the reconstructed zonal function.
@@ -190,29 +190,29 @@ class EqualAngleInterpolator(core.Block):
         _2m1 = np.reshape(2 * np.r_[:N + 1] + 1, (1, N + 1))
         alpha = (np.sin(colat_sph) / _2N2 *
                  np.sum(np.sin(_2m1 * colat_sph) / _2m1, axis=1, keepdims=True))
-        self._weight = (f * alpha[q]).to_value(u.dimensionless_unscaled)
+        self._weight = f * alpha[q]
 
         self._kernel_func = func.SphericalDirichlet(N, approximate_kernel)
 
-    @chk.check(dict(colat=chk.accept_any(chk.is_angle, chk.has_angles),
-                    lon=chk.accept_any(chk.is_angle, chk.has_angles)))
+    @chk.check(dict(colat=chk.accept_any(chk.is_real, chk.has_reals),
+                    lon=chk.accept_any(chk.is_real, chk.has_reals)))
     def __call__(self, colat, lon):
         """
         Interpolate function samples at order `N`.
 
         Parameters
         ----------
-        colat : :py:class:`~astropy.units.Quantity`
-            Polar/Zenith angle.
-        lon : :py:class:`~astropy.units.Quantity`
-            Longitude angle.
+        colat : float or :py:class:`~numpy.ndarray`
+            Polar/Zenith angle [rad].
+        lon : float or :py:class:`~numpy.ndarray`
+            Longitude angle [rad].
 
         Returns
         -------
         :py:class:`~numpy.ndarray`
             (L, ...) function values at specified coordinates.
         """
-        r = pol2cart(1, colat, lon)
+        r = np.stack(sph.pol2cart(1, colat, lon), axis=0)
         sh_kern = (1,) + r.shape[1:]
         sh_weight = (self._L,) + (1,) * len(r.shape[1:])
 
@@ -223,7 +223,8 @@ class EqualAngleInterpolator(core.Block):
             for w, t, p in zip(self._weight,
                                colat_sph[self._q, 0],
                                lon_sph[0, self._l]):
-                similarity = np.tensordot(pol2cart(1, t, p), r, axes=[[0], [0]])
+                similarity = np.tensordot(np.stack(sph.pol2cart(1, t, p), axis=-1),
+                                          r, axes=1)
                 kernel = self._kernel_func(similarity)
 
                 f_interp += kernel.reshape(sh_kern) * w.reshape(sh_weight)

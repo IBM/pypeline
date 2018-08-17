@@ -37,16 +37,21 @@ pybind11::array_t<double> py_ffs_sample(const double T,
 }
 
 PYBIND11_MODULE(_pypeline_util_math_fourier_pybind11, m) {
+    pybind11::options options;
+    options.disable_function_signatures();
+
     m.def("ffs_sample",
           &py_ffs_sample,
-          pybind11::arg("T"),
-          pybind11::arg("N_FS"),
-          pybind11::arg("T_c"),
-          pybind11::arg("N_s"),
+          pybind11::arg("T").none(false),
+          pybind11::arg("N_FS").none(false),
+          pybind11::arg("T_c").none(false),
+          pybind11::arg("N_s").none(false),
           pybind11::doc(R"EOF(
-Signal sample positions for :py:func:`~pypeline.util.math.fourier.ffs` and :py:class:`~pypeline.util.math.fourier.FFS`.
+ffs_sample(T, N_FS, T_c, N_s)
 
-Return the coordinates at which a signal must be sampled to use :py:func:`~pypeline.util.math.fourier.ffs` and :py:class:`~pypeline.util.math.fourier.FFS`.
+Signal sample positions for :py:func:`~pypeline.util.math.fourier.ffs`.
+
+Return the coordinates at which a signal must be sampled to use :py:func:`~pypeline.util.math.fourier.ffs`.
 
 Parameters
 ----------
@@ -67,7 +72,7 @@ Returns
 Examples
 --------
 Let :math:`\phi: \mathbb{R} \to \mathbb{C}` be a bandlimited periodic function of period :math:`T = 1`, bandwidth :math:`N_{FS} = 5`, and with one period centered at :math:`T_{c} = \pi`.
-The sampling points :math:`t[n] \in \mathbb{R}` at which :math:`\phi` must be evaluated to compute the Fourier Series coefficients :math:`\left\{ \phi_{k}^{FS}, k = -2, \ldots, 2 \right\}` with :py:func:`~pypeline.util.math.fourier.ffs` and :py:class:`~pypeline.util.math.fourier.FFS` are obtained as follows:
+The sampling points :math:`t[n] \in \mathbb{R}` at which :math:`\phi` must be evaluated to compute the Fourier Series coefficients :math:`\left\{ \phi_{k}^{FS}, k = -2, \ldots, 2 \right\}` with :py:func:`~pypeline.util.math.fourier.ffs` are obtained as follows:
 
 .. testsetup::
 
@@ -83,6 +88,6 @@ The sampling points :math:`t[n] \in \mathbb{R}` at which :math:`\phi` must be ev
 
 See Also
 --------
-:py:func:`~pypeline.util.math.fourier.ffs`, :py:class:`~pypeline.util.math.fourier.FFS`.
+:py:func:`~pypeline.util.math.fourier.ffs`
 )EOF"));
 }

@@ -14,31 +14,31 @@
 namespace cpp_py3_interop = pypeline::util::cpp_py3_interop;
 namespace linalg = pypeline::util::math::linalg;
 
-template <typename T>
-double py_z_rot2angle(pybind11::array_t<T> R) {
-    const auto& R_view = cpp_py3_interop ::numpy_to_xview<T>(R);
+double py_z_rot2angle(pybind11::array_t<double> R) {
+    const auto& R_view = cpp_py3_interop ::numpy_to_xview<double>(R);
 
     double angle = linalg::z_rot2angle(R_view);
     return angle;
 }
 
-template <typename T>
-pybind11::array_t<double> py_rot(pybind11::array_t<T> axis,
+pybind11::array_t<double> py_rot(pybind11::array_t<double> axis,
                                  const double angle) {
-    const auto& axis_view = cpp_py3_interop::numpy_to_xview<T>(axis);
+    const auto& axis_view = cpp_py3_interop::numpy_to_xview<double>(axis);
 
     auto R = linalg::rot(axis_view, angle);
     return cpp_py3_interop::xtensor_to_numpy(std::move(R));
 }
 
 PYBIND11_MODULE(_pypeline_util_math_linalg_pybind11, m) {
+    pybind11::options options;
+    options.disable_function_signatures();
+
     m.def("z_rot2angle",
-          &py_z_rot2angle<float>,
-          pybind11::arg("R").noconvert());
-    m.def("z_rot2angle",
-          &py_z_rot2angle<double>,
-          pybind11::arg("R").noconvert(),
+          &py_z_rot2angle,
+          pybind11::arg("R").none(false),
           pybind11::doc(R"EOF(
+z_rot2angle(R)
+
 Determine rotation angle from Z-axis rotation matrix.
 
 Parameters
@@ -74,14 +74,12 @@ Examples
 )EOF"));
 
     m.def("rot",
-          &py_rot<float>,
-          pybind11::arg("axis").noconvert(),
-          pybind11::arg("angle"));
-    m.def("rot",
-          &py_rot<double>,
-          pybind11::arg("axis").noconvert(),
-          pybind11::arg("angle"),
+          &py_rot,
+          pybind11::arg("axis").none(false),
+          pybind11::arg("angle").none(false),
           pybind11::doc(R"EOF(
+rot(axis, angle)
+
 3D rotation matrix.
 
 Parameters
@@ -104,7 +102,7 @@ Examples
 
  .. doctest::
 
-    >>> R = rot([0, 0, 1], np.pi / 2)
+    >>> R = rot(np.r_[0, 0, 1], np.pi / 2)
     >>> np.around(R, 2)
     array([[ 0., -1.,  0.],
            [ 1.,  0.,  0.],

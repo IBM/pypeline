@@ -18,6 +18,7 @@
 
 #include "xtensor/xarray.hpp"
 #include "xtensor/xmath.hpp"
+#include "xtensor/xbroadcast.hpp"
 
 #include "pypeline/util/argcheck.hpp"
 
@@ -78,7 +79,7 @@ namespace pypeline { namespace util { namespace math { namespace sphere {
         xt::xarray<double> sin_colat {xt::sin(colat)};
         xt::xarray<double> x {r * sin_colat * xt::cos(lon)};
         xt::xarray<double> y {r * sin_colat * xt::sin(lon)};
-        xt::xarray<double> z {r * xt::cos(colat)};
+        xt::xarray<double> z {xt::broadcast(r * xt::cos(colat), x.shape())};
 
         return std::make_tuple(x, y, z);
     }
@@ -139,7 +140,7 @@ namespace pypeline { namespace util { namespace math { namespace sphere {
         xt::xarray<double> cos_lat {xt::cos(lat)};
         xt::xarray<double> x {r * cos_lat * xt::cos(lon)};
         xt::xarray<double> y {r * cos_lat * xt::sin(lon)};
-        xt::xarray<double> z {r * xt::sin(lat)};
+        xt::xarray<double> z {xt::broadcast(r * xt::sin(lat), x.shape())};
 
         return std::make_tuple(x, y, z);
     }
@@ -198,7 +199,7 @@ namespace pypeline { namespace util { namespace math { namespace sphere {
         xt::xarray<double> s2 {(x * x) + (y * y)};
         xt::xarray<double> r {xt::sqrt(s2 + (z * z))};
         xt::xarray<double> colat {xt::atan2(xt::sqrt(s2), z)};
-        xt::xarray<double> lon {xt::atan2(y, x)};
+        xt::xarray<double> lon {xt::broadcast(xt::atan2(y, x), r.shape())};
 
         return std::make_tuple(r, colat, lon);
     }
@@ -257,7 +258,7 @@ namespace pypeline { namespace util { namespace math { namespace sphere {
         xt::xarray<double> s2 {(x * x) + (y * y)};
         xt::xarray<double> r {xt::sqrt(s2 + (z * z))};
         xt::xarray<double> lat {xt::atan2(z, xt::sqrt(s2))};
-        xt::xarray<double> lon {xt::atan2(y, x)};
+        xt::xarray<double> lon {xt::broadcast(xt::atan2(y, x), r.shape())};
 
         return std::make_tuple(r, lat, lon);
     }

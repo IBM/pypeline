@@ -5,7 +5,7 @@
 # #############################################################################
 
 """
-Statistical functions not available in `SciPy <https://www.scipy.org/>`_.
+Statistical functions.
 """
 
 import astropy.units as u
@@ -132,8 +132,8 @@ class Wishart(Distribution):
         """
         Parameters
         ----------
-        V : array-like(float, complex)
-            (p, p) positive-semidefinite scale matrix.
+        V : :py:class:`~numpy.ndarray`
+            (p, p) positive-semidefinite Hermitian scale matrix.
         n : int
             degrees of freedom.
         """
@@ -171,7 +171,7 @@ class Wishart(Distribution):
 
         Parameters
         ----------
-        x : array-like
+        x : :py:class:`~numpy.ndarray`
             (N, p, p) values at which to determine the pdf.
 
         Returns
@@ -196,7 +196,7 @@ class Wishart(Distribution):
             raise linalg.LinAlgError('Wishart density is not defined when '
                                      'scale matrix V is singular.')
 
-        # Determinants: real-valued since V,X are Hermitian.
+        # Determinants: real-valued since (V,X) are Hermitian.
         Vs, Vl = np.linalg.slogdet(self._V)
         dV = np.real(Vs * np.exp(Vl))
         Xs, Xl = np.linalg.slogdet(x)
@@ -281,9 +281,9 @@ class Kent(Distribution):
             Scale parameter.
         beta : float
             Ellipticity in [0, 1[.
-        g1 : array-like(float)
+        g1 : :py:class:`~numpy.ndarray`
             (3,) mean direction vector :math:`\gamma_{1}`.
-        a : array-like(float)
+        a : :py:class:`~numpy.ndarray`
             (3,) direction of major axis.
 
             This is *not* the same thing as :math:`\gamma_{2}`!
@@ -327,7 +327,7 @@ class Kent(Distribution):
 
         Parameters
         ----------
-        x : array-like
+        x : :py:class:`~numpy.ndarray`
             (N, 3) values at which to determine the pdf.
 
         Returns
@@ -400,7 +400,7 @@ class Kent(Distribution):
         return support
 
     @classmethod
-    @chk.check(dict(alpha=chk.is_angle,
+    @chk.check(dict(alpha=chk.is_real,
                     beta=chk.is_real,
                     eps=chk.is_real))
     def min_scale(cls, alpha, beta, eps=1e-2):
@@ -413,8 +413,8 @@ class Kent(Distribution):
 
         Parameters
         ----------
-        alpha : :py:class:`~astropy.units.Quantity`
-            Angular span of the density between :math:`\gamma_{1}` and a point :math:`r` along :math:`\gamma_{2}` on the sphere where :math:`f(r) = \epsilon f(\gamma_{1})`.
+        alpha : float
+            Angular span [rad] of the density between :math:`\gamma_{1}` and a point :math:`r` along :math:`\gamma_{2}` on the sphere where :math:`f(r) = \epsilon f(\gamma_{1})`.
         beta : float
             Ellipticity in [0, 1[.
         eps : float
@@ -425,7 +425,7 @@ class Kent(Distribution):
         k : int
             scale parameter.
         """
-        if not (0 < alpha.to_value(u.deg) <= 180):
+        if not (0 < alpha <= np.pi):
             raise ValueError('Parameter[alpha] is out of bounds.')
 
         if not (0 <= beta < 1):
@@ -434,7 +434,6 @@ class Kent(Distribution):
         if not (0 < eps < 1):
             raise ValueError('Parameter[eps] must lie in (0, 1).')
 
-        alpha = alpha.to_value(u.rad)
         denom = np.cos(alpha) + 0.5 * beta * np.sin(alpha) ** 2 - 1
 
         if np.isclose(denom, 0):

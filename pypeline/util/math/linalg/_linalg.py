@@ -29,14 +29,14 @@ def eigh(A, B=None, tau=1, N=None):
 
     Parameters
     ----------
-    A : array-like(float or complex)
+    A : :py:class:`~numpy.ndarray`
         (M, M) hermitian matrix.
         If `A` is not positive-semidefinite (PSD), its negative spectrum is discarded.
-    B : array-like(float or complex), optional
+    B : :py:class:`~numpy.ndarray`
         (M, M) PSD hermitian matrix.
         If unspecified, `B` is assumed to be the identity matrix.
     tau : float, optional
-        Normalized energy ratio. (Default: 1)
+        Normalized energy ratio in [0, 1].
     N : int, optional
         Number of eigenpairs to output. (Default: K, the minimum number of leading eigenpairs that account for `tau` percent of the total energy.)
 

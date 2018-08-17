@@ -18,6 +18,3 @@ czt = __py.czt
 fs_interp = __py.fs_interp
 
 ffs_sample = __cpp.ffs_sample
-# ffs = __cpp.ffs
-# iffs = __cpp.iffs
-# czt = __cpp.czt

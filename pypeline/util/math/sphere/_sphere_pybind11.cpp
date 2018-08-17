@@ -222,42 +222,47 @@ double py_lat2colat(double lat) {
 }
 
 PYBIND11_MODULE(_pypeline_util_math_sphere_pybind11, m) {
+    pybind11::options options;
+    options.disable_function_signatures();
+
     m.def("pol2cart",
           pybind11::overload_cast<pybind11::array_t<float>,
                                   pybind11::array_t<float>,
                                   pybind11::array_t<float>>(&py_pol2cart<float>),
-          pybind11::arg("r").noconvert(),
-          pybind11::arg("colat").noconvert(),
-          pybind11::arg("lon").noconvert());
+          pybind11::arg("r").noconvert().none(false),
+          pybind11::arg("colat").noconvert().none(false),
+          pybind11::arg("lon").noconvert().none(false));
     m.def("pol2cart",
           pybind11::overload_cast<pybind11::array_t<double>,
                                   pybind11::array_t<double>,
                                   pybind11::array_t<double>>(&py_pol2cart<double>),
-          pybind11::arg("r").noconvert(),
-          pybind11::arg("colat").noconvert(),
-          pybind11::arg("lon").noconvert());
+          pybind11::arg("r").noconvert().none(false),
+          pybind11::arg("colat").noconvert().none(false),
+          pybind11::arg("lon").noconvert().none(false));
     m.def("pol2cart",
           pybind11::overload_cast<double,
                                   pybind11::array_t<float>,
                                   pybind11::array_t<float>>(&py_pol2cart<float>),
-          pybind11::arg("r"),
-          pybind11::arg("colat").noconvert(),
-          pybind11::arg("lon").noconvert());
+          pybind11::arg("r").none(false),
+          pybind11::arg("colat").noconvert().none(false),
+          pybind11::arg("lon").noconvert().none(false));
     m.def("pol2cart",
           pybind11::overload_cast<double,
                                   pybind11::array_t<double>,
                                   pybind11::array_t<double>>(&py_pol2cart<double>),
-          pybind11::arg("r"),
-          pybind11::arg("colat").noconvert(),
-          pybind11::arg("lon").noconvert());
+          pybind11::arg("r").none(false),
+          pybind11::arg("colat").noconvert().none(false),
+          pybind11::arg("lon").noconvert().none(false));
     m.def("pol2cart",
           pybind11::overload_cast<double,
                                   double,
                                   double>(&py_pol2cart<double>),
-          pybind11::arg("r"),
-          pybind11::arg("colat"),
-          pybind11::arg("lon"),
+          pybind11::arg("r").none(false),
+          pybind11::arg("colat").none(false),
+          pybind11::arg("lon").none(false),
           pybind11::doc(R"EOF(
+pol2cart(r, colat, lon)
+
 Polar coordinates to Cartesian coordinates.
 
 Parameters
@@ -293,38 +298,40 @@ Examples
           pybind11::overload_cast<pybind11::array_t<float>,
                                   pybind11::array_t<float>,
                                   pybind11::array_t<float>>(&py_eq2cart<float>),
-          pybind11::arg("r").noconvert(),
-          pybind11::arg("lat").noconvert(),
-          pybind11::arg("lon").noconvert());
+          pybind11::arg("r").noconvert().none(false),
+          pybind11::arg("lat").noconvert().none(false),
+          pybind11::arg("lon").noconvert().none(false));
     m.def("eq2cart",
           pybind11::overload_cast<pybind11::array_t<double>,
                                   pybind11::array_t<double>,
                                   pybind11::array_t<double>>(&py_eq2cart<double>),
-          pybind11::arg("r").noconvert(),
-          pybind11::arg("lat").noconvert(),
-          pybind11::arg("lon").noconvert());
+          pybind11::arg("r").noconvert().none(false),
+          pybind11::arg("lat").noconvert().none(false),
+          pybind11::arg("lon").noconvert().none(false));
     m.def("eq2cart",
           pybind11::overload_cast<double,
                                   pybind11::array_t<float>,
                                   pybind11::array_t<float>>(&py_eq2cart<float>),
-          pybind11::arg("r"),
-          pybind11::arg("lat").noconvert(),
-          pybind11::arg("lon").noconvert());
+          pybind11::arg("r").none(false),
+          pybind11::arg("lat").noconvert().none(false),
+          pybind11::arg("lon").noconvert().none(false));
     m.def("eq2cart",
           pybind11::overload_cast<double,
                                   pybind11::array_t<double>,
                                   pybind11::array_t<double>>(&py_eq2cart<double>),
-          pybind11::arg("r"),
-          pybind11::arg("lat").noconvert(),
-          pybind11::arg("lon").noconvert());
+          pybind11::arg("r").none(false),
+          pybind11::arg("lat").noconvert().none(false),
+          pybind11::arg("lon").noconvert().none(false));
     m.def("eq2cart",
           pybind11::overload_cast<double,
                                   double,
                                   double>(&py_eq2cart<double>),
-          pybind11::arg("r"),
-          pybind11::arg("lat"),
-          pybind11::arg("lon"),
+          pybind11::arg("r").none(false),
+          pybind11::arg("lat").none(false),
+          pybind11::arg("lon").none(false),
           pybind11::doc(R"EOF(
+eq2cart(r, lat, lon)
+
 Equatorial coordinates to Cartesian coordinates.
 
 Parameters
@@ -360,24 +367,26 @@ Examples
           pybind11::overload_cast<pybind11::array_t<float>,
                                   pybind11::array_t<float>,
                                   pybind11::array_t<float>>(&py_cart2pol<float>),
-          pybind11::arg("x").noconvert(),
-          pybind11::arg("y").noconvert(),
-          pybind11::arg("z").noconvert());
+          pybind11::arg("x").noconvert().none(false),
+          pybind11::arg("y").noconvert().none(false),
+          pybind11::arg("z").noconvert().none(false));
     m.def("cart2pol",
           pybind11::overload_cast<pybind11::array_t<double>,
                                   pybind11::array_t<double>,
                                   pybind11::array_t<double>>(&py_cart2pol<double>),
-          pybind11::arg("x").noconvert(),
-          pybind11::arg("y").noconvert(),
-          pybind11::arg("z").noconvert());
+          pybind11::arg("x").noconvert().none(false),
+          pybind11::arg("y").noconvert().none(false),
+          pybind11::arg("z").noconvert().none(false));
     m.def("cart2pol",
           pybind11::overload_cast<double,
                                   double,
                                   double>(&py_cart2pol<double>),
-          pybind11::arg("x"),
-          pybind11::arg("y"),
-          pybind11::arg("z"),
+          pybind11::arg("x").none(false),
+          pybind11::arg("y").none(false),
+          pybind11::arg("z").none(false),
           pybind11::doc(R"EOF(
+cart2pol(x, y, z)
+
 Cartesian coordinates to Polar coordinates.
 
 Parameters
@@ -414,24 +423,26 @@ Examples
           pybind11::overload_cast<pybind11::array_t<float>,
                                   pybind11::array_t<float>,
                                   pybind11::array_t<float>>(&py_cart2eq<float>),
-          pybind11::arg("x").noconvert(),
-          pybind11::arg("y").noconvert(),
-          pybind11::arg("z").noconvert());
+          pybind11::arg("x").noconvert().none(false),
+          pybind11::arg("y").noconvert().none(false),
+          pybind11::arg("z").noconvert().none(false));
     m.def("cart2eq",
           pybind11::overload_cast<pybind11::array_t<double>,
                                   pybind11::array_t<double>,
                                   pybind11::array_t<double>>(&py_cart2eq<double>),
-          pybind11::arg("x").noconvert(),
-          pybind11::arg("y").noconvert(),
-          pybind11::arg("z").noconvert());
+          pybind11::arg("x").noconvert().none(false),
+          pybind11::arg("y").noconvert().none(false),
+          pybind11::arg("z").noconvert().none(false));
     m.def("cart2eq",
           pybind11::overload_cast<double,
                                   double,
                                   double>(&py_cart2eq<double>),
-          pybind11::arg("x"),
-          pybind11::arg("y"),
-          pybind11::arg("z"),
+          pybind11::arg("x").none(false),
+          pybind11::arg("y").none(false),
+          pybind11::arg("z").none(false),
           pybind11::doc(R"EOF(
+cart2eq(x, y, z)
+
 Cartesian coordinates to Equatorial coordinates.
 
 Parameters
@@ -466,14 +477,16 @@ Examples
 
     m.def("colat2lat",
           pybind11::overload_cast<pybind11::array_t<float>>(&py_colat2lat<float>),
-          pybind11::arg("colat").noconvert());
+          pybind11::arg("colat").noconvert().none(false));
     m.def("colat2lat",
           pybind11::overload_cast<pybind11::array_t<double>>(&py_colat2lat<double>),
-          pybind11::arg("colat").noconvert());
+          pybind11::arg("colat").noconvert().none(false));
     m.def("colat2lat",
           pybind11::overload_cast<double>(&py_colat2lat<double>),
-          pybind11::arg("colat"),
+          pybind11::arg("colat").none(false),
           pybind11::doc(R"EOF(
+colat2lat(colat)
+
 Co-latitude to latitude.
 
 Parameters
@@ -489,14 +502,16 @@ lat : float or :py:class:`~numpy.ndarray`
 
     m.def("lat2colat",
           pybind11::overload_cast<pybind11::array_t<float>>(&py_lat2colat<float>),
-          pybind11::arg("lat").noconvert());
+          pybind11::arg("lat").noconvert().none(false));
     m.def("lat2colat",
           pybind11::overload_cast<pybind11::array_t<double>>(&py_lat2colat<double>),
-          pybind11::arg("lat").noconvert());
+          pybind11::arg("lat").noconvert().none(false));
     m.def("lat2colat",
           pybind11::overload_cast<double>(&py_lat2colat<double>),
-          pybind11::arg("lat"),
+          pybind11::arg("lat").none(false),
           pybind11::doc(R"EOF(
+lat2colat(lat)
+
 Latitude to co-latitude.
 
 Parameters

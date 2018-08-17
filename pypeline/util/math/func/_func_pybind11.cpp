@@ -33,7 +33,12 @@ double py_Tukey___call__(const func::Tukey& tukey, double x) {
 }
 
 PYBIND11_MODULE(_pypeline_util_math_func_pybind11, m) {
+    pybind11::options options;
+    options.disable_function_signatures();
+
     pybind11::class_<func::Tukey>(m, "Tukey", R"EOF(
+Tukey(T, beta, alpha)
+
 Parameterized Tukey function.
 
 Examples
@@ -83,10 +88,12 @@ The Tukey function is defined as:
    \end{cases}
 )EOF")
         .def(pybind11::init<const double, const double, const double>(),
-             pybind11::arg("T"),
-             pybind11::arg("beta"),
-             pybind11::arg("alpha"),
+             pybind11::arg("T").none(false),
+             pybind11::arg("beta").none(false),
+             pybind11::arg("alpha").none(false),
              pybind11::doc(R"EOF(
+__init__(T, beta, alpha)
+
 Parameters
 ----------
 T : float
@@ -105,12 +112,14 @@ alpha : float
         .def("__call__",
              pybind11::overload_cast<const func::Tukey&,
                                      pybind11::array_t<float>>(&py_Tukey___call__<float>),
-             pybind11::arg("x").noconvert())
+             pybind11::arg("x").noconvert().none(false))
         .def("__call__",
              pybind11::overload_cast<const func::Tukey&,
                                      pybind11::array_t<double>>(&py_Tukey___call__<double>),
-             pybind11::arg("x").noconvert(),
+             pybind11::arg("x").noconvert().none(false),
              pybind11::doc(R"EOF(
+__call__(x)
+
 Sample the Tukey(T, beta, alpha) function.
 
 Parameters

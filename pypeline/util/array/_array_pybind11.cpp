@@ -39,55 +39,60 @@ pybind11::array_t<T> py_cluster_layers(pybind11::array_t<T> x,
 }
 
 PYBIND11_MODULE(_pypeline_util_array_pybind11, m) {
+    pybind11::options options;
+    options.disable_function_signatures();
+
     m.def("cluster_layers",
           &py_cluster_layers<int32_t>,
-          pybind11::arg("x").noconvert(),
-          pybind11::arg("idx"),
-          pybind11::arg("N"),
-          pybind11::arg("axis"));
+          pybind11::arg("x").noconvert().none(false),
+          pybind11::arg("idx").none(false),
+          pybind11::arg("N").none(false),
+          pybind11::arg("axis").none(false));
     m.def("cluster_layers",
           &py_cluster_layers<int64_t>,
-          pybind11::arg("x").noconvert(),
-          pybind11::arg("idx"),
-          pybind11::arg("N"),
-          pybind11::arg("axis"));
+          pybind11::arg("x").noconvert().none(false),
+          pybind11::arg("idx").none(false),
+          pybind11::arg("N").none(false),
+          pybind11::arg("axis").none(false));
     m.def("cluster_layers",
           &py_cluster_layers<uint32_t>,
-          pybind11::arg("x").noconvert(),
-          pybind11::arg("idx"),
-          pybind11::arg("N"),
-          pybind11::arg("axis"));
+          pybind11::arg("x").noconvert().none(false),
+          pybind11::arg("idx").none(false),
+          pybind11::arg("N").none(false),
+          pybind11::arg("axis").none(false));
     m.def("cluster_layers",
           &py_cluster_layers<uint64_t>,
-          pybind11::arg("x").noconvert(),
-          pybind11::arg("idx"),
-          pybind11::arg("N"),
-          pybind11::arg("axis"));
+          pybind11::arg("x").noconvert().none(false),
+          pybind11::arg("idx").none(false),
+          pybind11::arg("N").none(false),
+          pybind11::arg("axis").none(false));
     m.def("cluster_layers",
           &py_cluster_layers<float>,
-          pybind11::arg("x").noconvert(),
-          pybind11::arg("idx"),
-          pybind11::arg("N"),
-          pybind11::arg("axis"));
+          pybind11::arg("x").noconvert().none(false),
+          pybind11::arg("idx").none(false),
+          pybind11::arg("N").none(false),
+          pybind11::arg("axis").none(false));
     m.def("cluster_layers",
           &py_cluster_layers<double>,
-          pybind11::arg("x").noconvert(),
-          pybind11::arg("idx"),
-          pybind11::arg("N"),
-          pybind11::arg("axis"));
+          pybind11::arg("x").noconvert().none(false),
+          pybind11::arg("idx").none(false),
+          pybind11::arg("N").none(false),
+          pybind11::arg("axis").none(false));
     m.def("cluster_layers",
           &py_cluster_layers<cfloat_t>,
-          pybind11::arg("x").noconvert(),
-          pybind11::arg("idx"),
-          pybind11::arg("N"),
-          pybind11::arg("axis"));
+          pybind11::arg("x").noconvert().none(false),
+          pybind11::arg("idx").none(false),
+          pybind11::arg("N").none(false),
+          pybind11::arg("axis").none(false));
     m.def("cluster_layers",
           &py_cluster_layers<cdouble_t>,
-          pybind11::arg("x").noconvert(),
-          pybind11::arg("idx"),
-          pybind11::arg("N"),
-          pybind11::arg("axis"),
+          pybind11::arg("x").noconvert().none(false),
+          pybind11::arg("idx").none(false),
+          pybind11::arg("N").none(false),
+          pybind11::arg("axis").none(false),
           pybind11::doc(R"EOF(
+cluster_layers(x, idx, N, axis)
+
 Additive tensor compression along an axis.
 
 Parameters
