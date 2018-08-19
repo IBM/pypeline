@@ -88,7 +88,7 @@ autosummary_generate = True
 autodoc_member_order = 'bysource'
 autodoc_default_flags = [
     'members',
-    # 'inherited-members',
+    'inherited-members',
     'show-inheritance',
 ]
 autodoc_inherit_docstrings = True
