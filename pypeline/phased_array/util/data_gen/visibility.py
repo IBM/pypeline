@@ -12,6 +12,8 @@ Instead, signals from different antennas are correlated together to form *visibi
 """
 
 import numpy as np
+import scipy.fftpack as fftpack
+import skimage.util as sku
 
 import pypeline.core as core
 import pypeline.phased_array.beamforming as beamforming
@@ -20,6 +22,7 @@ import pypeline.phased_array.util.data_gen.sky as sky
 import pypeline.util.argcheck as chk
 import pypeline.util.array as array
 import pypeline.util.math.stat as stat
+import pypeline.util.math.func as func
 
 
 class VisibilityMatrix(array.LabeledMatrix):
@@ -185,3 +188,118 @@ class VisibilityGeneratorBlock(core.Block):
         wishart = stat.Wishart(V=S_sky + S_noise, n=self._N_sample)
         S = wishart()[0] / self._N_sample
         return VisibilityMatrix(data=S, beam_idx=W.index[1])
+
+
+@chk.check(dict(data=chk.accept_any(chk.has_reals, chk.has_complex),
+                T=chk.is_real,
+                fs=chk.is_integer,
+                channel_boundaries=chk.has_reals,
+                stft_window_alpha=chk.is_real))
+def ts2vs(data, T, fs, channel_boundaries, stft_window_alpha):
+    """
+    Transform time-series to a sequence of visibility matrices.
+
+    Parameters
+    ----------
+    data : :py:class:`~numpy.ndarray`
+        (N_samples, N_stream) antenna samples.
+    T : float
+        Integration time [s].
+    fs : int
+        Sampling rate [Hz].
+    channel_boundaries : :py:class:`~numpy.ndarray`
+        (N_band, 2) frequency band borders [Hz].
+    stft_window_alpha : float
+        Normalized decay-rate in (0, 1].
+
+        Small values denote sharp windows.
+
+    Returns
+    -------
+    N_samples : int
+        Number of time-samples used to form each visibility matrix.
+    S : :py:class:`~numpy.ndarray`
+        (N_time_slot, N_band, N_stream, N_stream) visibility matrices.
+
+    Examples
+    --------
+    .. testsetup::
+
+       import numpy as np
+       from pypeline.phased_array.util.data_gen.visibility import ts2vs
+
+    .. doctest::
+
+       # Generate some pure-tone time-series for 6 microphones.
+       >>> N_stream = 6
+       >>> fs = 48000
+       >>> f = np.array([1500, 4000, 8000])  # tone frequencies
+       >>> t = np.arange(2 * fs) / fs        # 2[s] recording
+       >>> phase = 2 * np.pi * np.random.rand(N_stream)
+       >>> time_series = np.cos(2 * np.pi * f.reshape(1, -1, 1) *
+       ...                                  t.reshape(-1, 1, 1) +
+       ...                                  phase.reshape(1, 1, -1)).sum(axis=1)
+
+       >>> T = 50e-3
+       >>> channel_boundaries = np.array([[ 500, 1400],  # no signal
+       ...                                [1400, 1600],  # signal present
+       ...                                [3700, 4300],  # signal present
+       ...                                [7800, 8100]]) # signal present
+       >>> stft_window_alpha = 0.1
+       >>> N_samples, S = ts2vs(time_series, T, fs, channel_boundaries, stft_window_alpha)
+
+       # Since the 0-th frequency band contains no signal, it should contain
+       # less total energy than bands 1,2,3:
+       >>> D = np.linalg.eigvalsh(S)        # (N_time, N_channel, N_stream)
+       >>> energy = np.sum(D, axis=(0, 2))  # (N_channel,) energy per band.
+       >>> np.all(energy[0] < energy[1:])
+       True
+    """
+    if T <= 0:
+        raise ValueError('Parameter[T] must be positive.')
+    if fs <= 0:
+        raise ValueError('Parameter[fs] must be positive.')
+    if not ((channel_boundaries.ndim == 2) and
+            (channel_boundaries.shape[1] == 2)):
+        raise ValueError('Parameter[channel_boundaries] must have shape (N_band, 2).')
+    if not np.all(channel_boundaries > 0):
+        raise ValueError('Parameter[channel_boundaries] must contain positive values.')
+    if not (0 < stft_window_alpha <= 1):
+        raise ValueError("Parameter[stft_window_alpha] must lie in (0, 1].")
+
+    data = np.array(data, copy=False)
+    channel_boundaries = np.array(channel_boundaries, dtype=np.float64)
+
+    # Partition data into time-slots.
+    N_samples = int(fs * T)
+    N_stream = data.shape[1]
+    block_data = (sku.view_as_blocks(data[:((len(data) // N_samples) * N_samples)],
+                                     (N_samples, N_stream))
+                  .squeeze(axis=1))
+    N_time_slot = block_data.shape[0]
+
+    # Apply windowing
+    tukey = func.Tukey(N_samples / fs,
+                       N_samples / (fs * 2),
+                       stft_window_alpha)
+    window = tukey(np.arange(N_samples) / fs)
+    block_data *= window.reshape(1, N_samples, 1)
+
+    # Block-level STFT
+    stft_data = fftpack.fft(block_data, axis=1)
+    frequency = np.linspace(0, fs, N_samples)
+
+    # Visibility formation for frequency bands of interest only.
+    N_band = len(channel_boundaries)
+    S = np.zeros((N_time_slot, N_band, N_stream, N_stream), dtype=np.complex64)
+
+    idx = np.digitize(frequency, np.sort(channel_boundaries, axis=-1).flatten())
+    for _idx in idx:
+        if (0 < _idx < 2 * N_band) and chk.is_odd(_idx):
+            mask = (idx == _idx)
+            freq_data = stft_data[:, mask]
+            S[:, (_idx - 1) // 2] += np.sum(freq_data[:, :, :, np.newaxis] *
+                                            freq_data[:, :, np.newaxis, :].conj(),
+                                            axis=1) / np.sum(mask)
+
+    return N_samples, S
