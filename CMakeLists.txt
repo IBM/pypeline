@@ -88,6 +88,9 @@ target_link_libraries(_pypeline_util_math_sphere_pybind11 PRIVATE pypeline)
 pybind11_add_module  (_pypeline_util_math_fourier_pybind11 ${PROJECT_SOURCE_DIR}/pypeline/util/math/fourier/_fourier_pybind11.cpp)
 target_link_libraries(_pypeline_util_math_fourier_pybind11 PRIVATE pypeline)
 
+pybind11_add_module  (_pypeline_phased_array_util_io_image_pybind11 ${PROJECT_SOURCE_DIR}/pypeline/phased_array/util/io/image/_image_pybind11.cpp)
+target_link_libraries(_pypeline_phased_array_util_io_image_pybind11 PRIVATE pypeline)
+
 ### Install Build Targets to lib64/ ===========================================
 install(TARGETS  pypeline
                 _pypeline_util_array_pybind11
@@ -95,5 +98,6 @@ install(TARGETS  pypeline
                 _pypeline_util_math_func_pybind11
                 _pypeline_util_math_sphere_pybind11
                 _pypeline_util_math_fourier_pybind11
+                _pypeline_phased_array_util_io_image_pybind11
         LIBRARY
         DESTINATION "${PROJECT_SOURCE_DIR}/lib64/")

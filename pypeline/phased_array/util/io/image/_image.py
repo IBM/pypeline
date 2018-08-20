@@ -1,12 +1,8 @@
 # #############################################################################
-# image.py
-# ========
+# _image.py
+# =========
 # Author : Sepand KASHANI [sep@zurich.ibm.com]
 # #############################################################################
-
-"""
-Image containers, visualization and export facilities.
-"""
 
 import astropy.coordinates as coord
 import astropy.io.fits as fits
@@ -24,6 +20,7 @@ import pypeline.phased_array.util.data_gen.sky as sky
 import pypeline.util.argcheck as chk
 import pypeline.util.math.sphere as sph
 import pypeline.util.plot as plot
+import _pypeline_phased_array_util_io_image_pybind11 as im_cpp
 
 
 @chk.check('file_name', chk.is_instance(str))
@@ -55,7 +52,8 @@ def from_fits(file_name):
 
 class SphericalImage:
     """
-    Container for storing real-valued images defined on :math:`\mathbb{S}^{2}`.
+    Wrapper around :py:class:`SphericalImageContainer_float32` and
+    :py:class:`SphericalImageContainer_float64` to enable advanced functionality.
 
     Main features:
 
@@ -103,7 +101,8 @@ class SphericalImage:
        data = np.stack([data0, data1], axis=0)
 
        # Image creation ======================
-       I = image.SphericalImage(data, px_grid)
+       I_container = image.SphericalImageContainer_float64(data, px_grid)
+       I = image.SphericalImage(I_container)
 
     Data IO:
 
@@ -133,77 +132,26 @@ class SphericalImage:
     .. image:: _img/sphericalimage_lcc_example.png
     """
 
-    @chk.check(dict(data=chk.has_reals,
-                    grid=chk.has_reals))
-    def __init__(self, data, grid):
+    @chk.check('container', chk.is_instance(im_cpp.SphericalImageContainer_float32,
+                                            im_cpp.SphericalImageContainer_float64))
+    def __init__(self, container):
         """
         Parameters
         ----------
-        data : :py:class:`~numpy.ndarray`
-            multi-level (real) data-cube.
-
-            Possible shapes are:
-
-            * (N_height, N_width);
-            * (N_image, N_height, N_width);
-            * (N_points,);
-            * (N_image, N_points).
-        grid : :py:class:`~numpy.ndarray`
-            (3, ...) Cartesian coordinates of the sky on which the data points are defined.
-
-            Possible shapes are:
-
-            * (3, N_height, N_width);
-            * (3, N_points).
-
-        Notes
-        -----
-        For efficiency reasons, `data` and `grid` are not copied internally.
+        container: :py:class:`~pypeline_phased_array_util_io_image_pybind11.SphericalImageContainer_float32` or :py:class:`~pypeline_phased_array_util_io_image_pybind11.SphericalImageContainer_float64`
+            Bare container holding spherical image data.
         """
-        grid = np.array(grid, copy=False)
-        grid_shape_error_msg = ('Parameter[grid] must have shape '
-                                '(3, N_height, N_width) or (3, N_points).')
-        if len(grid) != 3:
-            raise ValueError(grid_shape_error_msg)
-        if grid.ndim == 2:
-            self._is_gridded = False
-        elif grid.ndim == 3:
-            self._is_gridded = True
-        else:
-            raise ValueError(grid_shape_error_msg)
-        self._grid = grid / linalg.norm(grid, axis=0)
-
-        data = np.array(data, copy=False)
-        if self._is_gridded is True:
-            N_height, N_width = self._grid.shape[1:]
-            if ((data.ndim == 2) and
-                    chk.has_shape([N_height, N_width])(data)):
-                self._data = data[np.newaxis]
-            elif ((data.ndim == 3) and
-                  chk.has_shape([N_height, N_width])(data[0])):
-                self._data = data
-            else:
-                raise ValueError('Parameters[grid, data] are inconsistent.')
-        else:
-            N_points = self._grid.shape[1]
-            if ((data.ndim == 1) and
-                    chk.has_shape([N_points, ])(data)):
-                self._data = data[np.newaxis]
-            elif ((data.ndim == 2) and
-                  chk.has_shape([N_points, ])(data[0])):
-                self._data = data
-            else:
-                raise ValueError('Parameters[grid, data] are inconsistent.')
+        self._container = container
 
     @property
-    def data(self):
+    def image(self):
         """
         Returns
         -------
         :py:class:`~numpy.ndarray`
             (N_image, ...) data cube.
         """
-        return self._data
+        return self._container.image
 
     @property
     def grid(self):
@@ -213,7 +161,7 @@ class SphericalImage:
         :py:class:`~numpy.ndarray`
             (3, ...) Cartesian coordinates of the sky on which the data points are defined.
         """
-        return self._grid
+        return self._container.grid
 
     @chk.check('file_name', chk.is_instance(str))
     def to_fits(self, file_name):
@@ -254,7 +202,7 @@ class SphericalImage:
                                   'SphericalImage subclass'), )
 
         # grid: stored as angles to reduce file size.
-        _, colat, lon = sph.cart2pol(*self._grid)
+        _, colat, lon = sph.cart2pol(*self.grid)
         coordinates = np.stack([np.degrees(colat), np.degrees(lon)], axis=0)
 
         hdu = fits.PrimaryHDU(data=coordinates)
@@ -270,7 +218,7 @@ class SphericalImage:
         -------
         hdu : :py:class:`~astropy.io.fits.ImageHDU`
         """
-        hdu = fits.ImageHDU(data=self._data, name='IMAGE')
+        hdu = fits.ImageHDU(data=self.image, name='IMAGE')
         return hdu
 
     @classmethod
@@ -292,12 +240,18 @@ class SphericalImage:
         # PrimaryHDU: grid specification.
         colat, lon = primary_hdu.data
         x, y, z = sph.pol2cart(1, np.radians(colat), np.radians(lon))
+        grid = np.stack([x, y, z], axis=0)
 
         # ImageHDU: extract data cube.
-        data = image_hdu.data
+        image = image_hdu.data
+        # Make sure (image, grid) have the same dtype to work with SphericalImageContainer_floatxx().
+        image = image.astype(grid.dtype)
 
-        grid = np.stack([x, y, z], axis=0)
-        I = cls(data=data, grid=grid)
+        if grid.dtype == np.dtype(np.float32):
+            I_container = im_cpp.SphericalImageContainer_float32(image, grid)
+        else:  # float64 mode
+            I_container = im_cpp.SphericalImageContainer_float64(image, grid)
+        I = cls(I_container)
         return I
 
     @property
@@ -308,7 +262,7 @@ class SphericalImage:
         tuple
             Shape of data cube.
         """
-        return self._data.shape
+        return self.image.shape
 
     @chk.check(dict(index=chk.accept_any(chk.is_integer, chk.has_integers,
                                          chk.is_instance(slice)),
@@ -438,10 +392,10 @@ class SphericalImage:
         # Most projections can be provided a point in space around which distortions are minimized.
         # We choose this point to approximately map to the center of the grid when appropriate.
         # (approximate since it is not always a spherical cap.)
-        if self._is_gridded:  # (3, N_height, N_width) grid
-            grid_dir = np.mean(self._grid, axis=(1, 2))
+        if self._container.is_gridded:  # (3, N_height, N_width) grid
+            grid_dir = np.mean(self.grid, axis=(1, 2))
         else:  # (3, N_points) grid
-            grid_dir = np.mean(self._grid, axis=1)
+            grid_dir = np.mean(self.grid, axis=1)
         _, grid_lat, grid_lon = sph.cart2eq(*grid_dir)
         grid_lat = coord.Angle(grid_lat * u.rad).to_value(u.deg)
         grid_lon = coord.Angle(grid_lon * u.rad).wrap_at(180 * u.deg).to_value(u.deg)
@@ -526,12 +480,12 @@ class SphericalImage:
                 raise ValueError('No data-cube slice chosen.')
         if not np.all((0 <= index) & (index < N_image)):
             raise ValueError('Parameter[index] is out of bounds.')
-        data = np.sum(self._data[index], axis=0)
+        data = np.sum(self.image[index], axis=0)
 
         # Transform (lon,lat) to (x,y).
         # Some projections have unmappable regions or exhibit singularities at certain points.
         # These regions are colored white in contour plots by replacing their incorrect value (1e30) with NaN.
-        _, grid_lat, grid_lon = sph.cart2eq(*self._grid)
+        _, grid_lat, grid_lon = sph.cart2eq(*self.grid)
         grid_lat = coord.Angle(grid_lat * u.rad).to_value(u.deg)
         grid_lon = coord.Angle(grid_lon * u.rad).wrap_at(180 * u.deg).to_value(u.deg)
 
@@ -549,7 +503,7 @@ class SphericalImage:
         else:
             cmap = plot.cmap('matthieu-custom-sky', N=38)
 
-        if self._is_gridded:
+        if self._container.is_gridded:
             scm = ax.contourf(grid_x, grid_y, data,
                               cmap.N, cmap=cmap,
                               **data_kwargs)
@@ -661,7 +615,7 @@ class SphericalImage:
                           linestyle='solid')
         plot_style.update(grid_kwargs)
 
-        _, grid_lat, grid_lon = sph.cart2eq(*self._grid)
+        _, grid_lat, grid_lon = sph.cart2eq(*self.grid)
         grid_lat = coord.Angle(grid_lat * u.rad).to_value(u.deg)
         grid_lon = coord.Angle(grid_lon * u.rad).wrap_at(180 * u.deg).to_value(u.deg)
 
@@ -765,138 +719,138 @@ class SphericalImage:
         ax.axis('equal')
 
 
-class EqualAngleImage(SphericalImage):
-    """
-    Specialized container for Equal-Angle sampled images on :math:`\mathbb{S}^{2}.`
-    """
+# class EqualAngleImage(SphericalImage):
+#     """
+#     Specialized container for Equal-Angle sampled images on :math:`\mathbb{S}^{2}.`
+#     """
 
-    @chk.check(dict(colat=chk.has_reals,
-                    lon=chk.has_reals))
-    def __init__(self, data, colat, lon):
-        """
-        Parameters
-        ----------
-        data : :py:class:`~numpy.ndarray`
-            multi-level (real) data-cube.
+#     @chk.check(dict(colat=chk.has_reals,
+#                     lon=chk.has_reals))
+#     def __init__(self, data, colat, lon):
+#         """
+#         Parameters
+#         ----------
+#         data : :py:class:`~numpy.ndarray`
+#             multi-level (real) data-cube.
 
-            Possible shapes are:
+#             Possible shapes are:
 
-            * (N_height, N_width);
-            * (N_image, N_height, N_width).
-        colat : :py:class:`~numpy.ndarray`
-            (N_height, 1) equi-spaced polar angles [rad].
-        lon : :py:class:`~numpy.ndarray`
-            (1, N_width) equi-spaced azimuthal angles [rad].
-        """
-        N_height = colat.size
-        if not chk.has_shape([N_height, 1])(colat):
-            raise ValueError('Parameter[colat] must have shape (N_height, 1).')
-        N_width = lon.size
-        if not chk.has_shape([1, N_width])(lon):
-            raise ValueError('Parameter[lon] must have shape (1, N_width).')
+#             * (N_height, N_width);
+#             * (N_image, N_height, N_width).
+#         colat : :py:class:`~numpy.ndarray`
+#             (N_height, 1) equi-spaced polar angles [rad].
+#         lon : :py:class:`~numpy.ndarray`
+#             (1, N_width) equi-spaced azimuthal angles [rad].
+#         """
+#         N_height = colat.size
+#         if not chk.has_shape([N_height, 1])(colat):
+#             raise ValueError('Parameter[colat] must have shape (N_height, 1).')
+#         N_width = lon.size
+#         if not chk.has_shape([1, N_width])(lon):
+#             raise ValueError('Parameter[lon] must have shape (1, N_width).')
 
-        grid = np.stack(sph.pol2cart(1, colat, lon), axis=0)
-        super().__init__(data, grid)
+#         grid = np.stack(sph.pol2cart(1, colat, lon), axis=0)
+#         super().__init__(data, grid)
 
-        # Reorder grid/data for longitude/colatitude to be in increasing order.
-        colat_idx = np.argsort(colat, axis=0)
-        lon_idx = np.argsort(lon, axis=1)
-        self._grid = self._grid[:, colat_idx, lon_idx]
-        self._data = self._data[:, colat_idx, lon_idx]
+#         # Reorder grid/data for longitude/colatitude to be in increasing order.
+#         colat_idx = np.argsort(colat, axis=0)
+#         lon_idx = np.argsort(lon, axis=1)
+#         self._grid = self._grid[:, colat_idx, lon_idx]
+#         self._data = self._data[:, colat_idx, lon_idx]
 
-        # Make sure colat/lon were actually equi-spaced.
-        lon = lon[0, lon_idx][0]
-        lon_step = lon[1] - lon[0]
-        if not np.allclose(np.diff(lon), lon_step):
-            raise ValueError('Parameter[lon] must be equi-spaced.')
-        self._lon = lon.reshape(1, N_width)
+#         # Make sure colat/lon were actually equi-spaced.
+#         lon = lon[0, lon_idx][0]
+#         lon_step = lon[1] - lon[0]
+#         if not np.allclose(np.diff(lon), lon_step):
+#             raise ValueError('Parameter[lon] must be equi-spaced.')
+#         self._lon = lon.reshape(1, N_width)
 
-        colat = colat[colat_idx, 0][:, 0]
-        colat_step = colat[1] - colat[0]
-        if not np.allclose(np.diff(colat), colat_step):
-            raise ValueError('Parameter[colat] must be equi-spaced.')
-        self._colat = colat.reshape(N_height, 1)
+#         colat = colat[colat_idx, 0][:, 0]
+#         colat_step = colat[1] - colat[0]
+#         if not np.allclose(np.diff(colat), colat_step):
+#             raise ValueError('Parameter[colat] must be equi-spaced.')
+#         self._colat = colat.reshape(N_height, 1)
 
-    def _PrimaryHDU(self):
-        """
-        Generate primary Header Descriptor Unit (HDU) for FITS export.
+#     def _PrimaryHDU(self):
+#         """
+#         Generate primary Header Descriptor Unit (HDU) for FITS export.
 
-        Returns
-        -------
-        hdu : :py:class:`~astropy.io.fits.PrimaryHDU`
-        """
-        N_height = self._colat.size
-        N_width = self._lon.size
+#         Returns
+#         -------
+#         hdu : :py:class:`~astropy.io.fits.PrimaryHDU`
+#         """
+#         N_height = self._colat.size
+#         N_width = self._lon.size
 
-        metadata = {'IMG_TYPE': (self.__class__.__name__,
-                                 'SphericalImage subclass'),
-                    'N_HEIGHT': (N_height, 'N_rows'),
-                    'N_WIDTH': (N_width, 'N_columns')}
+#         metadata = {'IMG_TYPE': (self.__class__.__name__,
+#                                  'SphericalImage subclass'),
+#                     'N_HEIGHT': (N_height, 'N_rows'),
+#                     'N_WIDTH': (N_width, 'N_columns')}
 
-        # grid: store ogrid-style mesh in 1D form for compactness.
-        coordinates = np.r_[np.degrees(self._colat).reshape(N_height),
-                            np.degrees(self._lon).reshape(N_width)]
+#         # grid: store ogrid-style mesh in 1D form for compactness.
+#         coordinates = np.r_[np.degrees(self._colat).reshape(N_height),
+#                             np.degrees(self._lon).reshape(N_width)]
 
-        hdu = fits.PrimaryHDU(data=coordinates)
-        for k, v in metadata.items():
-            hdu.header[k] = v
-        return hdu
+#         hdu = fits.PrimaryHDU(data=coordinates)
+#         for k, v in metadata.items():
+#             hdu.header[k] = v
+#         return hdu
 
-    def _ImageHDU(self):
-        """
-        Generate image Header Descriptor Unit (HDU) for FITS export.
+#     def _ImageHDU(self):
+#         """
+#         Generate image Header Descriptor Unit (HDU) for FITS export.
 
-        Returns
-        -------
-        hdu : :py:class:`~astropy.io.fits.ImageHDU`
-        """
-        # Coordinate information for external FITS viewers:
-        #
-        # * arrays are Fortran-ordered with indices starting at 1;
-        # * angles (lon/lat) must be specified in degrees.
-        lat, lon = sph.colat2lat(self._colat), self._lon
-        RA = np.degrees(lon).reshape(-1)
-        DEC = np.degrees(lat).reshape(-1)
+#         Returns
+#         -------
+#         hdu : :py:class:`~astropy.io.fits.ImageHDU`
+#         """
+#         # Coordinate information for external FITS viewers:
+#         #
+#         # * arrays are Fortran-ordered with indices starting at 1;
+#         # * angles (lon/lat) must be specified in degrees.
+#         lat, lon = sph.colat2lat(self._colat), self._lon
+#         RA = np.degrees(lon).reshape(-1)
+#         DEC = np.degrees(lat).reshape(-1)
 
-        # Embed WCS header
-        hdu = super()._ImageHDU()
-        wcs = WCS(hdu.header)
-        wcs.wcs.cd = np.diag([RA[1] - RA[0], DEC[1] - DEC[0], 1])  # CD_ija
-        wcs.wcs.cname = ['RA', 'DEC', 'ENERGY_LEVEL']  # CNAMEa
-        wcs.wcs.crpix = [1, 1, 1]  # CRPIX_ja
-        wcs.wcs.crval = [RA[0], DEC[0], 0]  # CRVAL_ia
-        wcs.wcs.ctype = ['RA', 'DEC', '']  # CTYPE_ia
-        wcs.wcs.cunit = ['deg', 'deg', '']  # CUNIT_ia
-        wcs.wcs.name = 'ICRS'  # WCSNAMEa
+#         # Embed WCS header
+#         hdu = super()._ImageHDU()
+#         wcs = WCS(hdu.header)
+#         wcs.wcs.cd = np.diag([RA[1] - RA[0], DEC[1] - DEC[0], 1])  # CD_ija
+#         wcs.wcs.cname = ['RA', 'DEC', 'ENERGY_LEVEL']  # CNAMEa
+#         wcs.wcs.crpix = [1, 1, 1]  # CRPIX_ja
+#         wcs.wcs.crval = [RA[0], DEC[0], 0]  # CRVAL_ia
+#         wcs.wcs.ctype = ['RA', 'DEC', '']  # CTYPE_ia
+#         wcs.wcs.cunit = ['deg', 'deg', '']  # CUNIT_ia
+#         wcs.wcs.name = 'ICRS'  # WCSNAMEa
 
-        hdu.header.extend(wcs.to_header().cards, update=True)
-        return hdu
+#         hdu.header.extend(wcs.to_header().cards, update=True)
+#         return hdu
 
-    @classmethod
-    @chk.check(dict(primary_hdu=chk.is_instance(fits.PrimaryHDU),
-                    image_hdu=chk.is_instance(fits.ImageHDU)))
-    def _from_fits(cls, primary_hdu, image_hdu):
-        """
-        Load image from Header Descriptor Units.
+#     @classmethod
+#     @chk.check(dict(primary_hdu=chk.is_instance(fits.PrimaryHDU),
+#                     image_hdu=chk.is_instance(fits.ImageHDU)))
+#     def _from_fits(cls, primary_hdu, image_hdu):
+#         """
+#         Load image from Header Descriptor Units.
 
-        Parameters
-        ----------
-        primary_hdu : :py:class:`~astropy.io.fits.PrimaryHDU`
-        image_hdu : :py:class:`~astropy.io.fits.ImageHDU`
+#         Parameters
+#         ----------
+#         primary_hdu : :py:class:`~astropy.io.fits.PrimaryHDU`
+#         image_hdu : :py:class:`~astropy.io.fits.ImageHDU`
 
-        Returns
-        -------
-        I : :py:class:`~pypeline.phased_array.util.io.image.SphericalImage`
-        """
-        # PrimaryHDU: grid specification.
-        N_height = primary_hdu.header['N_HEIGHT']
-        colat = primary_hdu.data[:N_height].reshape(N_height, 1)
+#         Returns
+#         -------
+#         I : :py:class:`~pypeline.phased_array.util.io.image.SphericalImage`
+#         """
+#         # PrimaryHDU: grid specification.
+#         N_height = primary_hdu.header['N_HEIGHT']
+#         colat = primary_hdu.data[:N_height].reshape(N_height, 1)
 
-        N_width = primary_hdu.header['N_WIDTH']
-        lon = primary_hdu.data[-N_width:].reshape(1, N_width)
+#         N_width = primary_hdu.header['N_WIDTH']
+#         lon = primary_hdu.data[-N_width:].reshape(1, N_width)
 
-        # ImageHDU: extract data cube.
-        data = image_hdu.data
+#         # ImageHDU: extract data cube.
+#         data = image_hdu.data
 
-        I = cls(data=data, colat=np.radians(colat), lon=np.radians(lon))
-        return I
+#         I = cls(data=data, colat=np.radians(colat), lon=np.radians(lon))
+#         return I
