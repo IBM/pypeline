@@ -222,7 +222,7 @@ make install;
 mkdir -p "{build_dir}";
 cd "{build_dir}";
 cmake -DCMAKE_INSTALL_PREFIX="{project_root_dir}"  \
-      -DENABLE_OPENMP=ON \
+      -DENABLE_OPENMP={str(args.OpenMP).upper()} \
       -DENABLE_THREADS=ON \
       -DENABLE_FLOAT={compile_float} \
       -DENABLE_SSE=ON \
