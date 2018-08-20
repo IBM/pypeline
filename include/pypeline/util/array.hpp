@@ -141,7 +141,7 @@ namespace pypeline { namespace util { namespace array {
         using T = typename std::decay_t<E>::value_type;
         auto shape_y = x.shape();
         shape_y[axis] = N;
-        xt::xarray<T> y = xt::zeros<T>(shape_y);
+        xt::xarray<T> y {xt::zeros<T>(shape_y)};
 
         for (size_t i = 0; i < idx.size(); ++i) {
             auto idx_x = index(x.dimension(), axis, i);
