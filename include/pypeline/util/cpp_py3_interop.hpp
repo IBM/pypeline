@@ -24,20 +24,36 @@
 
 namespace pypeline { namespace util { namespace cpp_py3_interop {
     /*
-     * Reference C++ tensor from Python3 as NumPy array.
+     * Reference C++ tensor from Python3 as NumPy array OR
+     * Transfer  C++ tensor to Python3 as NumPy array.
      *
+     * Transfering C++ tensor to Python3
+     * ---------------------------------
      * The C++ tensor's memory is moved to a NumPy array whose lifetime is managed
      * by the Python interpreter.
      * In other words, the NumPy array's resources are automatically freed by the
      * Python interpreter when the array is no longer referenced from Python code.
-     *
      * The C++ tensor should no longer be used on the C++ side after calling this
      * function.
+     *
+     * Reference C++ tensor from Python3
+     * ---------------------------------
+     * A NumPy view on the C++ tensor is created and returned to the Python interpreter.
+     * Ownership of the tensor's memory stays with the C++ program.
+     * This option is typically useful for C++ classes containing tensor attributes
+     * that need to be accessible from the Python interpreter, but that cannot
+     * relinquish ownership of memory since it's lifetime must be tied to
+     * the C++ instance.
      *
      * Parameters
      * ----------
      * _x : xt::xarray<T> or xt::xtensor<T, rank>
      *     C++ tensor.
+     * take_ownership : bool
+     *     If true (default), ownership of `_x` will be given to the Python
+     *     interpreter: when the array is no longer referenced from Python, it
+     *     will be garbage-collected.
+     *     If false, ownership of `_x` will be kept by C++.
      *
      * Returns
      * -------
@@ -77,17 +93,16 @@ namespace pypeline { namespace util { namespace cpp_py3_interop {
      *           [4.+0.j, 5.+0.j, 6.+0.j]], dtype=complex64)
      */
     template <typename E>
-    auto xtensor_to_numpy(E &&_x) {
-        /*
-         * pybind11::array_t<T>() used below takes ownership of strides/shape
-         * vectors, so we need to allocate copies.
-         */
+    auto xtensor_to_numpy(E &&_x, bool take_ownership = true) {
         using EE = typename std::decay_t<E>;
         using T = typename EE::value_type;
-        EE *x = new EE(std::move(_x));
 
-        std::vector<ssize_t> shape_x(x->dimension());
-        std::copy(x->shape().begin(), x->shape().end(), shape_x.begin());
+        /*
+         * pybind11::array_t<T>() used below takes ownership of
+         * strides/shape vectors, so we need to allocate copies.
+         */
+        std::vector<ssize_t> shape_x(_x.dimension());
+        std::copy(_x.shape().begin(), _x.shape().end(), shape_x.begin());
 
         /*
          * Stride information differs between Xtensor and NumPy:
@@ -96,25 +111,59 @@ namespace pypeline { namespace util { namespace cpp_py3_interop {
          * We therefore need to rescale Xtensor's strides to match NumPy's
          * conventions.
          */
-        std::vector<ssize_t> strides_x(x->dimension());
-        for (size_t i = 0; i < x->dimension(); ++i) {
-            strides_x[i] = x->strides()[i] * sizeof(T);
+        std::vector<ssize_t> strides_x(_x.dimension());
+        for (size_t i = 0; i < _x.dimension(); ++i) {
+            strides_x[i] = _x.strides()[i] * sizeof(T);
         }
 
-        /*
-         * `x` took possession of `_x`'s memory, so we need to setup a mechanism
-         * on Python-side to deallocate it's ressources.
-         * :cpp:obj:`pybind11::capsule` is a thin wrapper around a pointer
-         * (first argument) so that it can be referenced from Python.
-         * The second argument is a deallocation function called by the Python
-         * garbage collector when all references to `x` have expired on Python-side.
-         */
-        pybind11::capsule dealloc_handle(x, [](void *capsule) {
-            EE *x = reinterpret_cast<EE *>(capsule);
-            delete x;
-        });
+        if (take_ownership) {
+            EE *x = new EE(std::move(_x));
 
-        return pybind11::array_t<T>(shape_x, strides_x, x->data(), dealloc_handle);
+            /*
+             * `x` took possession of `_x`'s memory, so we need to setup a mechanism
+             * on Python-side to deallocate it's ressources.
+             * :cpp:obj:`pybind11::capsule` is a thin wrapper around a pointer
+             * (first argument) so that it can be referenced from Python.
+             * The second argument is a deallocation function called by the Python
+             * garbage collector when all references to `x` have expired on Python-side.
+             */
+            pybind11::capsule dealloc_handle(x, [](void *capsule) {
+                EE *x = reinterpret_cast<EE *>(capsule);
+                delete x;
+            });
+
+            return pybind11::array_t<T>(shape_x, strides_x, x->data(), dealloc_handle);
+        } else {
+            /*
+             * Just reference _x's data.
+             *
+             * IMPORTANT
+             * ---------
+             * Even though we don't need to define a deallocation function when
+             * the NumPy array is no longer used (since the Python interpreter
+             * does not own the array's memory), doing so makes the NumPy array
+             * read-only.
+             * This is due to the NumPy view not having its `base` attribute set
+             * when no handle is specified. (Why is this the case? No idea.)
+             *
+             * We therefore must specify a blank callback.
+             */
+            int *x = new int {0};
+            pybind11::capsule dealloc_handle(x, [](void *capsule) {
+                /*
+                 * Why are we allocating memory?
+                 * The capsule object requires a valid pointer to be constructed
+                 * from the Python interpreter.
+                 * We can't give it `&_x` because `_x` goes out of scope once
+                 * this function returns, so the only option is to allocate
+                 * something and discard it afterwards.
+                 */
+                int *x = reinterpret_cast<int *>(capsule);
+                delete x;
+            });
+
+            return pybind11::array_t<T>(shape_x, strides_x, _x.data(), dealloc_handle);
+        }
     }
 
     /*
