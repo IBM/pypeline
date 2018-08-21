@@ -11,8 +11,8 @@ project(pypeline
 
 set (CMAKE_VERBOSE_MAKEFILE ON)
 set (CMAKE_PREFIX_PATH      "${PROJECT_SOURCE_DIR}/cmake"
-                            "${PROJECT_SOURCE_DIR}/lib64/cmake"
-                            "${PROJECT_SOURCE_DIR}/lib64/eigen3/cmake")
+                            "${PROJECT_SOURCE_DIR}/lib/cmake"
+                            "${PROJECT_SOURCE_DIR}/lib64/cmake")
 
 ### C++/Python Standards ======================================================
 set (CMAKE_CXX_STANDARD          14)

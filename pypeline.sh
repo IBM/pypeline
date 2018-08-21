@@ -61,11 +61,12 @@ load_pypeline_env() {
     local miniconda_root="$(dirname "$(dirname "$(which conda)")")"
     export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${miniconda_root}/lib"
 
-    # libpypeline.so + Python3 Extension Modules: add <project_root>/lib64/ to PYTHONPATH, LD_LIBRARY_PATH
+    # libpypeline.so + Python3 Extension Modules: add <project_root>/lib[64]/ to PYTHONPATH, LD_LIBRARY_PATH
     local project_root="${abs_script_dir}"
-    local project_lib_dir="${project_root}/lib64"
-    export PYTHONPATH="${PYTHONPATH}:${project_lib_dir}"
-    export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${project_lib_dir}"
+    local project_lib_dir="${project_root}/lib"
+    local project_lib64_dir="${project_root}/lib64"
+    export PYTHONPATH="${PYTHONPATH}:${project_lib_dir}:${project_lib64_dir}"
+    export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${project_lib_dir}:${project_lib64_dir}"
 
     # MKL + OpenMP
     export OMP_NUM_THREADS=4
