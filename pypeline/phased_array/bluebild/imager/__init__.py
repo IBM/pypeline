@@ -60,12 +60,15 @@ class IntegratingMultiFieldSynthesizerBlock(core.Block):
         """
         Transform integrated statistics to viewable image.
 
+        The image is stored in a :py:class:`~pypeline.phased_arraay.util.io.image.SphericalImageContainer_floatxx` that
+        can then be fed to :py:class:`~pypeline.phased_arraay.util.io.image.SphericalImage` for visualization.
+
         Returns
         -------
-        std : :py:class:`~pypeline.phased_array.util.io.image.SphericalImage`
+        std_c : :py:class:`~pypeline.phased_array.util.io.image.SphericalImageContainer_floatxx`
             (N_level, N_height, N_width) standardized energy-levels.
 
-        lsq : :py:class:`~pypeline.phased_array.util.io.image.SphericalImage`
+        lsq_c : :py:class:`~pypeline.phased_array.util.io.image.SphericalImageContainer_floatxx`
             (N_level, N_height, N_width) least-squares energy-levels.
         """
         raise NotImplementedError

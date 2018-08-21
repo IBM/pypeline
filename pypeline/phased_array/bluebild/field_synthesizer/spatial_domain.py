@@ -113,8 +113,9 @@ class SpatialFieldSynthesizerBlock(synth.FieldSynthesizerBlock):
 
     .. doctest::
 
-       from pypeline.phased_array.util.io.image import SphericalImage
-       I_snapshot = SphericalImage(data=field, grid=px_grid)
+       from pypeline.phased_array.util.io.image import SphericalImage, SphericalImageContainer_float64
+       I_container = SphericalImageContainer_float64(image=field, grid=px_grid)
+       I_snapshot = SphericalImage(I_container)
 
        ax = I_snapshot.draw(index=slice(None),  # Collapse all energy levels
                             catalog=sky_model,

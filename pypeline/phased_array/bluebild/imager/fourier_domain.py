@@ -100,7 +100,7 @@ class Fourier_IMFS_Block(bim.IntegratingMultiFieldSynthesizerBlock):
        ...     # (2, N_eig, N_height, N_FS+Q) energy levels [integrated, clustered) (compact descriptor, not the same thing as [D, V]).
        ...     field_stat = I_mfs(D, V, XYZ.data, W.data, c_idx)
 
-       >>> I_std, I_lsq = I_mfs.as_image()
+       >>> I_std_c, I_lsq_c = I_mfs.as_image()
 
     The standardized and least-squares images can then be viewed side-by-side:
 
@@ -113,17 +113,17 @@ class Fourier_IMFS_Block(bim.IntegratingMultiFieldSynthesizerBlock):
        px_grid = np.tensordot(R.T, pol2cart(1, px_colat, px_lon), axes=1)
 
        fig, ax = plt.subplots(ncols=2)
-       I_std.draw(index=slice(None),  # Collapse all energy levels
-                  catalog=sky_model,
-                  data_kwargs=dict(cmap='cubehelix'),
-                  catalog_kwargs=dict(s=600),
-                  ax=ax[0])
+       SphericalImage(I_std_c).draw(index=slice(None),  # Collapse all energy levels
+                                    catalog=sky_model,
+                                    data_kwargs=dict(cmap='cubehelix'),
+                                    catalog_kwargs=dict(s=600),
+                                    ax=ax[0])
        ax[0].set_title('Standardized Estimate')
-       I_lsq.draw(index=slice(None),  # Collapse all energy levels
-                  catalog=sky_model,
-                  data_kwargs=dict(cmap='cubehelix'),
-                  catalog_kwargs=dict(s=600),
-                  ax=ax[1])
+       SphericalImage(I_lsq_c).draw(index=slice(None),  # Collapse all energy levels
+                                    catalog=sky_model,
+                                    data_kwargs=dict(cmap='cubehelix'),
+                                    catalog_kwargs=dict(s=600),
+                                    ax=ax[1])
        ax[1].set_title('Least-Squares Estimate')
        fig.show()
 
@@ -231,30 +231,38 @@ class Fourier_IMFS_Block(bim.IntegratingMultiFieldSynthesizerBlock):
 
     def as_image(self):
         """
-        Transform integrated statistics to viewable ICRS image.
+        Transform integrated statistics to viewable image.
+
+        The image is stored in a :py:class:`~pypeline.phased_arraay.util.io.image.SphericalImageContainer_floatxx` that
+        can then be fed to :py:class:`~pypeline.phased_arraay.util.io.image.SphericalImage` for visualization.
 
         Returns
         -------
-        std : :py:class:`~pypeline.phased_array.util.io.image.SphericalImage`
+        std_c : :py:class:`~pypeline.phased_array.util.io.image.SphericalImageContainer_floatxx`
             (N_level, N_height, N_width) standardized energy-levels.
 
-        lsq : :py:class:`~pypeline.phased_array.util.io.image.SphericalImage`
+        lsq_c : :py:class:`~pypeline.phased_array.util.io.image.SphericalImageContainer_floatxx`
             (N_level, N_height, N_width) least-squares energy-levels.
         """
+        if self._fp == np.float32:
+            container_type = image.SphericalImageContainer_float32
+        else:
+            container_type = image.SphericalImageContainer_float64
+
         bfsf_x, bfsf_y, bfsf_z = sph.pol2cart(1,
                                               self._synthesizer._grid_colat,
                                               self._synthesizer._grid_lon)
         bfsf_grid = np.stack([bfsf_x, bfsf_y, bfsf_z], axis=0)
         icrs_grid = np.tensordot(self._synthesizer._R.T,
                                  bfsf_grid,
-                                 axes=1)
+                                 axes=1).astype(self._fp)
 
         stat_std = self._statistics[0]
-        field_std = self._synthesizer.synthesize(stat_std)
-        std = image.SphericalImage(field_std, icrs_grid)
+        field_std = self._synthesizer.synthesize(stat_std).astype(self._fp)
+        std = container_type(field_std, icrs_grid)
 
         stat_lsq = self._statistics[1]
-        field_lsq = self._synthesizer.synthesize(stat_lsq)
-        lsq = image.SphericalImage(field_lsq, icrs_grid)
+        field_lsq = self._synthesizer.synthesize(stat_lsq).astype(self._fp)
+        lsq = container_type(field_lsq, icrs_grid)
 
         return std, lsq

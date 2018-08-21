@@ -112,12 +112,13 @@ class FourierFieldSynthesizerBlock(synth.FieldSynthesizerBlock):
 
     .. doctest::
 
-       from pypeline.phased_array.util.io.image import SphericalImage
+       from pypeline.phased_array.util.io.image import SphericalImage, SphericalImageContainer_float64
        # Transform grid to ICRS coordinates before plotting.
        px_grid = np.tensordot(R.T,
                               np.stack(pol2cart(1, px_colat, px_lon), axis=0),
                               axes=1)
-       I_snapshot = SphericalImage(data=field, grid=px_grid)
+       I_container = SphericalImageContainer_float64(image=field, grid=px_grid)
+       I_snapshot = SphericalImage(I_container)
 
        ax = I_snapshot.draw(index=slice(None),  # Collapse all energy levels
                             catalog=sky_model,

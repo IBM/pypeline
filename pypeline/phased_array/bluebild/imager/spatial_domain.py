@@ -91,7 +91,7 @@ class Spatial_IMFS_Block(bim.IntegratingMultiFieldSynthesizerBlock):
        ...     # (2, N_level, N_height, N_width) energy levels [integrated, clustered] (compact descriptor, not the same thing as [D, V]).
        ...     field_stat = I_mfs(D, V, XYZ.data, W.data, c_idx)
 
-       >>> I_std, I_lsq = I_mfs.as_image()
+       >>> I_std_c, I_lsq_c = I_mfs.as_image()
 
     The standardized and least-squares images can then be viewed side-by-side:
 
@@ -101,16 +101,16 @@ class Spatial_IMFS_Block(bim.IntegratingMultiFieldSynthesizerBlock):
        import matplotlib.pyplot as plt
 
        fig, ax = plt.subplots(ncols=2)
-       I_std.draw(index=slice(None),  # Collapse all energy levels
-                  catalog=sky_model,
-                  data_kwargs=dict(cmap='cubehelix'),
-                  catalog_kwargs=dict(s=600),
-                  ax=ax[0])
-       I_lsq.draw(index=slice(None),  # Collapse all energy levels
-                  catalog=sky_model,
-                  data_kwargs=dict(cmap='cubehelix'),
-                  catalog_kwargs=dict(s=600),
-                  ax=ax[1])
+       SphericalImage(I_std_c).draw(index=slice(None),  # Collapse all energy levels
+                                    catalog=sky_model,
+                                    data_kwargs=dict(cmap='cubehelix'),
+                                    catalog_kwargs=dict(s=600),
+                                    ax=ax[0])
+       SphericalImage(I_lsq_c).draw(index=slice(None),  # Collapse all energy levels
+                                    catalog=sky_model,
+                                    data_kwargs=dict(cmap='cubehelix'),
+                                    catalog_kwargs=dict(s=600),
+                                    ax=ax[1])
        fig.show()
 
     .. image:: _img/bluebild_SpatialIMFSBlock_integrate_example.png
@@ -199,20 +199,28 @@ class Spatial_IMFS_Block(bim.IntegratingMultiFieldSynthesizerBlock):
         """
         Transform integrated statistics to viewable image.
 
+        The image is stored in a :py:class:`~pypeline.phased_arraay.util.io.image.SphericalImageContainer_floatxx` that
+        can then be fed to :py:class:`~pypeline.phased_arraay.util.io.image.SphericalImage` for visualization.
+
         Returns
         -------
-        std : :py:class:`~pypeline.phased_array.util.io.image.SphericalImage`
+        std_c : :py:class:`~pypeline.phased_array.util.io.image.SphericalImageContainer_floatxx`
             (N_level, N_height, N_width) standardized energy-levels.
 
-        lsq : :py:class:`~pypeline.phased_array.util.io.image.SphericalImage`
+        lsq_c : :py:class:`~pypeline.phased_array.util.io.image.SphericalImageContainer_floatxx`
             (N_level, N_height, N_width) least-squares energy-levels.
         """
-        grid = self._synthesizer._grid
+        if self._fp == np.float32:
+            container_type = image.SphericalImageContainer_float32
+        else:
+            container_type = image.SphericalImageContainer_float64
+
+        grid = self._synthesizer._grid.astype(self._fp)
 
         stat_std = self._statistics[0]
-        std = image.SphericalImage(stat_std, grid)
+        std = container_type(stat_std, grid)
 
         stat_lsq = self._statistics[1]
-        lsq = image.SphericalImage(stat_lsq, grid)
+        lsq = container_type(stat_lsq, grid)
 
         return std, lsq

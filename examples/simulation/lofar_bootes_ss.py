@@ -80,7 +80,7 @@ for t in ProgressBar(time[::1]):
 
     D, V, c_idx = I_dp(S, G)
     _ = I_mfs(D, V, XYZ.data, W.data, c_idx)
-I_std, I_lsq = I_mfs.as_image()
+I_std_c, I_lsq_c = I_mfs.as_image()
 
 ### Sensitivity Field =========================================================
 # Parameter Estimation
@@ -103,14 +103,16 @@ for t in ProgressBar(time[::50]):
 
     D, V = S_dp(G)
     _ = S_mfs(D, V, XYZ.data, W.data, cluster_idx=np.zeros(N_eig, dtype=int))
-_, S = S_mfs.as_image()
+_, S_c = S_mfs.as_image()
 
 # Plot Results ================================================================
 fig, ax = plt.subplots(ncols=2)
-I_std_eq = image.SphericalImage(I_std.data / S.data, I_std.grid)
+I_std_eq_c = getattr(image, 'SphericalImageContainer_float' + str(N_bits))(I_std_c.image / S_c.image, I_std_c.grid)
+I_std_eq = image.SphericalImage(I_std_eq_c)
 I_std_eq.draw(catalog=sky_model, ax=ax[0])
 ax[0].set_title('Bluebild Standardized Image')
 
-I_lsq_eq = image.SphericalImage(I_lsq.data / S.data, I_lsq.grid)
+I_lsq_eq_c = getattr(image, 'SphericalImageContainer_float' + str(N_bits))(I_lsq_c.image / S_c.image, I_lsq_c.grid)
+I_lsq_eq = image.SphericalImage(I_lsq_eq_c)
 I_lsq_eq.draw(catalog=sky_model, ax=ax[1])
 ax[1].set_title('Bluebild Least-Squares Image')

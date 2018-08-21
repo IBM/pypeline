@@ -66,7 +66,7 @@ N_eig, c_centroid = I_est.infer_parameters()
 I_dp = data_proc.IntensityFieldDataProcessorBlock(N_eig, c_centroid)
 I_mfs = bb_sd.Spatial_IMFS_Block(wl, pix_grid, N_level, N_bits)
 for t_idx, _, S in ProgressBar(ms.visibilities(channel_id=channel_idx,
-                                               time_id=slice(None, None, 200),
+                                               time_id=slice(None, None, 1),
                                                column='DATA_SIMULATED')):
     XYZ = ms.instrument(ms.time[t_idx])
     W = ms.beamformer(XYZ, wl)
@@ -75,7 +75,7 @@ for t_idx, _, S in ProgressBar(ms.visibilities(channel_id=channel_idx,
 
     D, V, c_idx = I_dp(S, G)
     _ = I_mfs(D, V, XYZ.data, W.data, c_idx)
-I_std, I_lsq = I_mfs.as_image()
+I_std_c, I_lsq_c = I_mfs.as_image()
 
 ### Sensitivity Field =========================================================
 # Parameter Estimation
@@ -92,7 +92,7 @@ N_eig = S_est.infer_parameters()
 S_dp = data_proc.SensitivityFieldDataProcessorBlock(N_eig)
 S_mfs = bb_sd.Spatial_IMFS_Block(wl, pix_grid, 1, N_bits)
 for t_idx, _, S in ProgressBar(ms.visibilities(channel_id=channel_idx,
-                                               time_id=slice(None, None, 200),
+                                               time_id=slice(None, None, 50),
                                                column='DATA_SIMULATED')):
     XYZ = ms.instrument(ms.time[t_idx])
     W = ms.beamformer(XYZ, wl)
@@ -101,14 +101,16 @@ for t_idx, _, S in ProgressBar(ms.visibilities(channel_id=channel_idx,
 
     D, V = S_dp(G)
     _ = S_mfs(D, V, XYZ.data, W.data, cluster_idx=np.zeros(N_eig, dtype=int))
-_, S = S_mfs.as_image()
+_, S_c = S_mfs.as_image()
 
 # Plot Results ================================================================
 fig, ax = plt.subplots(ncols=2)
-I_std_eq = image.SphericalImage(I_std.data / S.data, I_std.grid)
+I_std_eq_c = getattr(image, 'SphericalImageContainer_float' + str(N_bits))(I_std_c.image / S_c.image, I_std_c.grid)
+I_std_eq = image.SphericalImage(I_std_eq_c)
 I_std_eq.draw(catalog=sky_model, ax=ax[0])
 ax[0].set_title('Bluebild Standardized Image')
 
-I_lsq_eq = image.SphericalImage(I_lsq.data / S.data, I_lsq.grid)
+I_lsq_eq_c = getattr(image, 'SphericalImageContainer_float' + str(N_bits))(I_lsq_c.image / S_c.image, I_lsq_c.grid)
+I_lsq_eq = image.SphericalImage(I_lsq_eq_c)
 I_lsq_eq.draw(catalog=sky_model, ax=ax[1])
 ax[1].set_title('Bluebild Least-Squares Image')
