@@ -47,7 +47,8 @@ After installing `Miniconda <https://conda.io/miniconda.html>`_ or `Anaconda <ht
     $ python3 build.py --download_dependencies
     $ python3 build.py --install_dependencies                    \
                        --C_compiler="${PYPELINE_C_COMPILER}"     \
-                       --CXX_compiler="${PYPELINE_CXX_COMPILER}"
+                       --CXX_compiler="${PYPELINE_CXX_COMPILER}" \
+                      [--OpenMP]
     $ python3 build.py --lib={Debug, Release}                    \
                        --C_compiler="${PYPELINE_C_COMPILER}"     \
                        --CXX_compiler="${PYPELINE_CXX_COMPILER}" \
