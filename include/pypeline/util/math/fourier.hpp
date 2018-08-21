@@ -567,7 +567,7 @@ namespace pypeline { namespace util { namespace math { namespace fourier {
 
                 // Correct FFTW's lack of scaling during iFFTs.
                 const xt::xtensor<T, 1> N {static_cast<T>(m_shape[m_axis])};
-                view_out().multiplies_assign(1.0 / N);
+                view_out().multiplies_assign(T(1.0) / N);
             }
 
             /*
@@ -587,7 +587,7 @@ namespace pypeline { namespace util { namespace math { namespace fourier {
 
                 // Correct FFTW's lack of scaling during iFFTs.
                 const xt::xtensor<T, 1> N {static_cast<T>(m_shape[m_axis])};
-                view_in().multiplies_assign(1.0 / N);
+                view_in().multiplies_assign(T(1.0) / N);
             }
     };
 
