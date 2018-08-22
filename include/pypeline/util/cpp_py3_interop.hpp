@@ -175,7 +175,6 @@ namespace pypeline { namespace util { namespace cpp_py3_interop {
      * ----------
      * buf : pybind11::buffer
      *     Object that implements the `buffer-protocol <https://docs.python.org/3/c-api/buffer.html>`_.
-     *     It is assumed `buf` was obtained by calling :cpp:func:`pybind11::array_t<T>::request()`.
      * T : type
      *     Type of individual elements in the buffer.
      *
