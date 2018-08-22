@@ -22,11 +22,13 @@
 #include <vector>
 
 #include "fftw3.h"
+#include "xtensor/xarray.hpp"
 #include "xtensor/xtensor.hpp"
 #include "xtensor/xadapt.hpp"
 #include "xtensor/xcomplex.hpp"
 #include "xtensor/xmath.hpp"
 #include "xtensor/xbuilder.hpp"
+#include "xtensor/xview.hpp"
 #include "xtensor/xstrided_view.hpp"
 
 #include "pypeline/util/argcheck.hpp"
@@ -950,6 +952,597 @@ namespace pypeline { namespace util { namespace math { namespace fourier {
 
                 const TT N_samples = static_cast<int>(m_shape[m_axis]);
                 view_in().multiplies_assign(xt::conj(m_mod_2) * N_samples);
+            }
+    };
+
+    /*
+     * FFTW wrapper to compute the 1D Chirp Z-Transform on multidimensional tensors.
+     *
+     * This implementation follows the semantics defined in :ref:`CZT_def`.
+     *
+     * This object automatically allocates an optimally-sized buffer and
+     * provides a tensor interface to the underlying memory using xtensor views.
+     *
+     * Examples
+     * --------
+     * Implementation of the DFT:
+     *
+     * .. literal_block::
+     *
+     *    #include <cmath>
+     *    #include <vector>
+     *    #include "pypeline/util/math/fourier.hpp"
+     *    namespace fourier = pypeline::util::math::fourier;
+     *
+     *    // Transform parameters
+     *    const size_t N_transform {3}, len_transform {10};
+     *    const std::vector<size_t> shape {N_transform, len_transform};
+     *    const size_t axis = 1;
+     *    const size_t N_threads = 1;
+     *    auto effort = fourier::planning_effort::NONE;
+     *
+     *    // Perform DFT by using the CZT.
+     *    std::complex<double> _1j {0, 1};
+     *    std::complex<double> A {1, 0};
+     *    std::complex<double> W = std::exp(-_1j * (2 * M_PI / len_transform));
+     *    fourier::FFTW_CZT<double> czt_transform(shape, axis, A, W, len_transform,
+     *                                            N_threads, effort);
+     *
+     *    czt_transform.view_in() = 1;  // fill buffer
+     *    czt_transform.czt();
+     *    auto czt_res = czt_transform.view_out();
+     *
+     *    // Perform DFT using FFT directly.
+     *    fourier::FFTW_FFT<double> dft_transform(shape, axis, false, N_threads, effort);
+     *    dft_transform.view_in() = 1;
+     *    dft_transform.fft();
+     *    auto fft_res = dft_transform.view_out();
+     *
+     *    xt::allclose(fft_res,czt_res);  // true
+     */
+    template <typename T>
+    class FFTW_CZT {
+        private:
+            size_t m_axis = 0;
+            std::vector<size_t> m_shape {};
+            size_t m_M = 0;
+            size_t m_L = 0;
+            FFTW_FFT<T> m_transform;
+            xt::xarray<std::complex<T>> m_mod_y;
+            xt::xarray<std::complex<T>> m_mod_G;
+            xt::xarray<std::complex<T>> m_mod_g;
+
+            static size_t _L(const std::vector<size_t> shape,
+                             const size_t axis,
+                             const size_t M) {
+                const size_t N = shape[axis];
+                const size_t L = FFTW_size_finder(N + M - 1).next_fast_len();
+                return L;
+            }
+
+            static std::vector<size_t> _transform_shape(const std::vector<size_t> shape,
+                                                        const size_t axis,
+                                                        const size_t M) {
+                std::vector<size_t> shape_transform = shape;
+                shape_transform[axis] = _L(shape, axis, M);
+                return shape_transform;
+            }
+
+            void compute_modulation_vectors(const std::complex<double> A,
+                                            const std::complex<double> W) {
+                using cT = std::complex<T>;
+                auto n = xt::arange<double>(0, m_L);
+
+                // m_mod_y ====================================================
+                const size_t N = m_shape[m_axis];
+                std::vector<size_t> shape_mod_y(m_shape.size());
+                std::fill(shape_mod_y.begin(), shape_mod_y.end(), 1);
+                shape_mod_y[m_axis] = N;
+
+                xt::pow(A, xt::view(-n, xt::range(0, N)));
+                auto mod_y = (xt::pow(A, xt::view(-n, xt::range(0, N))) *
+                              xt::pow(W, 0.5 * xt::square(xt::view(n, xt::range(0, N)))));
+                m_mod_y = xt::reshape_view(xt::cast<cT>(mod_y),
+                                           std::vector<size_t> {shape_mod_y});
+
+                // m_mod_G ====================================================
+                std::vector<size_t> shape_mod_G(m_shape.size());
+                std::fill(shape_mod_G.begin(), shape_mod_G.end(), 1);
+                shape_mod_G[m_axis] = m_L;
+
+                xt::xtensor<std::complex<double>, 1> mod_G = xt::zeros<double>({m_L});
+                xt::view(mod_G, xt::range(0, m_M)) = xt::pow(W, -0.5 * xt::square(xt::view(n, xt::range(0, m_M))));
+                xt::view(mod_G, xt::range(m_L - N + 1, m_L)) = xt::pow(W, -0.5 * xt::square(m_L - xt::view(n, xt::range(m_L - N + 1, m_L))));
+
+                auto transform_mod_G = FFTW_FFT<double>(std::vector<size_t> {m_L}, 0, true, 1, planning_effort::NONE);
+                transform_mod_G.view_in() = mod_G;
+                transform_mod_G.fft();
+                mod_G = transform_mod_G.view_out();
+
+                m_mod_G = xt::reshape_view(xt::cast<cT>(mod_G),
+                                           std::vector<size_t> {shape_mod_G});
+
+                // m_mod_g ====================================================
+                std::vector<size_t> shape_mod_g(m_shape.size());
+                std::fill(shape_mod_g.begin(), shape_mod_g.end(), 1);
+                shape_mod_g[m_axis] = m_M;
+
+                auto mod_g = xt::pow(W, 0.5 * xt::square(xt::view(n, xt::range(0, m_M))));
+                m_mod_g = xt::reshape_view(xt::cast<cT>(mod_g),
+                                           std::vector<size_t> {shape_mod_g});
+            }
+
+        public:
+            /*
+             * Parameters
+             * ----------
+             * shape : std::vector<size_t>
+             *     Dimensions of the input array.
+             * axis : size_t
+             *     Dimension along which to apply the transform.
+             * A : std::complex<double>
+             *     Circular offset from the positive real-axis.
+             * W : std::complex<double>
+             *     Circular spacing between transform points.
+             * M : size_t
+             *     Length of the transform.
+             * N_threads : size_t
+             *     Number of threads to use.
+             * effort : planning_effort
+             *
+             * Notes
+             * -----
+             * Due to numerical instability when using large `M`, this implementation
+             * only supports transforms where `A` and `W` have unit norm.
+             */
+            FFTW_CZT(const std::vector<size_t> &shape,
+                     const size_t axis,
+                     const std::complex<double> A,
+                     const std::complex<double> W,
+                     const size_t M,
+                     const size_t N_threads,
+                     const planning_effort effort):
+                m_axis(axis), m_shape(shape),
+                m_M(M), m_L(_L(shape, axis, M)),
+                m_transform{_transform_shape(shape, axis, M), axis,
+                            true, N_threads, effort} {
+                if (M == 0) {
+                    std::string msg = "Parameter[M] must be positive.";
+                    throw std::runtime_error(msg);
+                }
+                if (!xt::allclose(std::abs(A), 1)) {
+                    std::string msg = "Parameter[A] must lie on the unit circle for numerical stability.";
+                    throw std::runtime_error(msg);
+                }
+                if (!xt::allclose(std::abs(W), 1)) {
+                    std::string msg = "Parameter[W] must lie on the unit circle for numerical stability.";
+                    throw std::runtime_error(msg);
+                }
+
+                compute_modulation_vectors(A, W);
+            }
+
+            /*
+             * Returns
+             * -------
+             * shape : std::vector<size_t>
+             *     Dimensions of the input.
+             */
+            std::vector<size_t> shape_in() {
+                return m_shape;
+            }
+
+            /*
+             * Returns
+             * -------
+             * shape : std::vectoro<size_t>
+             *     Dimensions of the output.
+             */
+            std::vector<size_t> shape_out() {
+                std::vector<size_t> shape_out = m_shape;
+                shape_out[m_axis] = m_M;
+
+                return shape_out;
+            }
+
+            /*
+             * Returns
+             * -------
+             * view_in : xt::xstrided_view
+             *     View on the input array.
+             */
+            auto view_in() {
+                namespace array = pypeline::util::array;
+
+                const size_t N = m_shape[m_axis];
+                const auto& idx = array::index(m_shape.size(), m_axis, xt::range(0, N));
+                return xt::strided_view(m_transform.view_in(), idx);
+            }
+
+            /*
+             * Returns
+             * -------
+             * view_out : xt::xstrided_view
+             *     View on the output array.
+             */
+            auto view_out() {
+                namespace array = pypeline::util::array;
+
+                const auto& idx = array::index(m_shape.size(), m_axis, xt::range(0, m_M));
+                return xt::strided_view(m_transform.view_out(), idx);
+            }
+
+            /*
+             * Transform buffer contents in-place using 1D-CZT.
+             *
+             * This function is meant to be used as follows:
+             * * Use `view_in()` to fill up the buffer.
+             * * Call `czt()` to transform buffer contents.
+             * * Use `view_out()` to get the result of the transform.
+             *
+             * Notes
+             * -----
+             * The contents of `view_in()` are not preserved after calls to `czt()`.
+             */
+            void czt() {
+                namespace array = pypeline::util::array;
+
+                /*
+                 * The user must have used `view_in()` to fill the transform buffer.
+                 * Since `m_L >= m_N`, we need to zero-out the last `m_L - m_N`
+                 * entries along `m_axis` for `czt()` to work.
+                 */
+                const size_t N = m_shape[m_axis];
+                if (m_L - N > 0) {
+                    const auto& idx = array::index(m_shape.size(), m_axis, xt::range(N, m_L));
+                    xt::strided_view(m_transform.view_in(), idx) = 0;
+                }
+
+                view_in().multiplies_assign(m_mod_y);
+                m_transform.fft();
+                m_transform.view_out().multiplies_assign(m_mod_G);
+                m_transform.ifft();
+                view_out().multiplies_assign(m_mod_g);
+            }
+    };
+
+    /*
+     * Interpolate bandlimited periodic signal as described in :ref:`fp_interp_def`.
+     *
+     * If given the Fourier Series coefficients of a bandlimited periodic function
+     * :math:`x(t): \mathbb{R} \to \mathbb{C}`, then :py:meth:`FFTW_FS_INTERP::fs_interp()`
+     * computes the values of :math:`x(t)` at points :math:`t[k] = (a + \frac{b - a}{M - 1} k) 1_{[0,\ldots,M-1]}[k]`.
+     *
+     * Examples
+     * --------
+     * Let :math:`\{\phi_{k}^{FS}, k = -N, \ldots, N\}` be the Fourier Series (FS)
+     * coefficients of a shifted Dirichlet kernel of period :math:`T`:
+     *
+     *.. math::
+     *
+     *   \phi_{k}^{FS} =
+     *   \begin{cases}
+     *       \exp\left( -j \frac{2 \pi}{T} k T_{c} \right) & -N \le k \le N, \\
+     *       0 & \text{otherwise}.
+     *   \end{cases}
+     *
+     * Being bandlimited, we can use :cpp:class:`FFTW_FS_INTERP` to numerically
+     * evaluate :math:`\phi(t)` on the interval
+     * :math:`\left[ T_{c} - \frac{T}{2}, T_{c} + \frac{T}{2} \right]`.
+     *
+     * .. literal_block::
+     *
+     *    #include <complex>
+     *    #include <cmath>
+     *    #include <vector>
+     *    #include "xtensor/xarray.hpp"
+     *    #include "xtensor/xbuilder.hpp"
+     *    #include "xtensor/xmath.hpp"
+     *    #include "xtensor/xindex_view.hpp"
+     *    #include "pypeline/util/math/fourier.hpp"
+     *    namespace fourier = pypeline::util::math::fourier;
+     *
+     *    // Compute samples from a shifted Dirichlet kernel.
+     *    xt::xarray<double> dirichlet(xt::xarray<double> x,
+     *                                 const double T,
+     *                                 const double T_c,
+     *                                 const size_t N_FS) {
+     *        xt::xarray<double> y {x - T_c};
+     *
+     *        xt::xarray<double> numerator {xt::zeros<double>({x.size()})};
+     *        xt::xarray<double> denominator {xt::zeros<double>({x.size()})};
+     *
+     *        xt::xarray<bool> nan_mask {xt::isclose(xt::fmod(y, M_PI), 0)};
+     *        xt::filter(numerator, ~nan_mask) = xt::sin((N_FS * M_PI / T) * xt::filter(y, ~nan_mask));
+     *        xt::filter(denominator, ~nan_mask) = xt::sin((M_PI / T) * xt::filter(y, ~nan_mask));
+     *        xt::filter(numerator, nan_mask) = N_FS * xt::cos((N_FS * M_PI / T) * xt::filter(y, nan_mask));
+     *        xt::filter(denominator, nan_mask) = xt::cos((M_PI / T) * xt::filter(y, nan_mask));
+     *
+     *        xt::xarray<double> vals {numerator / denominator};
+     *        return vals;
+     *    }
+     *
+     *    // Analytical FS coefficients of a shifted Dirichlet kernel.
+     *    xt::xarray<std::complex<double>> dirichlet_FS_theory(const double T,
+     *                                                         const double T_c,
+     *                                                         const size_t N_FS) {
+     *        const size_t N = (N_FS - 1) / 2;
+     *        std::complex<double> _1j(0, 1);
+     *
+     *        std::complex<double> base = exp(-_1j * (2 * M_PI * T_c) / T);
+     *        xt::xarray<double> exponent {xt::arange<int>(-N, N+1)};
+     *
+     *        xt::xarray<std::complex<double>> kernel {xt::pow(base, exponent)};
+     *        return kernel;
+     *    }
+     *
+     *    // Signal Parameters
+     *    const double T = M_PI;
+     *    const double T_c = M_E;
+     *    const size_t N_FS = 15;
+     *    xt::xarray<std::complex<double>> diric_FS {dirichlet_FS_theory(T, T_c, N_FS)};
+     *
+     *    // Ground-truth: exact interpolated result.
+     *    const double a = T_c - 0.5 * T;
+     *    const double b = T_c + 0.5 * T;
+     *    const size_t M = 10;  // We want a lot of interpolated points.
+     *    xt::xarray<double> sample_positions {a + ((b - a) / (M - 1)) * xt::arange<int>(M)};
+     *    xt::xarray<double> diric_sig_exact {dirichlet(sample_positions, T, T_c, N_FS)};
+     *
+     *    const std::vector<size_t> shape_transform {N_FS};
+     *    const size_t axis_transform = 0;
+     *    const size_t N_threads = 1;
+     *    auto effort = fourier::planning_effort::NONE;
+     *
+     *    // Option 1
+     *    // --------
+     *    // No assumptions on FS spectra: use generic algorithm.
+     *    fourier::FFTW_FS_INTERP<double> interpolant(shape_transform, axis_transform,
+     *                                                T, a, b, M, false,
+     *                                                N_threads, effort);
+     *    interpolant.in(diric_FS);  // fill input
+     *    interpolant.fs_interp();
+     *    xt::xarray<std::complex<double>> diric_sig {interpolant.view_out()};
+     *
+     *    // Option 2
+     *    // --------
+     *    // You know that the output is real-valued: use accelerated algorithm.
+     *    fourier::FFTW_FS_INTERP<double> interpolant_real(shape_transform, axis_transform,
+     *                                                     T, a, b, M, true,
+     *                                                     N_threads, effort);
+     *    interpolant_real.in(diric_FS);  // fill input
+     *    interpolant_real.fs_interp();
+     *    xt::xarray<std::complex<double>> diric_sig_real {interpolant_real.view_out()};
+     *    // .view_out() is always complex-valued, but its imaginary part will be 0.
+     *
+     *    xt::allclose(diric_sig_exact, diric_sig);       // true
+     *    xt::allclose(diric_sig_exact, diric_sig_real);  // true
+     */
+    template <typename TT>
+    class FFTW_FS_INTERP {
+        private:
+            size_t m_axis = 0;
+            std::vector<size_t> m_shape {};
+            size_t m_M = 0;
+            bool m_real_output = false;
+            FFTW_CZT<TT> m_transform;
+            xt::xarray<std::complex<TT>> m_mod;
+            xt::xarray<std::complex<TT>> m_DC;
+
+            static std::vector<size_t> _transform_shape(const std::vector<size_t> shape,
+                                                        const size_t axis,
+                                                        const bool real_valued_output) {
+                std::vector<size_t> shape_transform = shape;
+
+                if (real_valued_output) {
+                    const size_t N_FS = shape[axis];
+                    const size_t N = (N_FS - 1) / 2;
+
+                    shape_transform[axis] = N;
+                }
+
+                return shape_transform;
+            }
+
+            static std::complex<double> _transform_A(const double T,
+                                                     const double a) {
+                std::complex<double> _1j(0, 1);
+                std::complex<double> A = exp(-_1j * ((2 * M_PI * a) / T));
+                return A;
+            }
+
+            static std::complex<double> _transform_W(const double T,
+                                                     const double a,
+                                                     const double b,
+                                                     const size_t M) {
+                std::complex<double> _1j(0, 1);
+                std::complex<double> W = exp(_1j * (2 * M_PI / T) * ((b - a) / (M - 1)));
+                return W;
+            }
+
+            void compute_modulation_vector(const std::complex<double> A,
+                                           const std::complex<double> W) {
+                auto E = xt::arange<double>(0, m_M);
+
+                xt::xtensor<std::complex<double>, 1> mod;
+                if (m_real_output) {
+                    mod = 2.0 * xt::pow(W, E) / A;
+                } else {
+                    const size_t N_FS = m_shape[m_axis];
+                    const int N = (N_FS - 1) / 2;
+
+                    mod = xt::pow(W, -N * E) * std::pow<double>(A, N);
+                }
+
+                std::vector<size_t> shape_mod(m_shape.size());
+                std::fill(shape_mod.begin(), shape_mod.end(), 1);
+                shape_mod[m_axis] = m_M;
+
+                using cTT = std::complex<TT>;
+                m_mod = xt::reshape_view(xt::cast<cTT>(mod),
+                                         std::vector<size_t> {shape_mod});
+            }
+
+        public:
+            /*
+             * Parameters
+             * ----------
+             * shape : std::vector<size_t>
+             *     Dimensions of the input array.
+             * axis : size_t
+             *     Dimension along which the FS coefficients are stored.
+             * T : double
+             *     Function period.
+             * a : double
+             *     Interval LHS.
+             * b : double
+             *     Interval RHS.
+             * M : size_t
+             *     Number of points to interpolate.
+             * real_valued_output : bool
+             *     If true, it is assumed the interpolated signal is real-valued.
+             *     In this context, only the FS coefficients corresponding to
+             *     non-negative frequencies will be used, along with a more
+             *     efficient interpolation algorithm.
+             * N_threads : size_t
+             *     Number of threads to use.
+             * effort : planning_effort
+             */
+            FFTW_FS_INTERP(const std::vector<size_t> &shape,
+                           const size_t axis,
+                           const double T,
+                           const double a,
+                           const double b,
+                           const size_t M,
+                           const bool real_valued_output,
+                           const size_t N_threads,
+                           const planning_effort effort):
+                m_axis(axis), m_shape(shape), m_M(M), m_real_output(real_valued_output),
+                m_transform{_transform_shape(shape, axis, real_valued_output), axis,
+                            _transform_A(T, a), _transform_W(T, a, b, M), M,
+                            N_threads, effort} {
+                namespace argcheck = pypeline::util::argcheck;
+                if (argcheck::is_even(shape[axis])) {
+                    std::string msg = "Parameter[shape] must be odd-valued along Parameter[axis].";
+                    throw std::runtime_error(msg);
+                }
+                if (T <= 0) {
+                    std::string msg = "Parameter[T] must be positive.";
+                    throw std::runtime_error(msg);
+                }
+                if (b <= a) {
+                    std::string msg = "Parameter[a] must be smaller than Parameter[b].";
+                    throw std::runtime_error(msg);
+                }
+                if (M == 0) {
+                    std::string msg = "Parameter[M] must be positive.";
+                    throw std::runtime_error(msg);
+                }
+
+                compute_modulation_vector(_transform_A(T, a),
+                                          _transform_W(T, a, b, M));
+            }
+
+            /*
+             * Returns
+             * -------
+             * shape : std::vector<size_t>
+             *     Dimensions of the input.
+             */
+            std::vector<size_t> shape_in() {
+                return m_shape;
+            }
+
+            /*
+             * Returns
+             * -------
+             * shape : std::vector<size_t>
+             *     Dimensions of the output.
+             */
+            std::vector<size_t> shape_out() {
+                std::vector<size_t> shape_out = m_shape;
+                shape_out[m_axis] = m_M;
+
+                return shape_out;
+            }
+
+            /*
+             * Fill input array.
+             *
+             * Parameters
+             * ----------
+             * x : xt::xexpression
+             *     (..., N_FS, ...) FS coefficients in the order
+             *     :math:`\left[ x_{-N}^{FS}, \ldots, x_{N}^{FS}\right]`.
+             *
+             * Notes
+             * -----
+             * If `real_valued_output` was set to `true`, only the FS coefficients
+             * corresponding to non-negative frequencies are stored.
+             */
+            template <typename E>
+            void in(E &&x) {
+                namespace argcheck = pypeline::util::argcheck;
+                if (!(argcheck::has_floats(x) || argcheck::has_complex(x))) {
+                    std::string msg = "Parameter[x] must be real/complex-valued.";
+                    throw std::runtime_error(msg);
+                }
+
+                auto shape_x = x.shape();
+                std::string shape_error_msg = "Parameter[x] must have shape (..., N_FS, ...).";
+                if (shape_x.size() != m_shape.size()) {
+                    throw std::runtime_error(shape_error_msg);
+                }
+                for (size_t i = 0; i < shape_x.size(); ++i) {
+                    if (shape_x[i] != m_shape[i]) {
+                        throw std::runtime_error(shape_error_msg);
+                    }
+                }
+
+                if (m_real_output) {
+                    // Store DC + POSitive terms only.
+                    namespace array = pypeline::util::array;
+                    const size_t N_FS = m_shape[m_axis];
+                    const size_t N = (N_FS - 1) / 2;
+
+                    const auto& idx_DC = array::index(m_shape.size(), m_axis, xt::range(N, N + 1));
+                    m_DC = xt::strided_view(x, idx_DC);
+
+                    const auto& idx_POS = array::index(m_shape.size(), m_axis, xt::range(N + 1, N_FS));
+                    m_transform.view_in() = xt::strided_view(x, idx_POS);
+                } else {
+                    m_transform.view_in() = x;
+                }
+            }
+
+            /*
+             * Returns
+             * -------
+             * view_out : xt::xstrided_view
+             *     (..., M, ...) interpolated values :math:`\left[ x(t[0]), \ldots, x(t[M-1]) \right]` along the axis indicated by `axis`.
+             *     If `real_valued_output` is `true`, the output's imaginary part
+             *     is guaranteed to be 0.
+             */
+            auto view_out() {
+                return m_transform.view_out();
+            }
+
+            /*
+             * Interpolate bandlimited periodic signal.
+             *
+             * This function is meant to be used as follows:
+             * * Use `in()` to fill up the buffer with FS coefficients.
+             * * Call `fs_interp()` to obtain interpolated signal samples.
+             * * Use `view_out()` to get the signal samples.
+             */
+            void fs_interp() {
+                m_transform.czt();
+                m_transform.view_out().multiplies_assign(m_mod);
+
+                if (m_real_output) {
+                    m_transform.view_out().plus_assign(m_DC);
+                    xt::imag(m_transform.view_out()) = 0;
+                }
             }
     };
 }}}}

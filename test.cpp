@@ -7,21 +7,14 @@
 #include <complex>
 #include <cmath>
 #include <vector>
-#include <iostream>
-
 #include "xtensor/xarray.hpp"
 #include "xtensor/xbuilder.hpp"
 #include "xtensor/xmath.hpp"
-#include "xtensor/xstrided_view.hpp"
 #include "xtensor/xindex_view.hpp"
-#include "xtensor/xio.hpp"
-
-#include "pypeline/util/array.hpp"
 #include "pypeline/util/math/fourier.hpp"
-
-namespace array = pypeline::util::array;
 namespace fourier = pypeline::util::math::fourier;
 
+// Compute samples from a shifted Dirichlet kernel.
 xt::xarray<double> dirichlet(xt::xarray<double> x,
                              const double T,
                              const double T_c,
@@ -41,6 +34,7 @@ xt::xarray<double> dirichlet(xt::xarray<double> x,
     return vals;
 }
 
+// Analytical FS coefficients of a shifted Dirichlet kernel.
 xt::xarray<std::complex<double>> dirichlet_FS_theory(const double T,
                                                      const double T_c,
                                                      const size_t N_FS) {
@@ -55,42 +49,47 @@ xt::xarray<std::complex<double>> dirichlet_FS_theory(const double T,
 }
 
 int main() {
+    // Signal Parameters
     const double T = M_PI;
     const double T_c = M_E;
     const size_t N_FS = 15;
-    const size_t N_samples = 16;
+    xt::xarray<std::complex<double>> diric_FS {dirichlet_FS_theory(T, T_c, N_FS)};
 
-    const std::vector<size_t> shape_transform {N_samples};
+    // Ground-truth: exact interpolated result.
+    const double a = T_c - 0.5 * T;
+    const double b = T_c + 0.5 * T;
+    const size_t M = 10;  // We want a lot of interpolated points.
+    xt::xarray<double> sample_positions {a + ((b - a) / (M - 1)) * xt::arange<int>(M)};
+    xt::xarray<double> diric_sig_exact {dirichlet(sample_positions, T, T_c, N_FS)};
+
+    const std::vector<size_t> shape_transform {N_FS};
     const size_t axis_transform = 0;
-    const bool inplace = false;
     const size_t N_threads = 1;
-    const fourier::planning_effort effort = fourier::planning_effort::NONE;
+    auto effort = fourier::planning_effort::NONE;
 
-    xt::xarray<double> sample_points {fourier::ffs_sample(T, N_FS, T_c, N_samples)};
-    xt::xarray<double> diric_samples {dirichlet(sample_points, T, T_c, N_FS)};
-    xt::xarray<std::complex<double>> diric_FS_exact {dirichlet_FS_theory(T, T_c, N_FS)};
+    // Option 1
+    // --------
+    // No assumptions on FS spectra: use generic algorithm.
+    fourier::FFTW_FS_INTERP<double> interpolant(shape_transform, axis_transform,
+                                                T, a, b, M, false,
+                                                N_threads, effort);
+    interpolant.in(diric_FS);  // fill input
+    interpolant.fs_interp();
+    xt::xarray<std::complex<double>> diric_sig {interpolant.view_out()};
 
-    fourier::FFTW_FFS<double> transform(shape_transform,
-                                        axis_transform,
-                                        T, T_c, N_FS,
-                                        inplace, N_threads, effort);
+    // Option 2
+    // --------
+    // You know that the output is real-valued: use accelerated algorithm.
+    fourier::FFTW_FS_INTERP<double> interpolant_real(shape_transform, axis_transform,
+                                                     T, a, b, M, true,
+                                                     N_threads, effort);
+    interpolant_real.in(diric_FS);  // fill input
+    interpolant_real.fs_interp();
+    xt::xarray<std::complex<double>> diric_sig_real {interpolant_real.view_out()};
+    // .view_out() is always complex-valued, but its imaginary part will be 0.
 
-    transform.view_in() = diric_samples;
-    transform.view_out() = 0;
-    transform.ffs();
-    xt::xarray<std::complex<double>> diric_FS {transform.view_out()};
-
-    auto idx = array::index(diric_FS.dimension(), axis_transform, xt::range(0, N_FS));
-    std::cout << xt::allclose(xt::strided_view(diric_FS, idx), diric_FS_exact) << std::endl;
-
-
-    transform.view_out() = diric_samples;
-    transform.view_in() = 0;
-    transform.ffs_r();
-    diric_FS = transform.view_in();
-
-    idx = array::index(diric_FS.dimension(), axis_transform, xt::range(0, N_FS));
-    std::cout << xt::allclose(xt::strided_view(diric_FS, idx), diric_FS_exact) << std::endl;
+    xt::allclose(diric_sig_exact, diric_sig);       // true
+    xt::allclose(diric_sig_exact, diric_sig_real);  // true
 
     return 0;
 }
