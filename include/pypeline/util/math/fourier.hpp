@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <cmath>
 #include <complex>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <tuple>
@@ -30,6 +31,7 @@
 #include "xtensor/xbuilder.hpp"
 #include "xtensor/xview.hpp"
 #include "xtensor/xstrided_view.hpp"
+#include "xtensor/xio.hpp"
 
 #include "pypeline/util/argcheck.hpp"
 #include "pypeline/util/array.hpp"
@@ -323,6 +325,9 @@ namespace pypeline { namespace util { namespace math { namespace fourier {
                     m_data_out = reinterpret_cast<std::complex<T>*>(fftw_malloc(sizeof(std::complex<T>) * N_cells));
                 }
 
+                assert((m_data_in  != nullptr) && "Could not allocate buffer.");
+                assert((m_data_out != nullptr) && "Could not allocate buffer.");
+
                 view_in() = 0;
                 view_out() = 0;
             }
@@ -381,6 +386,11 @@ namespace pypeline { namespace util { namespace math { namespace fourier {
                                           howmany_rank, howmany_dims.data(),
                                           data_out, data_in, FFTW_BACKWARD,
                                           static_cast<unsigned int>(effort));
+
+                assert((m_plan_fft    != nullptr) && "Could not plan transform.");
+                assert((m_plan_fft_r  != nullptr) && "Could not plan transform.");
+                assert((m_plan_ifft   != nullptr) && "Could not plan transform.");
+                assert((m_plan_ifft_r != nullptr) && "Could not plan transform.");
             }
 
         public:
@@ -568,8 +578,8 @@ namespace pypeline { namespace util { namespace math { namespace fourier {
                 execute_func(m_plan_ifft);
 
                 // Correct FFTW's lack of scaling during iFFTs.
-                const xt::xtensor<T, 1> N {static_cast<T>(m_shape[m_axis])};
-                view_out().multiplies_assign(T(1.0) / N);
+                xt::xtensor<std::complex<T>, 1> scale {T(1.0) / static_cast<T>(m_shape[m_axis])};
+                view_out().multiplies_assign(scale);
             }
 
             /*
@@ -588,8 +598,18 @@ namespace pypeline { namespace util { namespace math { namespace fourier {
                 execute_func(m_plan_ifft_r);
 
                 // Correct FFTW's lack of scaling during iFFTs.
-                const xt::xtensor<T, 1> N {static_cast<T>(m_shape[m_axis])};
-                view_in().multiplies_assign(T(1.0) / N);
+                xt::xtensor<std::complex<T>, 1> scale {T(1.0) / static_cast<T>(m_shape[m_axis])};
+                view_in().multiplies_assign(scale);
+            }
+
+            std::string __repr__() {
+                std::stringstream msg;
+                msg << "FFTW_FFT<" << ((is_float) ? "float" : "double") << ">("
+                    << "shape=" << xt::adapt(m_shape) << ", "
+                    << "axis=" << std::to_string(m_axis)
+                    << ")";
+
+                return msg.str();
             }
     };
 
@@ -703,6 +723,8 @@ namespace pypeline { namespace util { namespace math { namespace fourier {
     template <typename TT>
     class FFTW_FFS {
         private:
+            static constexpr bool is_float = std::is_same<TT, float>::value;
+
             size_t m_axis = 0;
             std::vector<size_t> m_shape {};
             FFTW_FFT<TT> m_transform;
@@ -953,6 +975,16 @@ namespace pypeline { namespace util { namespace math { namespace fourier {
                 const TT N_samples = static_cast<int>(m_shape[m_axis]);
                 view_in().multiplies_assign(xt::conj(m_mod_2) * N_samples);
             }
+
+            std::string __repr__() {
+                std::stringstream msg;
+                msg << "FFTW_FFS<" << ((is_float) ? "float" : "double") << ">("
+                    << "shape=" << xt::adapt(m_shape) << ", "
+                    << "axis=" << std::to_string(m_axis)
+                    << ")";
+
+                return msg.str();
+            }
     };
 
     /*
@@ -1003,6 +1035,8 @@ namespace pypeline { namespace util { namespace math { namespace fourier {
     template <typename T>
     class FFTW_CZT {
         private:
+            static constexpr bool is_float = std::is_same<T, float>::value;
+
             size_t m_axis = 0;
             std::vector<size_t> m_shape {};
             size_t m_M = 0;
@@ -1204,6 +1238,17 @@ namespace pypeline { namespace util { namespace math { namespace fourier {
                 m_transform.ifft();
                 view_out().multiplies_assign(m_mod_g);
             }
+
+            std::string __repr__() {
+                std::stringstream msg;
+                msg << "FFTW_CZT<" << ((is_float) ? "float" : "double") << ">("
+                    << "shape=" << xt::adapt(m_shape) << ", "
+                    << "axis=" << std::to_string(m_axis) << ", "
+                    << "M=" << std::to_string(m_M)
+                    << ")";
+
+                return msg.str();
+            }
     };
 
     /*
@@ -1321,6 +1366,8 @@ namespace pypeline { namespace util { namespace math { namespace fourier {
     template <typename TT>
     class FFTW_FS_INTERP {
         private:
+            static constexpr bool is_float = std::is_same<TT, float>::value;
+
             size_t m_axis = 0;
             std::vector<size_t> m_shape {};
             size_t m_M = 0;
@@ -1494,7 +1541,8 @@ namespace pypeline { namespace util { namespace math { namespace fourier {
                     throw std::runtime_error(shape_error_msg);
                 }
                 for (size_t i = 0; i < shape_x.size(); ++i) {
-                    if (shape_x[i] != m_shape[i]) {
+                    if (static_cast<size_t>(shape_x[i]) !=
+                        static_cast<size_t>(m_shape[i])) {
                         throw std::runtime_error(shape_error_msg);
                     }
                 }
@@ -1543,6 +1591,17 @@ namespace pypeline { namespace util { namespace math { namespace fourier {
                     m_transform.view_out().plus_assign(m_DC);
                     xt::imag(m_transform.view_out()) = 0;
                 }
+            }
+
+            std::string __repr__() {
+                std::stringstream msg;
+                msg << "FFTW_FS_INTERP<" << ((is_float) ? "float" : "double") << ">("
+                    << "shape=" << xt::adapt(m_shape) << ", "
+                    << "axis=" << std::to_string(m_axis) << ", "
+                    << "M=" << std::to_string(m_M)
+                    << ")";
+
+                return msg.str();
             }
     };
 }}}}

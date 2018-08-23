@@ -104,6 +104,7 @@ def ffs(x, T, T_c, N_FS, axis=-1):
     --------
     :py:func:`~pypeline.util.math.fourier.ffs_sample`,
     :py:func:`~pypeline.util.math.fourier.iffs`
+    :py:func:`~pypeline.util.math.fourier.FFTW_FFS`
     """
     x = np.array(x, copy=False)
     N_s = x.shape[axis]
@@ -178,7 +179,8 @@ def iffs(x_FS, T, T_c, N_FS, axis=-1):
     See Also
     --------
     :py:func:`~pypeline.util.math.fourier.ffs_sample`,
-    :py:func:`~pypeline.util.math.fourier.ffs`
+    :py:func:`~pypeline.util.math.fourier.ffs`,
+    :py:class:`~pypeline.util.math.fourier.FFTW_FFS`
     """
     x_FS = np.array(x_FS, copy=False)
     N_s = x_FS.shape[axis]
@@ -280,6 +282,10 @@ def czt(x, A, W, M, axis=-1):
 
        >>> np.allclose(idft_x, czt_x / N)  # czt() does not do the scaling.
        True
+
+    See Also
+    --------
+    :py:class:`~pypeline.util.math.fourier.FFTW_CZT`
     """
     x = np.array(x, copy=False)
     A = complex(A)
@@ -457,7 +463,7 @@ def fs_interp(x_FS, T, a, b, M, axis=-1, real_x=False):
 
     See Also
     --------
-    :py:func:`~pypeline.util.math.fourier.czt`
+    :py:class:`~pypeline.util.math.fourier.FFTW_FS_INTERP`
     """
     x_FS = np.array(x_FS, copy=False)
 

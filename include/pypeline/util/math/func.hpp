@@ -13,6 +13,7 @@
 
 #include <cmath>
 #include <stdexcept>
+#include <sstream>
 #include <string>
 
 #include "xtensor/xarray.hpp"
@@ -128,10 +129,13 @@ namespace pypeline { namespace util { namespace math { namespace func {
             }
 
             std::string __repr__() {
-                std::string repr = ("<Tukey(T=" + std::to_string(m_T) +
-                                    ", beta=" + std::to_string(m_beta) +
-                                    ", alpha=" + std::to_string(m_alpha) + ">");
-                return repr;
+                std::stringstream msg;
+                msg << "Tukey("
+                    << "T=" << std::to_string(m_T) << ", "
+                    << "beta=" << std::to_string(m_beta) << ", "
+                    << "alpha=" << std::to_string(m_alpha) << ")";
+
+                return msg.str();
             }
 
         private:
