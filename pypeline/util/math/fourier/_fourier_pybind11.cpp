@@ -16,32 +16,27 @@
 namespace cpp_py3_interop = pypeline::util::cpp_py3_interop;
 namespace fourier = pypeline::util::math::fourier;
 
-pybind11::array_t<double> py_ffs_sample(const double T,
-                                        const int N_FS,
-                                        const double T_c,
-                                        const int N_s) {
-    if (N_FS < 0) {
-        std::string msg = "Parameter[N_FS] must be positive.";
-        throw std::runtime_error(msg);
-    }
-    size_t cpp_N_FS = N_FS;
-
-    if (N_s < 0) {
-        std::string msg = "Parameter[N_s] must be positive.";
-        throw std::runtime_error(msg);
-    }
-    size_t cpp_N_s = N_s;
-
-    const auto& sample_points = fourier::ffs_sample(T, cpp_N_FS, T_c, cpp_N_s);
-    return cpp_py3_interop::xtensor_to_numpy(std::move(sample_points));
-}
-
-PYBIND11_MODULE(_pypeline_util_math_fourier_pybind11, m) {
-    pybind11::options options;
-    options.disable_function_signatures();
-
+void ffs_sample_bindings(pybind11::module &m) {
     m.def("ffs_sample",
-          &py_ffs_sample,
+          [](const double T,
+             const int N_FS,
+             const double T_c,
+             const int N_s) {
+              if (N_FS < 0) {
+                  std::string msg = "Parameter[N_FS] must be positive.";
+                  throw std::runtime_error(msg);
+              }
+              size_t cpp_N_FS = N_FS;
+
+              if (N_s < 0) {
+                  std::string msg = "Parameter[N_s] must be positive.";
+                  throw std::runtime_error(msg);
+              }
+              size_t cpp_N_s = N_s;
+
+              const auto& sample_points = fourier::ffs_sample(T, cpp_N_FS, T_c, cpp_N_s);
+              return cpp_py3_interop::xtensor_to_numpy(std::move(sample_points));
+          },
           pybind11::arg("T").none(false),
           pybind11::arg("N_FS").none(false),
           pybind11::arg("T_c").none(false),
@@ -90,4 +85,11 @@ See Also
 --------
 :py:func:`~pypeline.util.math.fourier.ffs`
 )EOF"));
+}
+
+PYBIND11_MODULE(_pypeline_util_math_fourier_pybind11, m) {
+    pybind11::options options;
+    options.disable_function_signatures();
+
+    ffs_sample_bindings(m);
 }

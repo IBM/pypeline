@@ -16,8 +16,8 @@ namespace cpp_py3_interop = pypeline::util::cpp_py3_interop;
 namespace func = pypeline::util::math::func;
 
 template <typename T>
-pybind11::array_t<double> py_Tukey___call__(const func::Tukey& tukey,
-                                            pybind11::array_t<T> x) {
+pybind11::array_t<double> _Tukey___call__(const func::Tukey &tukey,
+                                          pybind11::array_t<T> x) {
     const auto& xview = cpp_py3_interop::numpy_to_xview<T>(x);
 
     auto amplitude = const_cast<func::Tukey&>(tukey)(xview);
@@ -25,18 +25,17 @@ pybind11::array_t<double> py_Tukey___call__(const func::Tukey& tukey,
 }
 
 template <typename T>
-double py_Tukey___call__(const func::Tukey& tukey, double x) {
+double _Tukey___call__(const func::Tukey &tukey, double x) {
     xt::xtensor<double, 1> _x {x};
 
     double amplitude = const_cast<func::Tukey&>(tukey)(_x)[0];
     return amplitude;
 }
 
-PYBIND11_MODULE(_pypeline_util_math_func_pybind11, m) {
-    pybind11::options options;
-    options.disable_function_signatures();
-
-    pybind11::class_<func::Tukey>(m, "Tukey", R"EOF(
+void Tukey_bindings(pybind11::module &m) {
+    auto obj = pybind11::class_<func::Tukey>(m,
+                                             "Tukey",
+                                             R"EOF(
 Tukey(T, beta, alpha)
 
 Parameterized Tukey function.
@@ -86,12 +85,13 @@ The Tukey function is defined as:
        0 &
        \text{otherwise.}
    \end{cases}
-)EOF")
-        .def(pybind11::init<const double, const double, const double>(),
-             pybind11::arg("T").none(false),
-             pybind11::arg("beta").none(false),
-             pybind11::arg("alpha").none(false),
-             pybind11::doc(R"EOF(
+)EOF");
+
+    obj.def(pybind11::init<const double, const double, const double>(),
+            pybind11::arg("T").none(false),
+            pybind11::arg("beta").none(false),
+            pybind11::arg("alpha").none(false),
+            pybind11::doc(R"EOF(
 __init__(T, beta, alpha)
 
 Parameters
@@ -102,22 +102,26 @@ beta : float
     Function mid-point.
 alpha : float
    Decay-rate in [0, 1].
-)EOF"))
-        .def("__repr__",
-             &func::Tukey::__repr__)
-        .def("__call__",
-             pybind11::overload_cast<const func::Tukey&,
-                                     double>(&py_Tukey___call__<double>),
-             pybind11::arg("x"))
-        .def("__call__",
-             pybind11::overload_cast<const func::Tukey&,
-                                     pybind11::array_t<float>>(&py_Tukey___call__<float>),
-             pybind11::arg("x").noconvert().none(false))
-        .def("__call__",
-             pybind11::overload_cast<const func::Tukey&,
-                                     pybind11::array_t<double>>(&py_Tukey___call__<double>),
-             pybind11::arg("x").noconvert().none(false),
-             pybind11::doc(R"EOF(
+)EOF"));
+
+    obj.def("__repr__",
+            &func::Tukey::__repr__);
+
+    obj.def("__call__",
+            pybind11::overload_cast<const func::Tukey&,
+                                    double>(&_Tukey___call__<double>),
+            pybind11::arg("x"));
+
+    obj.def("__call__",
+            pybind11::overload_cast<const func::Tukey&,
+                                    pybind11::array_t<float>>(&_Tukey___call__<float>),
+            pybind11::arg("x").noconvert().none(false));
+
+    obj.def("__call__",
+            pybind11::overload_cast<const func::Tukey&,
+                                    pybind11::array_t<double>>(&_Tukey___call__<double>),
+            pybind11::arg("x").noconvert().none(false),
+            pybind11::doc(R"EOF(
 __call__(x)
 
 Sample the Tukey(T, beta, alpha) function.
@@ -131,4 +135,11 @@ Returns
 -------
 amplitude : float or :py:class:`~numpy.ndarray`
 )EOF"));
+}
+
+PYBIND11_MODULE(_pypeline_util_math_func_pybind11, m) {
+    pybind11::options options;
+    options.disable_function_signatures();
+
+    Tukey_bindings(m);
 }
