@@ -23,6 +23,7 @@ pypeline.util.math.fourier
       FFTW_FFT
       FFTW_FFS
       FFTW_CZT
+      FFTW_FS_INTERP
 
 
    .. autofunction:: ffs_sample
@@ -44,4 +45,7 @@ pypeline.util.math.fourier
       :special-members: __init__
 
    .. autoclass:: FFTW_CZT
+      :special-members: __init__
+
+   .. autoclass:: FFTW_FS_INTERP
       :special-members: __init__

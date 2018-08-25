@@ -25,4 +25,4 @@ The length-:math:`M` `Chirp Z-Transform <https://ieeexplore.ieee.org/document/11
 Implementation Notes
 ********************
 
-:py:func:`~pypeline.util.math.fourier.czt` can be used to compute :math:`\text{CZT}_{N}^{M}` as defined above, with :math:`L \ge N + M - 1` optimally chosen.
+:py:func:`~pypeline.util.math.fourier.czt` or :py:class:`~pypeline.util.math.fourier.FFTW_CZT` can be used to compute :math:`\text{CZT}_{N}^{M}` as defined above, with :math:`L \ge N + M - 1` optimally chosen.

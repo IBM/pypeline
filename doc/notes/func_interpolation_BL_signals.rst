@@ -113,4 +113,4 @@ Real-valued Functions
 Implementation Notes
 ********************
 
-:py:func:`~pypeline.util.math.fourier.fs_interp` can be used to obtain samples of a function using the algorithms above.
+:py:func:`~pypeline.util.math.fourier.fs_interp` and :py:class:`~pypeline.util.math.fourier.FFTW_FS_INTERP` can be used to obtain samples of a function using the algorithms above.

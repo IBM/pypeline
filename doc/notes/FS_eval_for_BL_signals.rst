@@ -126,6 +126,6 @@ However, it is possible to calculate the FS coefficients exactly from :math:`N_{
 Implementation Notes
 ********************
 
-:py:func:`~pypeline.util.math.fourier.ffs` and :py:func:`~pypeline.util.math.fourier.iffs` can be used to obtain Fourier Series coefficients / spatial samples of a function using the algorithms above.
+:py:func:`~pypeline.util.math.fourier.ffs`, :py:func:`~pypeline.util.math.fourier.iffs` and :py:class:`~pypeline.util.math.fourier.FFTW_FFS` can be used to obtain Fourier Series coefficients / spatial samples of a function using the algorithms above.
 Due to the reliance on :math:`\text{(i)DFT}_{N_{s}}`, it is recommended to choose :math:`N_{s}` highly-composite.
 
