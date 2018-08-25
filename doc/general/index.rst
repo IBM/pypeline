@@ -14,3 +14,4 @@ General
    install
    programming_guide
    disable_checks
+   known_issues
