@@ -97,9 +97,9 @@ python3 "{project_root_dir}/setup.py" build_sphinx;
         if not archive_dir.exists():
             archive_dir.mkdir(parents=True)
 
-        for web_link in ['https://github.com/QuantStack/xtl/archive/0.4.14.tar.gz',
-                         'https://github.com/QuantStack/xsimd/archive/6.1.5.tar.gz',
-                         'https://github.com/QuantStack/xtensor/archive/0.17.1.tar.gz',
+        for web_link in ['https://github.com/QuantStack/xtl/archive/0.4.15.tar.gz',
+                         'https://github.com/QuantStack/xsimd/archive/6.1.6.tar.gz',
+                         'https://github.com/QuantStack/xtensor/archive/0.17.3.tar.gz',
                          'http://bitbucket.org/eigen/eigen/get/3.3.5.tar.gz',
                          'https://github.com/pybind/pybind11/archive/v2.2.3.tar.gz',
                          'http://www.fftw.org/fftw-3.3.8.tar.gz']:
@@ -223,7 +223,7 @@ mkdir -p "{build_dir}";
 cd "{build_dir}";
 cmake -DCMAKE_INSTALL_PREFIX="{project_root_dir}"  \
       -DENABLE_OPENMP={str(args.OpenMP).upper()} \
-      -DENABLE_THREADS=ON \
+      -DENABLE_THREADS={str(args.OpenMP).upper()} \
       -DENABLE_FLOAT={compile_float} \
       -DENABLE_SSE=ON \
       -DENABLE_SSE2=ON \
