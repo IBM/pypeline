@@ -325,8 +325,14 @@ namespace pypeline { namespace util { namespace math { namespace fourier {
                     m_data_out = reinterpret_cast<std::complex<T>*>(fftw_malloc(sizeof(std::complex<T>) * N_cells));
                 }
 
-                assert((m_data_in  != nullptr) && "Could not allocate buffer.");
-                assert((m_data_out != nullptr) && "Could not allocate buffer.");
+                if (m_data_in == nullptr) {
+                    std::string msg = "Could not allocate input buffer.";
+                    throw std::runtime_error(msg);
+                }
+                if (m_data_out == nullptr) {
+                    std::string msg = "Could not allocate output buffer.";
+                    throw std::runtime_error(msg);
+                }
 
                 view_in() = 0;
                 view_out() = 0;
@@ -387,10 +393,22 @@ namespace pypeline { namespace util { namespace math { namespace fourier {
                                           data_out, data_in, FFTW_BACKWARD,
                                           static_cast<unsigned int>(effort));
 
-                assert((m_plan_fft    != nullptr) && "Could not plan transform.");
-                assert((m_plan_fft_r  != nullptr) && "Could not plan transform.");
-                assert((m_plan_ifft   != nullptr) && "Could not plan transform.");
-                assert((m_plan_ifft_r != nullptr) && "Could not plan transform.");
+                if (m_plan_fft == nullptr) {
+                    std::string msg = "Could not plan fft() transform.";
+                    throw std::runtime_error(msg);
+                }
+                if (m_plan_fft_r == nullptr) {
+                    std::string msg = "Could not plan fft_r() transform.";
+                    throw std::runtime_error(msg);
+                }
+                if (m_plan_ifft == nullptr) {
+                    std::string msg = "Could not plan ifft() transform.";
+                    throw std::runtime_error(msg);
+                }
+                if (m_plan_ifft_r == nullptr) {
+                    std::string msg = "Could not plan ifft_r() transform.";
+                    throw std::runtime_error(msg);
+                }
             }
 
         public:
