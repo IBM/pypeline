@@ -11,7 +11,7 @@ High-level Bluebild interfaces that work in Fourier Series domain.
 import numpy as np
 import scipy.sparse as sparse
 
-import pypeline.phased_array.bluebild.field_synthesizer.fourier_domain as psd
+import pypeline.phased_array.bluebild.field_synthesizer.fourier_domain as fsfd
 import pypeline.phased_array.bluebild.imager as bim
 import pypeline.phased_array.util.io.image as image
 import pypeline.util.argcheck as chk
@@ -184,7 +184,7 @@ class Fourier_IMFS_Block(bim.IntegratingMultiFieldSynthesizerBlock):
             raise ValueError('Parameter[N_level] must be positive.')
         self._N_level = N_level
 
-        self._synthesizer = psd.FourierFieldSynthesizerBlock(wl, grid_colat, grid_lon, N_FS, T, R, precision)
+        self._synthesizer = fsfd.ReferenceFourierFieldSynthesizerBlock(wl, grid_colat, grid_lon, N_FS, T, R, precision)
 
     @chk.check(dict(D=chk.has_reals,
                     V=chk.has_complex,

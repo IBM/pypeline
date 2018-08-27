@@ -1,12 +1,8 @@
 # #############################################################################
-# fourier_domain.py
+# _fourier_domain.py
 # =================
 # Author : Sepand KASHANI [sep@zurich.ibm.com]
 # #############################################################################
-
-"""
-Field synthesizers that work in Fourier Series domain.
-"""
 
 import numexpr as ne
 import numpy as np
@@ -23,7 +19,7 @@ import pypeline.util.math.linalg as pylinalg
 import pypeline.util.math.sphere as sph
 
 
-class FourierFieldSynthesizerBlock(synth.FieldSynthesizerBlock):
+class ReferenceFourierFieldSynthesizerBlock(synth.FieldSynthesizerBlock):
     """
     Field synthesizer based on PeriodicSynthesis.
 
@@ -31,7 +27,7 @@ class FourierFieldSynthesizerBlock(synth.FieldSynthesizerBlock):
     --------
     Assume we are imaging a portion of the Bootes field with LOFAR's 24 core stations.
 
-    The short script below shows how to use :py:class:`~pypeline.phased_array.bluebild.field_synthesizer.fourier_domain.FourierFieldSynthesizerBlock` to form continuous energy level estimates.
+    The short script below shows how to use :py:class:`~pypeline.phased_array.bluebild.field_synthesizer.fourier_domain.ReferenceFourierFieldSynthesizerBlock` to form continuous energy level estimates.
 
     .. testsetup::
 
@@ -41,7 +37,7 @@ class FourierFieldSynthesizerBlock(synth.FieldSynthesizerBlock):
        import astropy.coordinates as coord
        from tqdm import tqdm as ProgressBar
        from pypeline.phased_array.bluebild.data_processor import IntensityFieldDataProcessorBlock
-       from pypeline.phased_array.bluebild.field_synthesizer.fourier_domain import FourierFieldSynthesizerBlock
+       from pypeline.phased_array.bluebild.field_synthesizer.fourier_domain import ReferenceFourierFieldSynthesizerBlock
        from pypeline.phased_array.instrument import LofarBlock
        from pypeline.phased_array.beamforming import MatchedBeamformerBlock
        from pypeline.phased_array.util.gram import GramBlock
@@ -91,7 +87,7 @@ class FourierFieldSynthesizerBlock(synth.FieldSynthesizerBlock):
 
        >>> I_dp = IntensityFieldDataProcessorBlock(N_eig=7,  # assumed obtained from IntensityFieldParameterEstimator.infer_parameters()
        ...                                         cluster_centroids=[124.927,  65.09 ,  38.589,  23.256])
-       >>> I_fs = FourierFieldSynthesizerBlock(wl, px_colat, px_lon,
+       >>> I_fs = ReferenceFourierFieldSynthesizerBlock(wl, px_colat, px_lon,
        ...                                     N_FS, T_kernel, R)
        >>> for t in ProgressBar(t_img):
        ...     XYZ = dev(t)
