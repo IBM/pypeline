@@ -14,4 +14,4 @@ from . import _fourier_domain as __py
 
 ReferenceFourierFieldSynthesizerBlock = __py.ReferenceFourierFieldSynthesizerBlock
 
-# FourierFieldSynthesizerBlock = __cpp.FourierFieldSynthesizerBlock
+FourierFieldSynthesizerBlock = __cpp.FourierFieldSynthesizerBlock_c128

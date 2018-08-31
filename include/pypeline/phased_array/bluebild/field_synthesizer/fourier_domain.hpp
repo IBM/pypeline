@@ -196,6 +196,7 @@ namespace pypeline { namespace phased_array { namespace bluebild { namespace fie
                                       {        0,         0, 1}};
 
                 const double theta = linalg::z_rot2angle(R);
+                std::cout << theta << std::endl;
                 return theta;
             }
 
@@ -236,9 +237,23 @@ namespace pypeline { namespace phased_array { namespace bluebild { namespace fie
                 m_XYZk = std::make_unique<xt::xtensor<TT, 2>>(XYZ);
             }
 
+            std::vector<size_t> shape_W(xt::xtensor<cTT, 2> &W) {
+                std::vector<size_t> shape(2);
+                std::copy(W.shape().begin(), W.shape().end(), shape.begin());
+                return shape;
+            }
+
+            std::vector<size_t> shape_W(SpMatrixXX_t<cTT> &W) {
+                std::vector<size_t> shape(2);
+                shape[0] = W.rows();
+                shape[1] = W.cols();
+                return shape;
+            }
+
+            template <typename E_W>
             void validate_shapes(xt::xtensor<cTT, 2> &V,
                                  xt::xtensor<TT, 2> &XYZ,
-                                 xt::xtensor<cTT, 2> &W) {
+                                 E_W &W) {
                 const size_t N_beam = V.shape()[0];
 
                 std::vector<size_t> shape_V(V.dimension());
@@ -255,12 +270,36 @@ namespace pypeline { namespace phased_array { namespace bluebild { namespace fie
                     throw std::runtime_error(msg);
                 }
 
-                std::vector<size_t> shape_W(W.dimension());
-                std::copy(W.shape().begin(), W.shape().end(), shape_W.begin());
-                if (shape_W != std::vector<size_t> {m_N_antenna, N_beam}) {
+                const std::vector<size_t> _shape_W {shape_W(W)};
+                if (_shape_W != std::vector<size_t> {m_N_antenna, N_beam}) {
                     std::string msg = "Parameters[V, W] have inconsistent dimensions.";
                     throw std::runtime_error(msg);
                 }
+            }
+
+            void compute_EFS(xt::xtensor<cTT, 2> &V,
+                             xt::xtensor<cTT, 2> &W) {
+                const size_t N_beam = V.shape()[0];
+                const size_t N_height = m_grid_colat.size();
+
+                Eigen::Map<MatrixXX_t<cTT>> _V(V.data(), N_beam, m_N_eig);
+                Eigen::Map<MatrixXX_t<cTT>> _W(W.data(), m_N_antenna, N_beam);
+                Eigen::Map<MatrixXX_t<cTT>> _FSK(m_FSK->data_in(), m_N_antenna, N_height * m_N_samples);
+                Eigen::Map<MatrixXX_t<cTT>> _E_FS(m_FST->data_in(), m_N_eig, N_height * m_N_samples);
+
+                _E_FS = _V.transpose() * (_W.transpose() * _FSK);
+            }
+
+            void compute_EFS(xt::xtensor<cTT, 2> &V,
+                             SpMatrixXX_t<cTT> &W) {
+                const size_t N_beam = V.shape()[0];
+                const size_t N_height = m_grid_colat.size();
+
+                Eigen::Map<MatrixXX_t<cTT>> _V(V.data(), N_beam, m_N_eig);
+                Eigen::Map<MatrixXX_t<cTT>> _FSK(m_FSK->data_in(), m_N_antenna, N_height * m_N_samples);
+                Eigen::Map<MatrixXX_t<cTT>> _E_FS(m_FST->data_in(), m_N_eig, N_height * m_N_samples);
+
+                _E_FS = _V.transpose() * (W.transpose() * _FSK);
             }
 
         public:
@@ -281,9 +320,14 @@ namespace pypeline { namespace phased_array { namespace bluebild { namespace fie
                 allocate_resources(N_threads, effort);
             }
 
+            /*
+             * W: xt::xtensor<cTT, 2>&
+             *    SpMatrixXX_t<cTT>&
+             */
+            template <typename E_W>
             auto operator()(xt::xtensor<cTT, 2> &V,
                             xt::xtensor<TT, 2> &XYZ,
-                            xt::xtensor<cTT, 2> &W) {
+                            E_W &W) {
                 validate_shapes(V, XYZ, W);
 
                 // icrs_XYZ -> bfsf_XYZ
@@ -307,17 +351,10 @@ namespace pypeline { namespace phased_array { namespace bluebild { namespace fie
                 cTT _1j(0, 1);
                 const int N = (static_cast<int>(m_N_FS) - 1) / 2;
                 const int Q = m_N_samples - m_N_FS;
-                const size_t N_beam = W.shape()[1];
-                const size_t N_height = m_grid_colat.size();
-                Eigen::Map<MatrixXX_t<cTT>> _V(V.data(), N_beam, m_N_eig);
-                Eigen::Map<MatrixXX_t<cTT>> _W(W.data(), m_N_antenna, N_beam);
-                Eigen::Map<MatrixXX_t<cTT>> _FSK((m_FSK->view_in()).data(), m_N_antenna, N_height * m_N_samples);
 
                 // Eigenfunctions (Fourier domain)
+                compute_EFS(V, W);
                 auto E_FS = m_FST->view_in();  // (N_eig * N_height, N_samples)
-                Eigen::Map<MatrixXX_t<cTT>> _E_FS(E_FS.data(), m_N_eig, N_height * m_N_samples);
-                _E_FS = _V.transpose() * (_W.transpose() * _FSK);
-
                 cTT base = std::exp(-_1j * static_cast<TT>((2 * M_PI * shift) / m_T));
                 xt::xtensor<TT, 1> exponent = xt::concatenate(
                                                 std::make_tuple(
@@ -329,10 +366,11 @@ namespace pypeline { namespace phased_array { namespace bluebild { namespace fie
                 // Field Statistics
                 m_FST->iffs();
                 auto E_Ny = m_FST->view_out();
-                auto _I_Ny = m_FST->view_out();
-                _I_Ny.assign(xt::square(xt::abs(E_Ny)));
+                // auto _I_Ny = m_FST->view_out();
+                // _I_Ny.assign(xt::square(xt::abs(E_Ny)));
 
                 // _I_Ny is a complex-valued container: extract its real part only.
+                const size_t N_height = m_grid_colat.size();
                 const size_t N_cells = m_N_eig * N_height * m_N_samples;
                 auto I_Ny = xt::adapt(reinterpret_cast<TT*>(m_FST->data_out()),
                                       N_cells, xt::no_ownership(),
@@ -340,6 +378,8 @@ namespace pypeline { namespace phased_array { namespace bluebild { namespace fie
                                       std::vector<size_t> {2 * m_N_samples * N_height,
                                                            2 * m_N_samples,
                                                            2});
+                I_Ny.assign(xt::square(xt::abs(E_Ny)));
+                I_Ny.reshape({m_N_eig, N_height, m_N_samples}); // because of simd instructions
                 return I_Ny;
             }
 

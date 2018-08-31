@@ -5,6 +5,7 @@
 // ############################################################################
 
 #include <cmath>
+#include <chrono>
 #include <complex>
 #include <iostream>
 #include "pypeline/util/math/fourier.hpp"
@@ -18,6 +19,7 @@
 #include "xtensor/xadapt.hpp"
 #include "xtensor/xio.hpp"
 #include "eigen3/Eigen/Eigen"
+#include "eigen3/Eigen/Sparse"
 
 namespace fourier = pypeline::util::math::fourier;
 namespace f_synth = pypeline::phased_array::bluebild::field_synthesizer::fourier_domain;
@@ -38,9 +40,10 @@ int main() {
     const xt::xtensor<TT, 2> R {{1, 0, 0},
                                 {0, 1, 0},
                                 {0, 0, 1}};
-    const size_t N_eig = 4;
+    const size_t N_eig = 12;
     const size_t N_antenna = 48;
-    const size_t N_beam = 33;
+    const size_t N_beam = 12;
+    const size_t N_antenna_per_beam = N_antenna / N_beam;
     const size_t N_threads = 1;
     auto effort = fourier::planning_effort::NONE;
 
@@ -53,12 +56,42 @@ int main() {
                                             std::vector<size_t> {N_beam, N_eig})};
     xt::xtensor<TT, 2> XYZ {xt::reshape_view(xt::arange(3 * N_antenna),
                                              std::vector<size_t> {N_antenna, 3})};
-    xt::xtensor<cTT, 2> W {xt::reshape_view(xt::arange(N_antenna * N_beam),
-                                            std::vector<size_t> {N_antenna, N_beam})};
-    xt::xtensor<TT, 3> stat {bb(V, XYZ, W)};
-    auto field = bb.synthesize(stat);
+    // xt::xtensor<cTT, 2> W {xt::zeros<TT>({N_antenna, N_beam})};
+    // TT elem = 0;
+    // for (size_t i = 0; i < N_beam; ++i) {
+    //     for (size_t j = 0; j < N_antenna_per_beam; ++j) {
+    //         size_t k = i * N_antenna_per_beam + j;
+    //         W(k, i) = elem;
+    //         elem += 1.0;
+    //     }
+    // }
+    std::vector<Eigen::Triplet<cTT>> triplets(N_antenna);
+    TT elem = 0;
+    size_t l = 0;
+    for (size_t i = 0; i < N_beam; ++i) {
+        for (size_t j = 0; j < N_antenna_per_beam; ++j) {
+            size_t k = i * N_antenna_per_beam + j;
+            triplets[l] = Eigen::Triplet<cTT>(k, i, elem);
+            elem += 1.0;
+            l += 1;
+        }
+    }
+    SpMatrixXX_t<cTT> W(N_antenna, N_beam);
+    W.setFromTriplets(triplets.begin(), triplets.end());
 
-    std::cout << field << std::endl;
+    auto start_stat = std::chrono::high_resolution_clock::now();
+    xt::xtensor<TT, 3> stat {bb(V, XYZ, W)};
+    auto stop_stat = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed_stat = stop_stat - start_stat;
+    std::cout << "Elapsed time: " << elapsed_stat.count() << " [s]" << std::endl;
+
+    auto start_stat2 = std::chrono::high_resolution_clock::now();
+    xt::xtensor<TT, 3> stat2 {bb(V, XYZ, W)};
+    auto stop_stat2 = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed_stat2 = stop_stat2 - start_stat2;
+    std::cout << "Elapsed time: " << elapsed_stat2.count() << " [s]" << std::endl;
+
+    auto field = bb.synthesize(stat);
 
     return 0;
 }
