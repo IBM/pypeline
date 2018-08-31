@@ -11,9 +11,11 @@
 #ifndef PYPELINE_PHASED_ARRAY_BLUEBILD_FIELD_SYNTHESIZER_FOURIER_DOMAIN
 #define PYPELINE_PHASED_ARRAY_BLUEBILD_FIELD_SYNTHESIZER_FOURIER_DOMAIN
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <complex>
+#include <limits>
 #include <memory>
 #include <sstream>
 #include <stdexcept>
@@ -22,8 +24,10 @@
 
 #include "eigen3/Eigen/Eigen"
 #include "xtensor/xtensor.hpp"
+#include "xtensor/xcomplex.hpp"
 #include "xtensor/xmath.hpp"
 #include "xtensor/xbuilder.hpp"
+#include "xtensor/xstrided_view.hpp"
 
 #include "pypeline/types.hpp"
 #include "pypeline/util/argcheck.hpp"
@@ -32,7 +36,11 @@
 #include "pypeline/util/math/linalg.hpp"
 #include "pypeline/util/math/sphere.hpp"
 
+#include <iostream>
+#include "xtensor/xio.hpp"
+
 namespace argcheck = pypeline::util::argcheck;
+namespace array = pypeline::util::array;
 namespace fourier = pypeline::util::math::fourier;
 namespace func = pypeline::util::math::func;
 namespace linalg = pypeline::util::math::linalg;
@@ -56,7 +64,7 @@ namespace pypeline { namespace phased_array { namespace bluebild { namespace fie
             xt::xtensor<TT, 2> m_grid_colat;
             xt::xtensor<TT, 2> m_grid_lon;
             xt::xtensor<TT, 2> m_R;
-            xt::xtensor<TT, 2> m_XYZk;  // Antenna positions at kernel eval time.
+            std::unique_ptr<xt::xtensor<TT, 2>> m_XYZk = nullptr;  // Antenna positions at kernel eval time.
 
             // block_1_parameters
             TT m_alpha_window = 0;
@@ -178,7 +186,7 @@ namespace pypeline { namespace phased_array { namespace bluebild { namespace fie
 
             double phase_shift(xt::xtensor<TT, 2> &XYZ) {
                 Eigen::Map<MatrixXX_t<TT>> _XYZ(XYZ.data(), m_N_antenna, 3);
-                Eigen::Map<MatrixXX_t<TT>> _mXYZ(m_XYZk.data(), m_N_antenna, 3);
+                Eigen::Map<MatrixXX_t<TT>> _mXYZ(m_XYZk->data(), m_N_antenna, 3);
 
                 MatrixXX_t<TT> R_T = (_mXYZ.leftCols(2)
                                       .fullPivHouseholderQr()
@@ -225,7 +233,34 @@ namespace pypeline { namespace phased_array { namespace bluebild { namespace fie
                 xt::xtensor<TT, 1> window {tukey(lon_smpl)};
                 m_FSK->view_in().multiplies_assign(window);
                 m_FSK->ffs();
-                m_XYZk = XYZ;
+                m_XYZk = std::make_unique<xt::xtensor<TT, 2>>(XYZ);
+            }
+
+            void validate_shapes(xt::xtensor<cTT, 2> &V,
+                                 xt::xtensor<TT, 2> &XYZ,
+                                 xt::xtensor<cTT, 2> &W) {
+                const size_t N_beam = V.shape()[0];
+
+                std::vector<size_t> shape_V(V.dimension());
+                std::copy(V.shape().begin(), V.shape().end(), shape_V.begin());
+                if (shape_V != std::vector<size_t> {N_beam, m_N_eig}) {
+                    std::string msg = "Parameter[V] does not have shape (N_beam, N_eig).";
+                    throw std::runtime_error(msg);
+                }
+
+                std::vector<size_t> shape_XYZ(XYZ.dimension());
+                std::copy(XYZ.shape().begin(), XYZ.shape().end(), shape_XYZ.begin());
+                if (shape_XYZ != std::vector<size_t> {m_N_antenna, 3}) {
+                    std::string msg = "Parameter[XYZ] does not have shape (N_antenna, 3).";
+                    throw std::runtime_error(msg);
+                }
+
+                std::vector<size_t> shape_W(W.dimension());
+                std::copy(W.shape().begin(), W.shape().end(), shape_W.begin());
+                if (shape_W != std::vector<size_t> {m_N_antenna, N_beam}) {
+                    std::string msg = "Parameters[V, W] have inconsistent dimensions.";
+                    throw std::runtime_error(msg);
+                }
             }
 
         public:
@@ -244,6 +279,134 @@ namespace pypeline { namespace phased_array { namespace bluebild { namespace fie
                                        grid_colat, grid_lon, R);
                 set_block_1_parameters(N_FS, T);
                 allocate_resources(N_threads, effort);
+            }
+
+            auto operator()(xt::xtensor<cTT, 2> &V,
+                            xt::xtensor<TT, 2> &XYZ,
+                            xt::xtensor<cTT, 2> &W) {
+                validate_shapes(V, XYZ, W);
+
+                // icrs_XYZ -> bfsf_XYZ
+                Eigen::Map<MatrixXX_t<TT>> _XYZ(XYZ.data(), m_N_antenna, 3);
+                Eigen::Map<MatrixXX_t<TT>> _R(m_R.data(), 3, 3);
+
+                xt::xtensor<TT, 2> bfsf_XYZ {xt::zeros<TT>(std::vector<size_t>{m_N_antenna, 3})};
+                Eigen::Map<MatrixXX_t<TT>> _bfsf_XYZ(bfsf_XYZ.data(), m_N_antenna, 3);
+                _bfsf_XYZ = _XYZ * _R.transpose();
+
+                // Phase shift + kernel evaluation
+                TT shift = std::numeric_limits<TT>::infinity();
+                if (m_XYZk != nullptr) {
+                    shift = phase_shift(bfsf_XYZ);
+                }
+                if (regen_required(shift)) {
+                    regen_kernel(bfsf_XYZ);
+                    shift = 0;
+                }
+
+                cTT _1j(0, 1);
+                const int N = (static_cast<int>(m_N_FS) - 1) / 2;
+                const int Q = m_N_samples - m_N_FS;
+                const size_t N_beam = W.shape()[1];
+                const size_t N_height = m_grid_colat.size();
+                Eigen::Map<MatrixXX_t<cTT>> _V(V.data(), N_beam, m_N_eig);
+                Eigen::Map<MatrixXX_t<cTT>> _W(W.data(), m_N_antenna, N_beam);
+                Eigen::Map<MatrixXX_t<cTT>> _FSK((m_FSK->view_in()).data(), m_N_antenna, N_height * m_N_samples);
+
+                // Eigenfunctions (Fourier domain)
+                auto E_FS = m_FST->view_in();  // (N_eig * N_height, N_samples)
+                Eigen::Map<MatrixXX_t<cTT>> _E_FS(E_FS.data(), m_N_eig, N_height * m_N_samples);
+                _E_FS = _V.transpose() * (_W.transpose() * _FSK);
+
+                cTT base = std::exp(-_1j * static_cast<TT>((2 * M_PI * shift) / m_T));
+                xt::xtensor<TT, 1> exponent = xt::concatenate(
+                                                std::make_tuple(
+                                                  xt::arange<int>(-N, N + 1),
+                                                  xt::zeros<int>({Q})));
+                xt::xtensor<cTT, 1> mod {xt::pow(base, exponent)};
+                E_FS.multiplies_assign(mod);
+
+                // Field Statistics
+                m_FST->iffs();
+                auto E_Ny = m_FST->view_out();
+                auto _I_Ny = m_FST->view_out();
+                _I_Ny.assign(xt::square(xt::abs(E_Ny)));
+
+                // _I_Ny is a complex-valued container: extract its real part only.
+                const size_t N_cells = m_N_eig * N_height * m_N_samples;
+                auto I_Ny = xt::adapt(reinterpret_cast<TT*>(m_FST->data_out()),
+                                      N_cells, xt::no_ownership(),
+                                      std::vector<size_t> {m_N_eig, N_height, m_N_samples},
+                                      std::vector<size_t> {2 * m_N_samples * N_height,
+                                                           2 * m_N_samples,
+                                                           2});
+                return I_Ny;
+            }
+
+            template <typename E_stat>
+            xt::xtensor<TT, 3> synthesize(E_stat &&stat) {
+                const size_t N_level = stat.shape()[0];
+                const size_t N_height = m_grid_colat.size();
+                const size_t N_width = m_grid_lon.size();
+
+                { // Verify arguments
+                    namespace argcheck = pypeline::util::argcheck;
+                    if (!argcheck::has_floats(stat)) {
+                        std::string msg = "Parameter[stat] must have real-valued entries.";
+                        throw std::runtime_error(msg);
+                    }
+                    std::array<size_t, 3> shape_stat {N_level, N_height, m_N_samples};
+                    if (!argcheck::has_shape(stat, shape_stat)) {
+                        std::string msg = "Parameter[stat] must have shape (N_level, N_height, N_samples).";
+                        throw std::runtime_error(msg);
+                    }
+                }
+
+                { // Fill m_FST->view_in() with statistics + go to FS domain.
+                    m_FST->view_in() = 0;
+                    const size_t N_cells = N_level * N_height * m_N_samples;
+                    xt::adapt(m_FST->data_in(), N_cells, xt::no_ownership(),
+                              std::vector<size_t> {N_level, N_height, m_N_samples}) = stat;
+                    m_FST->ffs();
+                }
+
+                std::vector<size_t> shape_transform {N_level * N_height, m_N_FS};
+                fourier::FFTW_FS_INTERP<TT> transform(shape_transform,
+                                                      1, m_T,
+                                                      m_grid_lon(0, 0),
+                                                      m_grid_lon(0, N_width - 1),
+                                                      N_width,
+                                                      true, 1, fourier::planning_effort::NONE);
+
+                { // Fill transform.in() with m_FST->view_out() + fs_interp()
+                    const size_t N_cells = N_level * N_height * m_N_samples;
+                    const auto& idx = array::index(shape_transform.size(), 1, xt::range(0, m_N_FS));
+                    const auto& transform_in = xt::strided_view(
+                        xt::adapt(m_FST->data_out(), N_cells, xt::no_ownership(),
+                                  std::vector<size_t> {N_level * N_height, m_N_samples}), idx);
+                    transform.in(transform_in);
+                    transform.fs_interp();
+                }
+
+                // allocate output buffer and copy FFTW_FS_INTERP->view_out()
+                xt::xtensor<TT, 3> field {xt::zeros<TT>({N_level, N_height, N_width})};
+                {
+                    const size_t N_cells = N_level * N_height * N_width;
+                    auto _field = xt::adapt(field.data(), N_cells, xt::no_ownership(),
+                                            std::vector<size_t> {N_level * N_height, N_width});
+                    auto _strides = transform.view_out().strides();
+                    std::vector<size_t> strides(2);
+                    std::copy(_strides.begin(), _strides.end(), strides.begin());
+                    for (size_t i = 0; i < strides.size(); ++i) {
+                        strides[i] *= 2;
+                    }
+                    auto _transform_out = xt::adapt(reinterpret_cast<TT*>(transform.view_out().data()),
+                                                    N_cells, xt::no_ownership(),
+                                                    std::vector<size_t> {N_level * N_height, N_width},
+                                                    std::vector<size_t> {strides});
+                    _field = _transform_out;
+                }
+                return field;
             }
 
             std::string __repr__() {
