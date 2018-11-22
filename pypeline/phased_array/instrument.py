@@ -655,8 +655,9 @@ class LofarBlock(EarthBoundInstrumentGeometryBlock):
     This LOFAR model consists of 62 stations, each containing between 17 to 24 HBA dipole antennas.
     """
 
-    @chk.check('N_station', chk.allow_None(chk.is_integer))
-    def __init__(self, N_station=None):
+    @chk.check(dict(N_station=chk.allow_None(chk.is_integer),
+                    station_only=chk.is_boolean))
+    def __init__(self, N_station=None, station_only=False):
         """
         Parameters
         ----------
@@ -665,11 +666,14 @@ class LofarBlock(EarthBoundInstrumentGeometryBlock):
 
             Sometimes only a subset of an instrument’s stations are desired.
             Setting `N_station` limits the number of stations to those that appear first in `XYZ` when sorted by STATION_ID.
+
+        station_only : bool
+            If :py:obj:`True`, model LOFAR stations as single-element antennas. (Default = False)
         """
-        XYZ = self._get_geometry()
+        XYZ = self._get_geometry(station_only)
         super().__init__(XYZ, N_station)
 
-    def _get_geometry(self):
+    def _get_geometry(self, station_only):
         """
         Load instrument geometry.
 
@@ -684,6 +688,17 @@ class LofarBlock(EarthBoundInstrumentGeometryBlock):
 
         itrs_geom = (pd.read_csv(abs_path)
                      .set_index(['STATION_ID', 'ANTENNA_ID']))
+
+        if station_only:
+            # Compute station mean by using Pandas.
+            # Replace `itrs_geom` with what you computed.
+            # Everything else is transparent.
+            itrs_geom = itrs_geom.groupby('STATION_ID').mean()
+            station_id = itrs_geom.index.get_level_values('STATION_ID')
+            itrs_geom.index = (pd.MultiIndex
+                .from_product(
+                [station_id, [0]],
+                names=['STATION_ID', 'ANTENNA_ID']))
 
         XYZ = _as_InstrumentGeometry(itrs_geom)
         return XYZ
