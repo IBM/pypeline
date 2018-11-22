@@ -20,10 +20,11 @@ import pypeline.phased_array.bluebild.data_processor as data_proc
 import pypeline.phased_array.bluebild.imager.spatial_domain as bb_sd
 import pypeline.phased_array.bluebild.parameter_estimator as param_est
 import pypeline.phased_array.instrument as instrument
-import pypeline.phased_array.util.data_gen as dgen
+import pypeline.phased_array.util.data_gen.sky as dgen_sky
+import pypeline.phased_array.util.data_gen.visibility as dgen_vis
 import pypeline.phased_array.util.gram as gr
 import pypeline.phased_array.util.grid as grid
-import pypeline.phased_array.util.io as io
+import pypeline.phased_array.util.io.image as img
 import pypeline.util.math.sphere as sph
 
 # Observation
@@ -41,8 +42,8 @@ gram = gr.GramBlock()
 
 # Data generation
 T_integration = 8 * u.s
-sky_model = dgen.from_tgss_catalog(field_center, field_of_view, N_src=20)
-vis = dgen.VisibilityGeneratorBlock(T_integration, fs=196 * u.kHz, SNR=np.inf)
+sky_model = dgen_sky.from_tgss_catalog(field_center, field_of_view, N_src=20)
+vis = dgen_vis.VisibilityGeneratorBlock(sky_model, T_integration, fs=196 * u.kHz, SNR=np.inf)
 time = obs_start + T_integration * np.arange(3595)
 
 # Imaging
@@ -60,7 +61,7 @@ I_est = param_est.IntensityFieldParameterEstimator(N_level, sigma=0.95)
 for t in ProgressBar(time[::200]):
     XYZ = dev(t)
     W = mb(XYZ, frequency)
-    S = vis(XYZ, W, frequency, sky_model)
+    S = vis(XYZ, W, frequency)
     G = gram(XYZ, W, frequency)
 
     I_est.collect(S, G)
@@ -72,7 +73,7 @@ I_mfs = bb_sd.Spatial_IMFS_Block(frequency, pix_grid, N_level, N_bits)
 for t in ProgressBar(time[::1]):
     XYZ = dev(t)
     W = mb(XYZ, frequency)
-    S = vis(XYZ, W, frequency, sky_model)
+    S = vis(XYZ, W, frequency)
     G = gram(XYZ, W, frequency)
 
     D, V, c_idx = I_dp(S, G)
@@ -104,10 +105,10 @@ _, S = S_mfs.as_image()
 
 # Plot Results ================================================================
 fig, ax = plt.subplots(ncols=2)
-I_std_eq = io.SphericalImage(I_std.data / S.data, I_std.grid)
+I_std_eq = img.SphericalImage(I_std.data / S.data, I_std.grid)
 I_std_eq.draw(catalog=sky_model, ax=ax[0])
 ax[0].set_title('Bluebild Standardized Image')
 
-I_lsq_eq = io.SphericalImage(I_lsq.data / S.data, I_lsq.grid)
+I_lsq_eq = img.SphericalImage(I_lsq.data / S.data, I_lsq.grid)
 I_lsq_eq.draw(catalog=sky_model, ax=ax[1])
 ax[1].set_title('Bluebild Least-Squares Image')

@@ -363,8 +363,9 @@ class LofarMeasurementSet(MeasurementSet):
     """
 
     @chk.check(dict(file_name=chk.is_instance(str),
-                    N_station=chk.allow_None(chk.is_integer)))
-    def __init__(self, file_name, N_station=None):
+                    N_station=chk.allow_None(chk.is_integer),
+                    station_only=chk.is_boolean))
+    def __init__(self, file_name, N_station=None, station_only=False):
         """
         Parameters
         ----------
@@ -375,6 +376,8 @@ class LofarMeasurementSet(MeasurementSet):
 
             Sometimes only a subset of an instrument’s stations are desired.
             Setting `N_station` limits the number of stations to those that appear first when sorted by STATION_ID.
+        station_only : bool
+            If :py:obj:`True`, model LOFAR stations as single-element antennas. (Default = False)
         """
         super().__init__(file_name)
 
@@ -382,6 +385,7 @@ class LofarMeasurementSet(MeasurementSet):
             if N_station <= 0:
                 raise ValueError('Parameter[N_station] must be positive.')
         self._N_station = N_station
+        self._station_only = station_only
 
     @property
     def instrument(self):
@@ -391,7 +395,7 @@ class LofarMeasurementSet(MeasurementSet):
         :py:class:`~pypeline.phased_array.instrument.EarthBoundInstrumentGeometryBlock`
             Instrument position computer.
         """
-        if self._geometry is None:
+        if self._instrument is None:
             # Following the LOFAR MS file specification from https://www.astron.nl/lofarwiki/lib/exe/fetch.php?media=public:documents:ms2_description_for_lofar_2.08.00.pdf, the special LOFAR_ANTENNA_FIELD sub-table must be used due to the hierarchical design of LOFAR.
             # Some remarks on the required fields:
             # - ANTENNA_ID: equivalent to STATION_ID field in `InstrumentGeometry.index[0]`.
@@ -426,6 +430,17 @@ class LofarMeasurementSet(MeasurementSet):
                                 columns=('X', 'Y', 'Z'),
                                 index=cfg_idx)
                 .loc[~antenna_flag])
+
+            # If in `station_only` mode, return centroid of each station only.
+            # Why do we not just use `station_mean` above? Because it arbitrarily
+            # points to some sub-antenna, not the station centroid.
+            if self._station_only:
+                cfg = cfg.groupby('STATION_ID').mean()
+                station_id = cfg.index.get_level_values('STATION_ID')
+                cfg.index = (pd.MultiIndex
+                    .from_product(
+                    [station_id, [0]],
+                    names=['STATION_ID', 'ANTENNA_ID']))
 
             # Finally, only keep the stations that were specified in `__init__()`.
             XYZ = instrument.InstrumentGeometry(xyz=cfg.values,
