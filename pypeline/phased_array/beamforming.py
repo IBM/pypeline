@@ -66,19 +66,16 @@ def _as_BeamWeights(df):
                .assign(COL_ID=lambda s: np.arange(len(s))))
     N_beam = len(col_map)
 
-    data = (df
-            .merge(row_map, on=['STATION_ID', 'ANTENNA_ID'])
-            .merge(col_map, on='BEAM_ID')
-            .loc[:, ['ROW_ID', 'COL_ID', 'W']])
+    data = (df.merge(row_map, on=['STATION_ID', 'ANTENNA_ID'])
+              .merge(col_map, on='BEAM_ID')
+              .loc[:, ['ROW_ID', 'COL_ID', 'W']])
 
     sparsity_ratio = len(data) / (N_antenna * N_beam)
-    max_sparsity_ratio = pypeline.config.getfloat('phased_array.beamforming',
-                                                  'bw_max_sparsity_ratio')
+    max_sparsity_ratio = pypeline.config.getfloat('phased_array.beamforming', 'bw_max_sparsity_ratio')
     if sparsity_ratio <= max_sparsity_ratio:  # Use sparse matrix
-        W = sparse.csr_matrix(
-            (data.W.values, (data.ROW_ID.values, data.COL_ID.values)),
-            shape=(N_antenna, N_beam),
-            dtype=complex)
+        W = sparse.csr_matrix((data.W.values, (data.ROW_ID.values, data.COL_ID.values)),
+                              shape=(N_antenna, N_beam),
+                              dtype=complex)
     else:  # Use dense matrix
         W = np.zeros(shape=(N_antenna, N_beam), dtype=complex)
         W[data.ROW_ID.values, data.COL_ID.values] = data.W.values
@@ -141,8 +138,7 @@ class BeamWeights(array.LabeledMatrix):
 
         N_antenna, N_beam = len(ant_idx), len(beam_idx)
         if not chk.has_shape((N_antenna, N_beam))(data):
-            raise ValueError('Parameters[data, ant_idx, beam_idx] are not '
-                             'consistent.')
+            raise ValueError('Parameters[data, ant_idx, beam_idx] are not consistent.')
 
         super().__init__(data=data, row_idx=ant_idx, col_idx=beam_idx)
 
@@ -252,8 +248,8 @@ class MatchedBeamformerBlock(BeamformerBlock):
                                          F_Z=focus_dir[2]))
 
     @chk.check(dict(XYZ=chk.is_instance(instrument.InstrumentGeometry),
-                    freq=chk.is_frequency))
-    def __call__(self, XYZ, freq):
+                    wl=chk.is_wavelength))
+    def __call__(self, XYZ, wl):
         """
         Determine beamweights to apply to each (antenna, beam) pair.
 
@@ -261,8 +257,8 @@ class MatchedBeamformerBlock(BeamformerBlock):
         ----------
         XYZ : :py:class:`~pypeline.phased_array.instrument.InstrumentGeometry`
             (N_antenna, 3) ICRS instrument geometry.
-        freq : :py:class:`~astropy.units.Quantity`
-            Frequency at which to generate beamweights.
+        wl : :py:class:`~astropy.units.Quantity`
+            Wavelength at which to generate beamweights.
 
         Returns
         -------
@@ -275,6 +271,7 @@ class MatchedBeamformerBlock(BeamformerBlock):
 
            from pypeline.phased_array.instrument import LofarBlock
            from pypeline.phased_array.beamforming import MatchedBeamformerBlock
+           import astropy.constants as constants
            import astropy.units as u
            import astropy.time as atime
            import astropy.coordinates as coord
@@ -289,7 +286,9 @@ class MatchedBeamformerBlock(BeamformerBlock):
            >>> mb = MatchedBeamformerBlock(mb_cfg)
 
            >>> XYZ = instr(atime.Time('J2000'))
-           >>> W = mb(XYZ, freq=145 * u.MHz)
+           >>> freq = 145 * u.MHz
+           >>> wl = constants.c / freq
+           >>> W = mb(XYZ, wl)
 
         When using radio telescopes, W is generally sparse:
 
@@ -303,8 +302,7 @@ class MatchedBeamformerBlock(BeamformerBlock):
 
         .. image:: _img/mb_weights_mask_example.png
         """
-        wps = pypeline.config.getfloat('phased_array', 'wps') * (u.m / u.s)
-        wl = (wps / freq).to_value(u.m)
+        wl = wl.to_value(u.m)
 
         xyz = XYZ.as_frame()
         xyz = (xyz - xyz.mean()) / wl

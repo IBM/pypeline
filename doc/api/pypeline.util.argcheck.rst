@@ -22,12 +22,12 @@ pypeline.util.argcheck
    .. rubric:: Boolean Functions
 
    .. autosummary::
-   
+
       has_angles
       has_booleans
       has_complex
       has_evens
-      has_frequencies
+      has_wavelengths
       has_integers
       has_odds
       has_pow2s
@@ -38,7 +38,7 @@ pypeline.util.argcheck
       is_boolean
       is_complex
       is_even
-      is_frequency
+      is_wavelength
       is_duration
       is_integer
       is_odd

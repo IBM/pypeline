@@ -42,8 +42,7 @@ def from_fits(file_name):
     -------
     I : :py:class:`~pypeline.phased_array.util.io.image.SphericalImage`
     """
-    with fits.open(file_name, mode='readonly',
-                   memmap=True, lazy_load_hdus=True) as hdulist:
+    with fits.open(file_name, mode='readonly', memmap=True, lazy_load_hdus=True) as hdulist:
         # PrimaryHDU: grid / class info
         primary_hdu = hdulist[0]
         image_hdu = hdulist['IMAGE']
@@ -54,7 +53,7 @@ def from_fits(file_name):
 
 
 class SphericalImage:
-    """
+    r"""
     Container for storing real-valued images defined on :math:`\mathbb{S}^{2}`.
 
     Main features:
@@ -93,12 +92,10 @@ class SphericalImage:
                          g1=direction,
                          a=a1)
 
-       data0 = (kent0
-                .pdf(px_grid.reshape(3, N_height * N_width).T)
-                .reshape(N_height, N_width))
-       data1 = (kent1
-                .pdf(px_grid.reshape(3, N_height * N_width).T)
-                .reshape(N_height, N_width))
+       data0 = (kent0.pdf(px_grid.reshape(3, N_height * N_width).T)
+                     .reshape(N_height, N_width))
+       data1 = (kent1.pdf(px_grid.reshape(3, N_height * N_width).T)
+                     .reshape(N_height, N_width))
        data = np.stack([data0, data1], axis=0)
 
        # Image creation ======================
@@ -160,8 +157,7 @@ class SphericalImage:
         For efficiency reasons, `data` and `grid` are not copied internally.
         """
         grid = np.array(grid, copy=False)
-        grid_shape_error_msg = ('Parameter[grid] must have shape '
-                                '(3, N_height, N_width) or (3, N_points).')
+        grid_shape_error_msg = ('Parameter[grid] must have shape (3, N_height, N_width) or (3, N_points).')
         if len(grid) != 3:
             raise ValueError(grid_shape_error_msg)
         if grid.ndim == 2:
@@ -249,13 +245,11 @@ class SphericalImage:
         -------
         hdu : :py:class:`~astropy.io.fits.PrimaryHDU`
         """
-        metadata = dict(IMG_TYPE=(self.__class__.__name__,
-                                  'SphericalImage subclass'), )
+        metadata = dict(IMG_TYPE=(self.__class__.__name__, 'SphericalImage subclass'), )
 
         # grid: stored as angles to reduce file size.
         _, colat, lon = sph.cart2pol(*self._grid)
-        coordinates = np.stack([colat.to_value(u.deg),
-                                lon.to_value(u.deg)], axis=0)
+        coordinates = np.stack([colat.to_value(u.deg), lon.to_value(u.deg)], axis=0)
 
         hdu = fits.PrimaryHDU(data=coordinates)
         for k, v in metadata.items():
@@ -481,8 +475,7 @@ class SphericalImage:
                                lat_0=grid_lat,
                                R=1)
         else:
-            raise ValueError('Parameter[projection] is not a valid projection '
-                             'specifier.')
+            raise ValueError('Parameter[projection] is not a valid projection specifier.')
 
         return proj
 
@@ -773,7 +766,7 @@ class SphericalImage:
 
 
 class EqualAngleImage(SphericalImage):
-    """
+    r"""
     Specialized container for Equal-Angle sampled images on :math:`\mathbb{S}^{2}.`
     """
 
@@ -835,8 +828,7 @@ class EqualAngleImage(SphericalImage):
         N_height = self._colat.size
         N_width = self._lon.size
 
-        metadata = {'IMG_TYPE': (self.__class__.__name__,
-                                 'SphericalImage subclass'),
+        metadata = {'IMG_TYPE': (self.__class__.__name__, 'SphericalImage subclass'),
                     'N_HEIGHT': (N_height, 'N_rows'),
                     'N_WIDTH': (N_width, 'N_columns')}
 
@@ -907,14 +899,3 @@ class EqualAngleImage(SphericalImage):
 
         I = cls(data=data, colat=colat, lon=lon)
         return I
-
-
-class HEALPixImage(SphericalImage):
-    """
-    Specialized container for HEALPix-sampled images on :math:`\mathbb{S}^{2}`.
-    """
-
-    def __init__(self):
-        """
-        """
-        raise NotImplementedError

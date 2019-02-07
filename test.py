@@ -19,12 +19,11 @@ project_root_dir = pathlib.Path(__file__).parent.absolute()
 cmds = dict(pytest=[f'source "{project_root_dir}/pypeline.sh" --no_shell',
                     f'pytest "{project_root_dir}/pypeline/test"'],
             flake8=[f'source "{project_root_dir}/pypeline.sh" --no_shell',
-                    f'flake8 --ignore=E122,E128,E501,E731,E741 "{project_root_dir}/pypeline"'],
+                    f'flake8 --ignore=E122,E128,E501,E731,E741,W504 "{project_root_dir}/pypeline"'],
             doctest=[f'source "{project_root_dir}/pypeline.sh" --no_shell',
                      f'sphinx-build -b doctest "{project_root_dir}/doc" "{project_root_dir}/build/doctest"'])
 for k in cmds:
     cmds[k].insert(0, 'export PYPELINE_RUNNING_TESTS=1')
-
 
 parser = argparse.ArgumentParser(description='Pypeline test runner.',
                                  epilog='When run with no arguments, all tests are executed.')

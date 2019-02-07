@@ -77,6 +77,7 @@ class IntensityFieldParameterEstimator(ParameterEstimator):
        import astropy.units as u
        import astropy.time as atime
        import astropy.coordinates as coord
+       import astropy.constants as constants
        from pypeline.phased_array.bluebild.parameter_estimator import IntensityFieldParameterEstimator
        from pypeline.phased_array.instrument import LofarBlock
        from pypeline.phased_array.beamforming import MatchedBeamformerBlock
@@ -94,6 +95,7 @@ class IntensityFieldParameterEstimator(ParameterEstimator):
        >>> field_center = coord.SkyCoord(218 * u.deg, 34.5 * u.deg)
        >>> field_of_view = 5 * u.deg
        >>> frequency = 145 * u.MHz
+       >>> wl = constants.c / frequency
 
        # instrument
        >>> N_station = 24
@@ -104,7 +106,7 @@ class IntensityFieldParameterEstimator(ParameterEstimator):
        # Visibility generation
        >>> vis = VisibilityGeneratorBlock(sky_model=from_tgss_catalog(field_center, field_of_view, N_src=10),
        ...                                T=8 * u.s,
-       ...                                fs=196 * u.kHz,
+       ...                                fs=196000,
        ...                                SNR=np.inf)
 
        ### Parameter estimation ============================================
@@ -112,9 +114,9 @@ class IntensityFieldParameterEstimator(ParameterEstimator):
        >>> t_est = obs_start + np.arange(20) * 400 * u.s  # sample visibilities throughout the 8h observation.
        >>> for t in t_est:
        ...    XYZ = dev(t)
-       ...    W = mb(XYZ, frequency)
-       ...    S = vis(XYZ, W, frequency)
-       ...    G = gram(XYZ, W, frequency)
+       ...    W = mb(XYZ, wl)
+       ...    S = vis(XYZ, W, wl)
+       ...    G = gram(XYZ, W, wl)
        ...
        ...    I_est.collect(S, G)  # Store S, G internally until full 8h interval has been sampled.
        ...

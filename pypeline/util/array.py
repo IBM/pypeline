@@ -81,7 +81,7 @@ class LabeledMatrix:
         if N_col != M:
             raise ValueError(f'Parameter[col_idx] contains {N_col} entries, '
                              f'but Parameter[data] expected {M}.')
-        self.__index = (row_idx.copy(), col_idx.copy())
+        self.__index = row_idx.copy(), col_idx.copy()
 
     @property
     def data(self):
@@ -98,11 +98,11 @@ class LabeledMatrix:
         """
         Returns
         -------
-            row_idx : :py:class:`~pandas.Index`
-                (N,) row index.
+        row_idx : :py:class:`~pandas.Index`
+            (N,) row index.
 
-            col_idx : :py:class:`~pandas.Index`
-                (M,) column index.
+        col_idx : :py:class:`~pandas.Index`
+            (M,) column index.
         """
         return self.__index
 

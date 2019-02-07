@@ -14,7 +14,6 @@ Instead, signals from different antennas are correlated together to form *visibi
 import astropy.units as u
 import numpy as np
 
-import pypeline
 import pypeline.core as core
 import pypeline.phased_array.beamforming as beamforming
 import pypeline.phased_array.instrument as instrument
@@ -80,7 +79,7 @@ class VisibilityGeneratorBlock(core.Block):
 
     @chk.check(dict(sky_model=chk.is_instance(sky.SkyEmission),
                     T=chk.is_duration,
-                    fs=chk.is_frequency,
+                    fs=chk.is_integer,
                     SNR=chk.is_real))
     def __init__(self, sky_model, T, fs, SNR):
         """
@@ -90,20 +89,20 @@ class VisibilityGeneratorBlock(core.Block):
             Source model from which to generate data.
         T : :py:class:`~astropy.units.Quantity`
             Integration time.
-        fs : :py:class:`~astropy.units.Quantity`
-            Sampling rate.
+        fs : int
+            Sampling rate [samples/s].
         SNR : float
             Signal-to-Noise-Ratio (dB).
         """
         super().__init__()
-        self._N_sample = int((T * fs).to_value(u.dimensionless_unscaled)) + 1
+        self._N_sample = int((T * fs * u.Hz).to_value(u.dimensionless_unscaled)) + 1
         self._SNR = 10 ** (SNR / 10)
         self._sky_model = sky_model
 
     @chk.check(dict(XYZ=chk.is_instance(instrument.InstrumentGeometry),
                     W=chk.is_instance(beamforming.BeamWeights),
-                    freq=chk.is_frequency))
-    def __call__(self, XYZ, W, freq):
+                    wl=chk.is_wavelength))
+    def __call__(self, XYZ, W, wl):
         """
         Compute visibility matrix.
 
@@ -113,8 +112,8 @@ class VisibilityGeneratorBlock(core.Block):
             (N_antenna, 3) ICRS instrument geometry.
         W : :py:class:`~pypeline.phased_array.beamforming.BeamWeights`
             (N_antenna, N_beam) synthesis beamweights.
-        freq : :py:class:`~astropy.units.Quantity`
-            Frequency at which to generate visibilities.
+        wl : :py:class:`~astropy.units.Quantity`
+            Wavelength at which to generate visibilities.
 
         Returns
         -------
@@ -127,6 +126,7 @@ class VisibilityGeneratorBlock(core.Block):
 
            from pypeline.phased_array.instrument import LofarBlock
            from pypeline.phased_array.beamforming import MatchedBeamformerBlock
+           import astropy.constants as constants
            import astropy.units as u
            import astropy.time as atime
            import astropy.coordinates as coord
@@ -149,13 +149,14 @@ class VisibilityGeneratorBlock(core.Block):
            ...                               N_src=10)
            >>> S_gen = VisibilityGeneratorBlock(sky_model,
            ...                                  T=8 * u.s,
-           ...                                  fs=196 * u.kHz,
+           ...                                  fs=196000,
            ...                                  SNR=np.inf)
 
            # Generate data
            >>> XYZ = instr(atime.Time('J2000'))
-           >>> W = mb(XYZ, freq=145 * u.MHz)
-           >>> S = S_gen(XYZ, W, freq=145 * u.MHz)
+           >>> wl = constants.c / (145 * u.MHz)
+           >>> W = mb(XYZ, wl)
+           >>> S = S_gen(XYZ, W, wl)
 
            # Only 10 sources & no noise, so rank(S) <= 10
            >>> np.linalg.matrix_rank(S.data) <= 10
@@ -164,13 +165,10 @@ class VisibilityGeneratorBlock(core.Block):
         if not XYZ.is_consistent_with(W, axes=[0, 0]):
             raise ValueError('Parameters[XYZ, W] are inconsistent.')
 
-        wps = pypeline.config.getfloat('phased_array', 'wps') * (u.m / u.s)
-        wl = (wps / freq).to_value(u.m)
+        wl = wl.to_value(u.m)
 
-        A = np.exp((1j * 2 * np.pi / wl) *
-                   (self._sky_model.xyz @ XYZ.data.T))
-        S_sky = ((W.data.conj().T @ (A.conj().T * self._sky_model.intensity)) @
-                 (A @ W.data))
+        A = np.exp((1j * 2 * np.pi / wl) * (self._sky_model.xyz @ XYZ.data.T))
+        S_sky = (W.data.conj().T @ (A.conj().T * self._sky_model.intensity)) @ (A @ W.data)
 
         noise_var = np.sum(self._sky_model.intensity) / (2 * self._SNR)
         S_noise = W.data.conj().T @ (noise_var * W.data)

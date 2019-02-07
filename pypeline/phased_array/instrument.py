@@ -27,7 +27,6 @@ import pkg_resources as pkg
 import plotly.graph_objs as go
 import scipy.linalg as linalg
 
-import pypeline
 import pypeline.core as core
 import pypeline.util.argcheck as chk
 import pypeline.util.array as array
@@ -93,7 +92,7 @@ class InstrumentGeometry(array.LabeledMatrix):
 
        >>> geometry.index[0]
        MultiIndex(levels=[[0, 1, 2], [0, 1]],
-                  labels=[[0, 0, 1, 1, 2, 2], [0, 1, 0, 1, 0, 1]],
+                  codes=[[0, 0, 1, 1, 2, 2], [0, 1, 0, 1, 0, 1]],
                   names=['STATION_ID', 'ANTENNA_ID'])
     """
 
@@ -115,8 +114,7 @@ class InstrumentGeometry(array.LabeledMatrix):
 
         N_idx = len(ant_idx)
         if N_idx != N_antenna:
-            raise ValueError('Parameter[xyz] and Parameter[ant_idx] are not '
-                             'compatible.')
+            raise ValueError('Parameter[xyz] and Parameter[ant_idx] are not compatible.')
 
         col_idx = pd.Index(['X', 'Y', 'Z'], name='COORDINATE')
         super().__init__(xyz, ant_idx, col_idx)
@@ -263,15 +261,15 @@ class InstrumentGeometryBlock(core.Block):
         """
         raise NotImplementedError
 
-    @chk.check('freq', chk.is_frequency)
-    def nyquist_rate(self, freq):
+    @chk.check('wl', chk.is_wavelength)
+    def nyquist_rate(self, wl):
         """
         Order of imageable complex plane-waves.
 
         Parameters
         ----------
-        freq : :py:class:`~astropy.units.Quantity`
-            Frequency of observations.
+        wl : :py:class:`~astropy.units.Quantity`
+            Wavelength of observations.
 
         Returns
         -------
@@ -284,15 +282,17 @@ class InstrumentGeometryBlock(core.Block):
 
            from pypeline.phased_array.instrument import MwaBlock
            import astropy.units as u
+           import astropy.constants as constants
 
         .. doctest::
 
            >>> instr = MwaBlock()
-           >>> instr.nyquist_rate(freq=145 * u.MHz)
+           >>> freq = 145 * u.MHz
+           >>> wl = constants.c / freq
+           >>> instr.nyquist_rate(wl)
            8753
         """
-        wps = pypeline.config.getfloat('phased_array', 'wps') * (u.m / u.s)
-        wl = (wps / freq).to_value(u.m)
+        wl = wl.to_value(u.m)
 
         XYZ = self._layout.values
         baseline = linalg.norm(XYZ[:, np.newaxis, :] -
@@ -559,8 +559,7 @@ class EarthBoundInstrumentGeometryBlock(InstrumentGeometryBlock):
                   [-0.   ,  0.   , -1.   ]])
         """
         if obs_start > obs_end:
-            raise ValueError('Parameter[obs_start] must precede '
-                             'Parameter[obs_end].')
+            raise ValueError('Parameter[obs_start] must precede Parameter[obs_end].')
 
         # Find the position of the antennas at several time-instants
         # during `period`.
@@ -571,8 +570,7 @@ class EarthBoundInstrumentGeometryBlock(InstrumentGeometryBlock):
         icrs_layouts = [self.__call__(t).data for t in sampling_times]
         icrs_layouts = np.stack(icrs_layouts, axis=1)  # (N_antenna, N_time, 3)
 
-        # For each antenna `i`, find a normal vector `n_{i}` to the
-        # rotation plane.
+        # For each antenna `i`, find a normal vector `n_{i}` to the rotation plane.
         N_antenna = len(icrs_layouts)
         abc = np.zeros((N_antenna, 3))
         for i, xyz in enumerate(icrs_layouts):
@@ -592,17 +590,17 @@ class EarthBoundInstrumentGeometryBlock(InstrumentGeometryBlock):
         R /= linalg.norm(R, axis=1, keepdims=True)
         return R
 
-    @chk.check(dict(freq=chk.is_frequency,
+    @chk.check(dict(wl=chk.is_wavelength,
                     obs_start=chk.is_instance(time.Time),
                     obs_end=chk.is_instance(time.Time)))
-    def bfsf_kernel_bandwidth(self, freq, obs_start, obs_end):
-        """
+    def bfsf_kernel_bandwidth(self, wl, obs_start, obs_end):
+        r"""
         Bandwidth of :math:`2 \pi`-periodic complex plane-wave kernel in BFSF coordinates.
 
         Parameters
         ----------
-        freq : :py:class:`~astropy.units.Quantity`
-            Frequency of observations.
+        wl : :py:class:`~astropy.units.Quantity`
+            Wavelength of observations.
         obs_start : :py:class:`~astropy.time.Time`
             Start of the observation period.
         obs_end : :py:class:`~astropy.time.Time`
@@ -618,6 +616,7 @@ class EarthBoundInstrumentGeometryBlock(InstrumentGeometryBlock):
         .. testsetup::
 
            from pypeline.phased_array.instrument import LofarBlock
+           import astropy.constants as constants
            import astropy.time as atime
            import astropy.units as u
 
@@ -626,13 +625,13 @@ class EarthBoundInstrumentGeometryBlock(InstrumentGeometryBlock):
            >>> instr = LofarBlock(N_station=48)
 
            >>> freq = 145 * u.MHz
+           >>> wl = constants.c / freq
            >>> obs_start = atime.Time('J2000')
            >>> obs_end = obs_start + 4 * u.h
-           >>> instr.bfsf_kernel_bandwidth(freq, obs_start, obs_end)
+           >>> instr.bfsf_kernel_bandwidth(wl, obs_start, obs_end)
            21783
         """
-        wps = pypeline.config.getfloat('phased_array', 'wps') * (u.m / u.s)
-        wl = (wps / freq).to_value(u.m)
+        wl = wl.to_value(u.m)
 
         R = self.icrs2bfsf_rot(obs_start, obs_end)
         obs_mid = obs_start + (obs_end - obs_start) / 2
@@ -682,23 +681,18 @@ class LofarBlock(EarthBoundInstrumentGeometryBlock):
         :py:class:`~pypeline.phased_array.instrument.InstrumentGeometry`
             ITRS instrument geometry.
         """
-        rel_path = pathlib.Path('data', 'phased_array',
-                                'instrument', 'LOFAR.csv')
+        rel_path = pathlib.Path('data', 'phased_array', 'instrument', 'LOFAR.csv')
         abs_path = pkg.resource_filename('pypeline', str(rel_path))
 
         itrs_geom = (pd.read_csv(abs_path)
                      .set_index(['STATION_ID', 'ANTENNA_ID']))
 
         if station_only:
-            # Compute station mean by using Pandas.
-            # Replace `itrs_geom` with what you computed.
-            # Everything else is transparent.
             itrs_geom = itrs_geom.groupby('STATION_ID').mean()
             station_id = itrs_geom.index.get_level_values('STATION_ID')
             itrs_geom.index = (pd.MultiIndex
-                .from_product(
-                [station_id, [0]],
-                names=['STATION_ID', 'ANTENNA_ID']))
+                               .from_product([station_id, [0]],
+                                             names=['STATION_ID', 'ANTENNA_ID']))
 
         XYZ = _as_InstrumentGeometry(itrs_geom)
         return XYZ
@@ -743,8 +737,7 @@ class MwaBlock(EarthBoundInstrumentGeometryBlock):
         :py:class:`~pypeline.phased_array.instrument.InstrumentGeometry`
             ITRS instrument geometry.
         """
-        rel_path = pathlib.Path('data', 'phased_array',
-                                'instrument', 'MWA.csv')
+        rel_path = pathlib.Path('data', 'phased_array', 'instrument', 'MWA.csv')
         abs_path = pkg.resource_filename('pypeline', str(rel_path))
 
         itrs_geom = (pd.read_csv(abs_path)
@@ -753,9 +746,8 @@ class MwaBlock(EarthBoundInstrumentGeometryBlock):
         station_id = itrs_geom.index.get_level_values('STATION_ID')
         if station_only:
             itrs_geom.index = (pd.MultiIndex
-                .from_product(
-                [station_id, [0]],
-                names=['STATION_ID', 'ANTENNA_ID']))
+                               .from_product([station_id, [0]],
+                                             names=['STATION_ID', 'ANTENNA_ID']))
         else:
             # Generate flat 4x4 antenna grid pointing towards the Noth pole.
             x_lim = y_lim = 1.65

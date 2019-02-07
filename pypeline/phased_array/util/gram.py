@@ -12,7 +12,6 @@ import astropy.units as u
 import numpy as np
 import scipy.linalg as linalg
 
-import pypeline
 import pypeline.core as core
 import pypeline.phased_array.beamforming as beamforming
 import pypeline.phased_array.instrument as instrument
@@ -82,8 +81,8 @@ class GramBlock(core.Block):
 
     @chk.check(dict(XYZ=chk.is_instance(instrument.InstrumentGeometry),
                     W=chk.is_instance(beamforming.BeamWeights),
-                    freq=chk.is_frequency))
-    def __call__(self, XYZ, W, freq):
+                    wl=chk.is_wavelength))
+    def __call__(self, XYZ, W, wl):
         """
         Compute Gram matrix.
 
@@ -93,8 +92,8 @@ class GramBlock(core.Block):
             (N_antenna, 3) Cartesian antenna coordinates in any reference frame.
         W : :py:class:`~pypeline.phased_array.beamforming.BeamWeights`
             (N_antenna, N_beam) synthesis beamweights.
-        freq : :py:class:`~astropy.units.Quantity`
-            Frequency at which to compute the Gram.
+        wl : :py:class:`~astropy.units.Quantity`
+            Wavelength at which to compute the Gram.
 
         Returns
         -------
@@ -105,6 +104,7 @@ class GramBlock(core.Block):
         --------
         .. testsetup::
 
+           import astropy.constants as constants
            import astropy.units as u
            import astropy.time as atime
            import astropy.coordinates as coord
@@ -117,16 +117,17 @@ class GramBlock(core.Block):
            >>> instr = LofarBlock()
            >>> station_id = instr._layout.index.get_level_values('STATION_ID')
            >>> freq = 145 * u.MHz
+           >>> wl = constants.c / freq
 
            >>> mb_cfg = [(_, _, coord.SkyCoord(0 * u.deg, 90 * u.deg))
            ...           for _ in station_id.drop_duplicates()]
            >>> mb = MatchedBeamformerBlock(mb_cfg)
 
            >>> XYZ = instr(atime.Time('J2000'))
-           >>> W = mb(XYZ, freq)
+           >>> W = mb(XYZ, wl)
 
            >>> gr = GramBlock()
-           >>> G = gr(XYZ, W, freq)
+           >>> G = gr(XYZ, W, wl)
 
            >>> np.around(np.abs(G.data[:4, :4]), 2)
            array([[3.0774e+02, 3.3000e-01, 1.0000e-02, 1.8000e-01],
@@ -137,8 +138,7 @@ class GramBlock(core.Block):
         if not XYZ.is_consistent_with(W, axes=[0, 0]):
             raise ValueError('Parameters[XYZ, W] are inconsistent.')
 
-        wps = pypeline.config.getfloat('phased_array', 'wps') * (u.m / u.s)
-        wl = (wps / freq).to_value(u.m)
+        wl = wl.to_value(u.m)
 
         N_antenna = XYZ.shape[0]
         baseline = linalg.norm(XYZ.data.reshape(N_antenna, 1, 3) -

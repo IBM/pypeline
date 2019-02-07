@@ -164,8 +164,7 @@ def ea_grid(direction, FoV, size):
     direction /= linalg.norm(direction)
 
     if np.allclose(np.cross([0, 0, 1], direction), 0):
-        raise ValueError('Generating Equal-Angle grids centered at poles are '
-                         'currently not supported.')
+        raise ValueError('Generating Equal-Angle grids centered at poles currently not supported.')
 
     if not (0 < FoV.to_value(u.deg) <= 179):
         raise ValueError('Parameter[FoV] must be in [0, 179] degrees.')
@@ -225,8 +224,7 @@ def ea_harmonic_grid(direction, FoV, N):
     direction /= linalg.norm(direction)
 
     if np.allclose(np.cross([0, 0, 1], direction), 0):
-        raise ValueError('Generating Equal-Angle grids centered at poles are '
-                         'currently not supported.')
+        raise ValueError('Generating Equal-Angle grids centered at poles currently not supported.')
 
     if not (0 < FoV.to_value(u.deg) <= 179):
         raise ValueError('Parameter[FoV] must be in [0, 179] degrees.')

@@ -20,6 +20,7 @@ class TestBlock:
         """
         Abstract blocks cannot be instantiated.
         """
+
         class B(Block):
             pass
 
@@ -30,6 +31,7 @@ class TestBlock:
         """
         Blocks overloading :py:meth:`~pypeline.core.Block.__call__` can be instantiated.
         """
+
         class A(Block):
             def __call__(self):
                 return 5

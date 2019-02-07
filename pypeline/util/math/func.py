@@ -10,7 +10,6 @@
 
 import warnings
 
-import astropy.units as u
 import numpy as np
 import scipy.interpolate as interpolate
 import scipy.special as sp
@@ -122,10 +121,8 @@ class Tukey(core.Block):
         amplitude = np.zeros_like(x)
         amplitude[body] = 1
         if not np.isclose(self._alpha, 0):
-            amplitude[ramp_up] = np.sin(np.pi / (self._T * self._alpha) *
-                                        y[ramp_up]) ** 2
-            amplitude[ramp_down] = np.sin(np.pi / (self._T * self._alpha) *
-                                          (self._T - y[ramp_down])) ** 2
+            amplitude[ramp_up] = np.sin(np.pi / (self._T * self._alpha) * y[ramp_up]) ** 2
+            amplitude[ramp_down] = np.sin(np.pi / (self._T * self._alpha) * (self._T - y[ramp_down])) ** 2
         return amplitude
 
 
@@ -212,18 +209,17 @@ class SphericalDirichlet(core.Block):
         self._N = N
 
         if (approx is True) and (N <= 10):
-            raise ValueError('Cannot use approximation method if '
-                             'Parameter[N] <= 10.')
+            raise ValueError('Cannot use approximation method if Parameter[N] <= 10.')
         self._approx = approx
 
         if approx is True:  # Fit cubic-spline interpolator.
             N_samples = 10 ** 3
 
             # Find interval LHS after which samples will be evaluated exactly.
-            theta_max = 180 * u.deg
+            theta_max = np.pi
             while True:
                 x = np.linspace(0, theta_max, N_samples)
-                cx = np.cos(x).value
+                cx = np.cos(x)
                 cy = self._exact_kernel(cx)
                 zero_cross = np.diff(np.sign(cy))
                 N_cross = np.abs(np.sign(zero_cross)).sum()
@@ -233,18 +229,12 @@ class SphericalDirichlet(core.Block):
                 else:
                     break
 
-            window = Tukey(T=2 - 2 * np.cos(2 * theta_max.to_value(u.rad)),
-                           beta=1,
-                           alpha=0.5)
+            window = Tukey(T=2 - 2 * np.cos(2 * theta_max), beta=1, alpha=0.5)
 
-            x = np.r_[np.linspace(np.cos(theta_max * 2), np.cos(theta_max),
-                                  N_samples, endpoint=False),
-                      np.linspace(np.cos(theta_max), 1, N_samples)].value
+            x = np.r_[np.linspace(np.cos(theta_max * 2), np.cos(theta_max), N_samples, endpoint=False),
+                      np.linspace(np.cos(theta_max), 1, N_samples)]
             y = self._exact_kernel(x) * window(x)
-            self.__cs_interp = interpolate.interp1d(x, y,
-                                                    kind='cubic',
-                                                    bounds_error=False,
-                                                    fill_value=0)
+            self.__cs_interp = interpolate.interp1d(x, y, kind='cubic', bounds_error=False, fill_value=0)
 
     @chk.check('x', chk.accept_any(chk.is_real, chk.has_reals))
     def __call__(self, x):
@@ -278,8 +268,7 @@ class SphericalDirichlet(core.Block):
 
     # @chk.check('x', chk.accept_any(chk.is_real, chk.has_reals))
     def _exact_kernel(self, x):
-        amplitude = (sp.eval_legendre(self._N + 1, x) -
-                     sp.eval_legendre(self._N, x))
+        amplitude = sp.eval_legendre(self._N + 1, x) - sp.eval_legendre(self._N, x)
         with warnings.catch_warnings():
             # The kernel is so condensed near 1 at high N that np.isclose()
             # does a terrible job at letting us manually treat values close to

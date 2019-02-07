@@ -34,6 +34,7 @@ class Spatial_IMFS_Block(bim.IntegratingMultiFieldSynthesizerBlock):
        import astropy.units as u
        import astropy.time as atime
        import astropy.coordinates as coord
+       import astropy.constants as constants
        from tqdm import tqdm as ProgressBar
        from pypeline.phased_array.bluebild.data_processor import IntensityFieldDataProcessorBlock
        from pypeline.phased_array.bluebild.imager.spatial_domain import Spatial_IMFS_Block
@@ -54,6 +55,7 @@ class Spatial_IMFS_Block(bim.IntegratingMultiFieldSynthesizerBlock):
        >>> field_center = coord.SkyCoord(218 * u.deg, 34.5 * u.deg)
        >>> field_of_view = 5 * u.deg
        >>> frequency = 145 * u.MHz
+       >>> wl = constants.c / frequency
 
        # instrument
        >>> N_station = 24
@@ -65,7 +67,7 @@ class Spatial_IMFS_Block(bim.IntegratingMultiFieldSynthesizerBlock):
        >>> sky_model=from_tgss_catalog(field_center, field_of_view, N_src=10)
        >>> vis = VisibilityGeneratorBlock(sky_model,
        ...                                T=8 * u.s,
-       ...                                fs=196 * u.kHz,
+       ...                                fs=196000,
        ...                                SNR=np.inf)
 
        ### Energy-level imaging ============================================
@@ -76,13 +78,13 @@ class Spatial_IMFS_Block(bim.IntegratingMultiFieldSynthesizerBlock):
 
        >>> I_dp = IntensityFieldDataProcessorBlock(N_eig=7,  # assumed obtained from IntensityFieldParameterEstimator.infer_parameters()
        ...                                         cluster_centroids=[124.927,  65.09 ,  38.589,  23.256])
-       >>> I_mfs = Spatial_IMFS_Block(frequency, px_grid, N_level=4)
+       >>> I_mfs = Spatial_IMFS_Block(wl, px_grid, N_level=4)
        >>> t_img = obs_start + np.arange(20) * 400 * u.s  # well-spaced snapshots
        >>> for t in ProgressBar(t_img):
        ...     XYZ = dev(t)
-       ...     W = mb(XYZ, frequency)
-       ...     S = vis(XYZ, W, frequency)
-       ...     G = gram(XYZ, W, frequency)
+       ...     W = mb(XYZ, wl)
+       ...     S = vis(XYZ, W, wl)
+       ...     G = gram(XYZ, W, wl)
        ...
        ...     D, V, c_idx = I_dp(S, G)
        ...
@@ -114,16 +116,16 @@ class Spatial_IMFS_Block(bim.IntegratingMultiFieldSynthesizerBlock):
     .. image:: _img/bluebild_SpatialIMFSBlock_integrate_example.png
     """
 
-    @chk.check(dict(freq=chk.is_frequency,
+    @chk.check(dict(wl=chk.is_wavelength,
                     pix_grid=chk.has_reals,
                     N_level=chk.is_integer,
                     precision=chk.is_integer))
-    def __init__(self, freq, pix_grid, N_level, precision=64):
+    def __init__(self, wl, pix_grid, N_level, precision=64):
         """
         Parameters
         ----------
-        freq : :py:class:`~astropy.units.Quantity`
-            Frequency of observations.
+        wl : :py:class:`~astropy.units.Quantity`
+            Wavelength of observations.
         pix_grid : :py:class:`~numpy.ndarray`
             (3, N_height, N_width) pixel vectors.
         N_level : int
@@ -148,8 +150,7 @@ class Spatial_IMFS_Block(bim.IntegratingMultiFieldSynthesizerBlock):
             raise ValueError('Parameter[N_level] must be positive.')
         self._N_level = N_level
 
-        self._synthesizer = ssd.SpatialFieldSynthesizerBlock(
-            freq, pix_grid, precision)
+        self._synthesizer = ssd.SpatialFieldSynthesizerBlock(wl, pix_grid, precision)
 
     @chk.check(dict(D=chk.has_reals,
                     V=chk.has_complex,
@@ -188,8 +189,7 @@ class Spatial_IMFS_Block(bim.IntegratingMultiFieldSynthesizerBlock):
         stat_lsq = stat_std * D.reshape(-1, 1, 1)
 
         stat = np.stack([stat_std, stat_lsq], axis=0)
-        stat = array._cluster_layers(stat, cluster_idx,
-                                     N=self._N_level, axis=1)
+        stat = array._cluster_layers(stat, cluster_idx, N=self._N_level, axis=1)
 
         self._update(stat)
         return stat

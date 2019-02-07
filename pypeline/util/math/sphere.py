@@ -176,8 +176,7 @@ class EqualAngleInterpolator(core.Block):
                 chk.has_shape((q.size,))(q)):
             raise ValueError("Parameter[q, l] must be 1D and of equal length.")
         if not all(np.all(0 <= _) and np.all(_ < _2N2) for _ in [q, l]):
-            raise ValueError(f"Parameter[q, l] must contain entries in "
-                             f"{{0, ..., 2N + 1}}.")
+            raise ValueError(f"Parameter[q, l] must contain entries in {{0, ..., 2N + 1}}.")
         self._N = N
         self._q = q
         self._l = l

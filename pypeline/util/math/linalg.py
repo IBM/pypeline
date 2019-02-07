@@ -283,8 +283,7 @@ def z_rot2angle(R):
 
     if not np.allclose(R[[0, 1, 2, 2, 2], [2, 2, 2, 0, 1]],
                        np.r_[0, 0, 1, 0, 0]):
-        raise ValueError('Parameter[R] is not a rotation matrix '
-                         'around the Z-axis.')
+        raise ValueError('Parameter[R] is not a rotation matrix around the Z-axis.')
 
     ct, st = np.clip([R[0, 0], R[1, 0]], -1, 1)
     if st >= 0:  # In quadrants I or II

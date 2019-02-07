@@ -15,7 +15,6 @@ import scipy.fftpack as fftpack
 import scipy.linalg as linalg
 import scipy.sparse as sparse
 
-import pypeline
 import pypeline.phased_array.bluebild.field_synthesizer as synth
 import pypeline.phased_array.bluebild.field_synthesizer.spatial_domain as fsd
 import pypeline.util.argcheck as chk
@@ -41,6 +40,7 @@ class FourierFieldSynthesizerBlock(synth.FieldSynthesizerBlock):
        import astropy.units as u
        import astropy.time as atime
        import astropy.coordinates as coord
+       import astropy.constants as constants
        from tqdm import tqdm as ProgressBar
        from pypeline.phased_array.bluebild.data_processor import IntensityFieldDataProcessorBlock
        from pypeline.phased_array.bluebild.field_synthesizer.fourier_domain import FourierFieldSynthesizerBlock
@@ -62,6 +62,7 @@ class FourierFieldSynthesizerBlock(synth.FieldSynthesizerBlock):
        >>> field_center = coord.SkyCoord(218 * u.deg, 34.5 * u.deg)
        >>> field_of_view = 5 * u.deg
        >>> frequency = 145 * u.MHz
+       >>> wl = constants.c / frequency
 
        # instrument
        >>> N_station = 24
@@ -73,7 +74,7 @@ class FourierFieldSynthesizerBlock(synth.FieldSynthesizerBlock):
        >>> sky_model=from_tgss_catalog(field_center, field_of_view, N_src=10)
        >>> vis = VisibilityGeneratorBlock(sky_model,
        ...                                T=8 * u.s,
-       ...                                fs=196 * u.kHz,
+       ...                                fs=196000,
        ...                                SNR=np.inf)
 
        ### Energy-level imaging ============================================
@@ -81,7 +82,7 @@ class FourierFieldSynthesizerBlock(synth.FieldSynthesizerBlock):
        >>> t_img = obs_start + np.arange(200) * 8 * u.s  # fine-grained snapshots
        >>> obs_start, obs_end = t_img[0], t_img[-1]
        >>> R = dev.icrs2bfsf_rot(obs_start, obs_end)
-       >>> N_FS = dev.bfsf_kernel_bandwidth(frequency, obs_start, obs_end)
+       >>> N_FS = dev.bfsf_kernel_bandwidth(wl, obs_start, obs_end)
        >>> T_kernel = 10 * u.deg
 
        # Pixel grid: make sure to generate it in BFSF coordinates by applying R.
@@ -91,13 +92,12 @@ class FourierFieldSynthesizerBlock(synth.FieldSynthesizerBlock):
 
        >>> I_dp = IntensityFieldDataProcessorBlock(N_eig=7,  # assumed obtained from IntensityFieldParameterEstimator.infer_parameters()
        ...                                         cluster_centroids=[124.927,  65.09 ,  38.589,  23.256])
-       >>> I_fs = FourierFieldSynthesizerBlock(frequency, px_colat, px_lon,
-       ...                                     N_FS, T_kernel, R)
+       >>> I_fs = FourierFieldSynthesizerBlock(wl, px_colat, px_lon, N_FS, T_kernel, R)
        >>> for t in ProgressBar(t_img):
        ...     XYZ = dev(t)
-       ...     W = mb(XYZ, frequency)
-       ...     S = vis(XYZ, W, frequency)
-       ...     G = gram(XYZ, W, frequency)
+       ...     W = mb(XYZ, wl)
+       ...     S = vis(XYZ, W, wl)
+       ...     G = gram(XYZ, W, wl)
        ...
        ...     D, V, c_idx = I_dp(S, G)
        ...
@@ -126,7 +126,7 @@ class FourierFieldSynthesizerBlock(synth.FieldSynthesizerBlock):
     .. image:: _img/bluebild_FourierFieldSynthesizer_snapshot_example.png
     """
 
-    @chk.check(dict(freq=chk.is_frequency,
+    @chk.check(dict(wl=chk.is_wavelength,
                     grid_colat=chk.has_angles,
                     grid_lon=chk.has_angles,
                     N_FS=chk.is_odd,
@@ -134,12 +134,12 @@ class FourierFieldSynthesizerBlock(synth.FieldSynthesizerBlock):
                     R=chk.require_all(chk.has_shape([3, 3]),
                                       chk.has_reals),
                     precision=chk.is_integer))
-    def __init__(self, freq, grid_colat, grid_lon, N_FS, T, R, precision=64):
-        """
+    def __init__(self, wl, grid_colat, grid_lon, N_FS, T, R, precision=64):
+        r"""
         Parameters
         ----------
-        freq : :py:class:`~astropy.units.Quantity`
-            Frequency of observations.
+        wl : :py:class:`~astropy.units.Quantity`
+            Wavelength of observations.
         grid_colat : :py:class:`~astropy.units.Quantity`
             (N_height, 1) BFSF polar angles.
         grid_lon : :py:class:`~astropy.units.Quantity`
@@ -172,8 +172,7 @@ class FourierFieldSynthesizerBlock(synth.FieldSynthesizerBlock):
         else:
             raise ValueError('Parameter[precision] must be 32 or 64.')
 
-        wps = pypeline.config.getfloat('phased_array', 'wps') * (u.m / u.s)
-        self._wl = (wps / freq).to_value(u.m)
+        self._wl = wl.to_value(u.m)
 
         if N_FS <= 0:
             raise ValueError('Parameter[N_FS] must be positive.')
@@ -298,8 +297,7 @@ class FourierFieldSynthesizerBlock(synth.FieldSynthesizerBlock):
         N_height, _2N1Q = self._FSk.shape[1:]
 
         if not chk.has_shape([N_level, N_height, _2N1Q])(stat):
-            raise ValueError("Parameter[stat] does not match "
-                             "the kernel's dimensions.")
+            raise ValueError("Parameter[stat] does not match the kernel's dimensions.")
 
         field_FS = fourier.ffs(stat, self._T, self._Tc, self._NFS, axis=2)
         field = fourier.fs_interp(field_FS[:, :, :self._NFS],

@@ -105,8 +105,7 @@ class MeasurementSet:
             raise FileNotFoundError(f'{file_name} does not exist.')
 
         if not path.is_dir():
-            raise NotADirectoryError(f'{file_name} is not a directory, '
-                                     f'so cannot be an MS file.')
+            raise NotADirectoryError(f'{file_name} is not a directory, so cannot be an MS file.')
 
         self._msf = str(path)
 
@@ -157,8 +156,7 @@ class MeasurementSet:
             # Following the MS file specification from https://casa.nrao.edu/casadocs/casa-5.1.0/reference-material/measurement-set, the SPECTRAL_WINDOW sub-table contains CHAN_FREQ which gives the center frequency for each channel.
             # It is generally encoded in [Hz].
             # One must take care to verify the encoding scheme for different MS files as different conventions may be used.
-            query = (f'select CHAN_FREQ, CHAN_WIDTH from '
-                     f'{self._msf}::SPECTRAL_WINDOW')
+            query = (f'select CHAN_FREQ, CHAN_WIDTH from {self._msf}::SPECTRAL_WINDOW')
             table = ct.taql(query)
 
             f = table.getcell('CHAN_FREQ', 0).flatten() * u.Hz
@@ -254,8 +252,7 @@ class MeasurementSet:
             * S (:py:class:`~pypeline.phased_array.util.data_gen.visibility.VisibilityMatrix`)
         """
         if column not in ct.taql(f'select * from {self._msf}').colnames():
-            raise ValueError(f'column={column} does not exist '
-                             f'in {self._msf}::MAIN.')
+            raise ValueError(f'column={column} does not exist in {self._msf}::MAIN.')
 
         channel_id = self.channels['CHANNEL_ID'][channel_id]
         if chk.is_integer(time_id):
@@ -270,8 +267,7 @@ class MeasurementSet:
         # Unfortunately this query consumes a lot of memory due to the column selection process.
         # Therefore, we will instead ask for all columns and only access those of interest.
         query = (f'select * from {self._msf} where TIME in '
-                 f'(select unique TIME from {self._msf} '
-                 f'limit {time_start}:{time_stop}:{time_step})')
+                 f'(select unique TIME from {self._msf} limit {time_start}:{time_stop}:{time_step})')
         table = ct.taql(query)
 
         for sub_table in table.iter('TIME', sort=True):
@@ -405,8 +401,7 @@ class LofarMeasurementSet(MeasurementSet):
             #                   When combined with POSITION, it gives the absolute antenna positions in ITRF.
             # - ELEMENT_FLAG: True/False value for each (station, antenna, polarization) pair.
             #                 If any of the polarization flags is True for a given antenna, then the antenna can be discarded from that station.
-            query = ('select ANTENNA_ID, POSITION, ELEMENT_OFFSET, ELEMENT_FLAG'
-                     f' from {self._msf}::LOFAR_ANTENNA_FIELD')
+            query = f'select ANTENNA_ID, POSITION, ELEMENT_OFFSET, ELEMENT_FLAG from {self._msf}::LOFAR_ANTENNA_FIELD'
             table = ct.taql(query)
 
             station_id = table.getcol('ANTENNA_ID')

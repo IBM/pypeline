@@ -69,8 +69,7 @@ def ffs_sample(T, N_FS, T_c, N_s):
     if N_FS < 3:
         raise ValueError('Parameter[N_FS] must be at least 3.')
     if N_s < N_FS:
-        raise ValueError('Parameter[N_s] must be greater or equal to the '
-                         'signal bandwidth.')
+        raise ValueError('Parameter[N_s] must be greater or equal to the signal bandwidth.')
 
     if chk.is_odd(N_s):
         M = (N_s - 1) // 2
@@ -357,8 +356,7 @@ def czt(x, A, W, M, axis=-1):
     W = complex(W)
 
     if not cmath.isclose(abs(A), 1):
-        raise ValueError('Parameter[A] must lie on the unit circle for '
-                         'numerical stability.')
+        raise ValueError('Parameter[A] must lie on the unit circle for numerical stability.')
     if not cmath.isclose(abs(W), 1):
         raise ValueError('Parameter[W] must lie on the unit circle.')
     if M <= 0:

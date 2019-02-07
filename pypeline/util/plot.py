@@ -57,8 +57,7 @@ def colorbar(scm, ax):
     """
     fig = ax.get_figure()
     divider = ax_grid.make_axes_locatable(ax)
-    ax_colorbar = divider.append_axes('right', size='5%', pad=0.05,
-                                      axes_class=axes.Axes)
+    ax_colorbar = divider.append_axes('right', size='5%', pad=0.05, axes_class=axes.Axes)
     colorbar = fig.colorbar(scm, cax=ax_colorbar)
     return colorbar
 
@@ -113,9 +112,7 @@ def cmap(name, N=None):
 
     if pkg.resource_exists('pypeline', str(cmap_rel_path)):
         cmap_abs_path = pkg.resource_filename('pypeline', str(cmap_rel_path))
-        colors = (pd.read_csv(cmap_abs_path)
-                  .loc[:, ['R', 'G', 'B']]
-                  .values)
+        colors = pd.read_csv(cmap_abs_path).loc[:, ['R', 'G', 'B']].values
 
         N = len(colors) if (N is None) else N
         colormap = col.ListedColormap(colors[-N:])

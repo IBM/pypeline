@@ -940,64 +940,64 @@ def has_reals(x):
     return False
 
 
-def is_frequency(x):
+def is_wavelength(x):
     """
-    Return :py:obj:`True` if `x` is a (positive) frequency.
+    Return :py:obj:`True` if `x` is a (positive) wavelength.
 
     Examples
     --------
     .. testsetup::
 
        import astropy.units as u
-       from pypeline.util.argcheck import is_frequency
+       from pypeline.util.argcheck import is_wavelength
 
     .. doctest::
 
-       >>> is_frequency(5 * u.MHz)
+       >>> is_wavelength(5 * u.m)
        True
 
-       >>> is_frequency(-5 * u.Hz)  # negative frequencies not allowed
+       >>> is_wavelength(-5 * u.m)  # negative wavelengths not allowed
        False
 
-       >>> is_frequency(1 * u.s)
+       >>> is_wavelength(1 * u.s)
        False
     """
     if isinstance(x, u.Quantity):
         if x.shape == tuple():
-            return _is_frequency(x)
+            return _is_wavelength(x)
 
     return False
 
 
-def has_frequencies(x):
+def has_wavelengths(x):
     """
-    Return :py:obj:`True` if `x` contains (positive) frequencies.
+    Return :py:obj:`True` if `x` contains (positive) wavelengths.
 
     Examples
     --------
     .. testsetup::
 
-       from pypeline.util.argcheck import has_frequencies
+       from pypeline.util.argcheck import has_wavelengths
 
     .. doctest::
 
-       >>> has_frequencies(np.r_[0] * u.Hz)
+       >>> has_wavelengths(np.r_[0] * u.m)
        True
     """
     if isinstance(x, u.Quantity):
-        return _is_frequency(x)
+        return _is_wavelength(x)
 
     return False
 
 
-def _is_frequency(x):
+def _is_wavelength(x):
     """
-    Return :py:obj:`True` if `x` represents positive frequenc(y/ies).
+    Return :py:obj:`True` if `x` represents positive wavelength(s).
 
     :param x: u.Quantity objects to test.
     """
-    if (x.unit.is_equivalent(u.Hz) and
-            np.all(x.to_value(u.Hz) >= 0)):
+    if (x.unit.is_equivalent(u.m) and
+            np.all(x.to_value(u.m) >= 0)):
         return True
 
     return False

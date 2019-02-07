@@ -26,7 +26,7 @@ Launch Python3 interactive shell with Pypeline installed.
 
 optional arguments:
   --no_shell (w/ source)   Only load Pypeline environment in current shell process.
-                           This option is mainly used by install.py.
+                           This option is mainly used for development.
 
 Environment variables in this script can be modified by the user to tailor Pypeline to their environment.
 
@@ -60,14 +60,6 @@ load_pypeline_env() {
     # CasaCore: add <miniconda_root>/lib/ to LD_LIBRARY_PATH for libtinfow.so
     local miniconda_root="$(dirname "$(dirname "$(which conda)")")"
     export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${miniconda_root}/lib"
-
-    # Python Extension Modules: add <project_root>/build/cpp/ to PYTHONPATH
-    local project_root="${abs_script_dir}"
-    export PYTHONPATH="${PYTHONPATH}:${project_root}/build/cpp"
-
-    # MKL + OpenMP
-    export OMP_NUM_THREADS=4
-    export MKL_VML_MODE=VML_LA,VML_FTZDAZ_ON,VML_ERRMODE_EXCEPT
 }
 
 if [ "${#}" -eq 1 ] && [ "${1}" = '-h' ]; then

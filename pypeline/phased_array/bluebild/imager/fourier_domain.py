@@ -35,6 +35,7 @@ class Fourier_IMFS_Block(bim.IntegratingMultiFieldSynthesizerBlock):
        import astropy.units as u
        import astropy.time as atime
        import astropy.coordinates as coord
+       import astropy.constants as constants
        from tqdm import tqdm as ProgressBar
        from pypeline.phased_array.bluebild.data_processor import IntensityFieldDataProcessorBlock
        from pypeline.phased_array.bluebild.imager.fourier_domain import Fourier_IMFS_Block
@@ -56,6 +57,7 @@ class Fourier_IMFS_Block(bim.IntegratingMultiFieldSynthesizerBlock):
        >>> field_center = coord.SkyCoord(218 * u.deg, 34.5 * u.deg)
        >>> field_of_view = 5 * u.deg
        >>> frequency = 145 * u.MHz
+       >>> wl = constants.c / frequency
 
        # instrument
        >>> N_station = 24
@@ -67,7 +69,7 @@ class Fourier_IMFS_Block(bim.IntegratingMultiFieldSynthesizerBlock):
        >>> sky_model=from_tgss_catalog(field_center, field_of_view, N_src=10)
        >>> vis = VisibilityGeneratorBlock(sky_model,
        ...                                T=8 * u.s,
-       ...                                fs=196 * u.kHz,
+       ...                                fs=196000,
        ...                                SNR=np.inf)
 
        ### Energy-level imaging ============================================
@@ -75,7 +77,7 @@ class Fourier_IMFS_Block(bim.IntegratingMultiFieldSynthesizerBlock):
        >>> t_img = obs_start + np.arange(200) * 8 * u.s  # fine-grained snapshots
        >>> obs_start, obs_end = t_img[0], t_img[-1]
        >>> R = dev.icrs2bfsf_rot(obs_start, obs_end)
-       >>> N_FS = dev.bfsf_kernel_bandwidth(frequency, obs_start, obs_end)
+       >>> N_FS = dev.bfsf_kernel_bandwidth(wl, obs_start, obs_end)
        >>> T_kernel = 10 * u.deg
 
        # Pixel grid: make sure to generate it in BFSF coordinates by applying R.
@@ -85,13 +87,12 @@ class Fourier_IMFS_Block(bim.IntegratingMultiFieldSynthesizerBlock):
 
        >>> I_dp = IntensityFieldDataProcessorBlock(N_eig=7,  # assumed obtained from IntensityFieldParameterEstimator.infer_parameters()
        ...                                         cluster_centroids=[124.927,  65.09 ,  38.589,  23.256])
-       >>> I_mfs = Fourier_IMFS_Block(frequency, px_colat, px_lon,
-       ...                            N_FS, T_kernel, R, N_level=4)
+       >>> I_mfs = Fourier_IMFS_Block(wl, px_colat, px_lon, N_FS, T_kernel, R, N_level=4)
        >>> for t in ProgressBar(t_img):
        ...     XYZ = dev(t)
-       ...     W = mb(XYZ, frequency)
-       ...     S = vis(XYZ, W, frequency)
-       ...     G = gram(XYZ, W, frequency)
+       ...     W = mb(XYZ, wl)
+       ...     S = vis(XYZ, W, wl)
+       ...     G = gram(XYZ, W, wl)
        ...
        ...     D, V, c_idx = I_dp(S, G)
        ...
@@ -128,7 +129,7 @@ class Fourier_IMFS_Block(bim.IntegratingMultiFieldSynthesizerBlock):
     .. image:: _img/bluebild_FourierIMFSBlock_integrate_example.png
     """
 
-    @chk.check(dict(freq=chk.is_frequency,
+    @chk.check(dict(wl=chk.is_wavelength,
                     grid_colat=chk.has_angles,
                     grid_lon=chk.has_angles,
                     N_FS=chk.is_odd,
@@ -137,13 +138,12 @@ class Fourier_IMFS_Block(bim.IntegratingMultiFieldSynthesizerBlock):
                                       chk.has_reals),
                     N_level=chk.is_integer,
                     precision=chk.is_integer))
-    def __init__(self, freq, grid_colat, grid_lon, N_FS, T, R, N_level,
-                 precision=64):
-        """
+    def __init__(self, wl, grid_colat, grid_lon, N_FS, T, R, N_level, precision=64):
+        r"""
         Parameters
         ----------
-        freq : :py:class:`~astropy.units.Quantity`
-            Frequency of observations.
+        wl : :py:class:`~astropy.units.Quantity`
+            Wavelength of observations.
         grid_colat : :py:class:`~astropy.units.Quantity`
             (N_height, 1) BFSF polar angles.
         grid_lon : :py:class:`~astropy.units.Quantity`
@@ -182,8 +182,7 @@ class Fourier_IMFS_Block(bim.IntegratingMultiFieldSynthesizerBlock):
             raise ValueError('Parameter[N_level] must be positive.')
         self._N_level = N_level
 
-        self._synthesizer = psd.FourierFieldSynthesizerBlock(
-            freq, grid_colat, grid_lon, N_FS, T, R, precision)
+        self._synthesizer = psd.FourierFieldSynthesizerBlock(wl, grid_colat, grid_lon, N_FS, T, R, precision)
 
     @chk.check(dict(D=chk.has_reals,
                     V=chk.has_complex,
@@ -222,8 +221,7 @@ class Fourier_IMFS_Block(bim.IntegratingMultiFieldSynthesizerBlock):
         stat_lsq = stat_std * D.reshape(-1, 1, 1)
 
         stat = np.stack([stat_std, stat_lsq], axis=0)
-        stat = array._cluster_layers(stat, cluster_idx,
-                                     N=self._N_level, axis=1)
+        stat = array._cluster_layers(stat, cluster_idx, N=self._N_level, axis=1)
 
         self._update(stat)
         return stat

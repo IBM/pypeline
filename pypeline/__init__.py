@@ -24,8 +24,7 @@ def ___load_config():
     cfg = configparser.ConfigParser()
 
     # Load default configuration
-    cfg_path = pkg.resource_filename('pypeline',
-                                     str(pathlib.Path('data', 'pypeline.cfg')))
+    cfg_path = pkg.resource_filename('pypeline', str(pathlib.Path('data', 'pypeline.cfg')))
     with open(cfg_path, mode='r') as f:
         cfg.read_file(f)
 

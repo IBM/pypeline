@@ -193,8 +193,7 @@ class Wishart(Distribution):
             raise ValueError('Parameter[x] must be hermitian symmetric.')
 
         if np.linalg.matrix_rank(self._V) < self._p:
-            raise linalg.LinAlgError('Wishart density is not defined when '
-                                     'scale matrix V is singular.')
+            raise linalg.LinAlgError('Wishart density is not defined when scale matrix V is singular.')
 
         # Determinants: real-valued since V,X are Hermitian.
         Vs, Vl = np.linalg.slogdet(self._V)

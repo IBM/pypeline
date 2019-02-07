@@ -14,7 +14,6 @@ import numpy as np
 import scipy.linalg as linalg
 import scipy.sparse as sparse
 
-import pypeline
 import pypeline.phased_array.bluebild.field_synthesizer as synth
 import pypeline.util.argcheck as chk
 
@@ -46,6 +45,7 @@ class SpatialFieldSynthesizerBlock(synth.FieldSynthesizerBlock):
        import astropy.units as u
        import astropy.time as atime
        import astropy.coordinates as coord
+       import astropy.constants as constants
        from tqdm import tqdm as ProgressBar
        from pypeline.phased_array.bluebild.data_processor import IntensityFieldDataProcessorBlock
        from pypeline.phased_array.bluebild.field_synthesizer.spatial_domain import SpatialFieldSynthesizerBlock
@@ -66,6 +66,7 @@ class SpatialFieldSynthesizerBlock(synth.FieldSynthesizerBlock):
        >>> field_center = coord.SkyCoord(218 * u.deg, 34.5 * u.deg)
        >>> field_of_view = 5 * u.deg
        >>> frequency = 145 * u.MHz
+       >>> wl = constants.c / frequency
 
        # instrument
        >>> N_station = 24
@@ -77,7 +78,7 @@ class SpatialFieldSynthesizerBlock(synth.FieldSynthesizerBlock):
        >>> sky_model=from_tgss_catalog(field_center, field_of_view, N_src=10)
        >>> vis = VisibilityGeneratorBlock(sky_model,
        ...                                T=8 * u.s,
-       ...                                fs=196 * u.kHz,
+       ...                                fs=196000,
        ...                                SNR=np.inf)
 
        ### Energy-level imaging ============================================
@@ -88,13 +89,13 @@ class SpatialFieldSynthesizerBlock(synth.FieldSynthesizerBlock):
 
        >>> I_dp = IntensityFieldDataProcessorBlock(N_eig=7,  # assumed obtained from IntensityFieldParameterEstimator.infer_parameters()
        ...                                         cluster_centroids=[124.927,  65.09 ,  38.589,  23.256])
-       >>> I_fs = SpatialFieldSynthesizerBlock(frequency, px_grid)
+       >>> I_fs = SpatialFieldSynthesizerBlock(wl, px_grid)
        >>> t_img = obs_start + np.arange(20) * 400 * u.s  # well-spaced snapshots
        >>> for t in ProgressBar(t_img):
        ...     XYZ = dev(t)
-       ...     W = mb(XYZ, frequency)
-       ...     S = vis(XYZ, W, frequency)
-       ...     G = gram(XYZ, W, frequency)
+       ...     W = mb(XYZ, wl)
+       ...     S = vis(XYZ, W, wl)
+       ...     G = gram(XYZ, W, wl)
        ...
        ...     D, V, c_idx = I_dp(S, G)
        ...
@@ -125,15 +126,15 @@ class SpatialFieldSynthesizerBlock(synth.FieldSynthesizerBlock):
     .. image:: _img/bluebild_SpatialFieldSynthesizer_snapshot_example.png
     """
 
-    @chk.check(dict(freq=chk.is_frequency,
+    @chk.check(dict(wl=chk.is_wavelength,
                     pix_grid=chk.has_reals,
                     precision=chk.is_integer))
-    def __init__(self, freq, pix_grid, precision=64):
+    def __init__(self, wl, pix_grid, precision=64):
         """
         Parameters
         ----------
-        freq : :py:class:`~astropy.units.Quantity`
-            Frequency of observations.
+        wl : :py:class:`~astropy.units.Quantity`
+            Wavelength of observations.
         pix_grid : :py:class:`~numpy.ndarray`
             (3, N_height, N_width) pixel vectors.
         precision : int
@@ -152,12 +153,10 @@ class SpatialFieldSynthesizerBlock(synth.FieldSynthesizerBlock):
         else:
             raise ValueError('Parameter[precision] must be 32 or 64.')
 
-        wps = pypeline.config.getfloat('phased_array', 'wps') * (u.m / u.s)
-        self._wl = (wps / freq).to_value(u.m)
+        self._wl = wl.to_value(u.m)
 
         if not ((pix_grid.ndim == 3) and (len(pix_grid) == 3)):
-            raise ValueError('Parameter[pix_grid] must have '
-                             'dimensions (3, N_height, N_width).')
+            raise ValueError('Parameter[pix_grid] must have dimensions (3, N_height, N_width).')
         self._grid = pix_grid / linalg.norm(pix_grid, axis=0)
 
     @chk.check(dict(V=chk.has_complex,
@@ -235,8 +234,7 @@ class SpatialFieldSynthesizerBlock(synth.FieldSynthesizerBlock):
         N_height, N_width = self._grid.shape[1:]
 
         if not chk.has_shape([N_level, N_height, N_width])(stat):
-            raise ValueError("Parameter[stat] does not match "
-                             "the grid's dimensions.")
+            raise ValueError("Parameter[stat] does not match the grid's dimensions.")
 
         field = stat
         return field
