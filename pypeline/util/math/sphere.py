@@ -11,7 +11,7 @@ Spherical geometry tools.
 import astropy.coordinates as coord
 import astropy.units as u
 import numpy as np
-import tqdm
+import scipy.sparse as sp
 
 import pypeline.core as core
 import pypeline.util.argcheck as chk
@@ -89,7 +89,106 @@ def ea_sample(N):
     return colat, lon
 
 
-class EqualAngleInterpolator(core.Block):
+class Interpolator(core.Block):
+    r"""
+    Interpolate order-limited zonal function from spatial samples.
+
+    Computes :math:`f(r) = \sum_{q} \alpha_{q} f(r_{q}) K_{N}(\langle r, r_{q} \rangle)`, where :math:`r_{q} \in \mathbb{S}^{2}`
+    are points from a spatial sampling scheme, :math:`K_{N}(\cdot)` is the spherical Dirichlet kernel of order :math:`N`,
+    and the :math:`\alpha_{q}` are scaling factors tailored to the sampling scheme.
+    """
+
+    @chk.check(dict(weight=chk.has_reals,
+                    support=chk.has_reals,
+                    N=chk.is_integer,
+                    approximate_kernel=chk.is_boolean))
+    def __init__(self, weight, support, N, approximate_kernel=False):
+        r"""
+        Parameters
+        ----------
+        weight : :py:class:`~numpy.ndarray`
+            (N_s,) weighting scheme to apply to each support point.
+        support : :py:class:`~numpy.ndarray`
+            (3, N_s) critical support points for a given sampling scheme.
+        N : int
+            Order of the reconstructed zonal function.
+        approximate_kernel : bool
+            If :py:obj:`True`, pass the `approx` option to :py:class:`~pypeline.util.math.func.SphericalDirichlet`.
+
+        Notes
+        -----
+        * `weight` corresponds to :math:`\alpha_{ql}` in :ref:`ZOL_def`.
+
+        * `support` corresponds to :math:`r_{ql}` in :ref:`ZOL_def`.
+        """
+        super().__init__()
+        if not (weight.ndim == 1):
+            raise ValueError('Parameter[weight] must be (N_s,).')
+        N_s = len(weight)
+        self._weight = weight
+
+        if not (support.shape == (3, N_s)):
+            raise ValueError('Parameter[support] must be (3, N_s).')
+        self._support = support
+
+        if not (N > 0):
+            raise ValueError('Parameter[N] must be positive.')
+        self._N = N
+
+        self._kernel_func = func.SphericalDirichlet(N, approximate_kernel)
+
+    @chk.check(dict(f=chk.accept_any(chk.has_reals, chk.has_complex),
+                    r=chk.has_reals,
+                    sparse_kernel=chk.is_boolean))
+    def __call__(self, f, r, sparse_kernel=False):
+        """
+        Interpolate function samples at order `N`.
+
+        Parameters
+        ----------
+        f : :py:class:`~numpy.ndarray`
+            (N_s,) samples of the zonal function at data-points. (float or complex)
+            :math:`L`-dimensional zonal functions are also supported by supplying an (L, N_s) array instead.
+        r : :py:class:`~numpy.ndarray`
+            (3, N_px) evaluation points.
+        sparse_kernel : bool
+            If :py:obj:`True`, take advantage of kernel sparsity to perform localised operations.
+
+        Returns
+        -------
+        f_interp : :py:class:`~numpy.ndarray`
+            (L, N_px) function values at specified coordinates.
+
+
+        .. todo::
+
+           As currently implemented, using `sparse_kernel=True` is slower than direct evaluation.
+           Need to look into this when required.
+           self._kernel_func._zero_threshold may be useful here.
+        """
+        N_s = len(self._weight)
+        if f.shape == (N_s,):
+            f = f.reshape(1, N_s)
+        elif (f.ndim == 2) and (f.shape[1] == N_s):
+            pass
+        else:
+            raise ValueError('Parameter[f] must have shape (N_s,) or (L, N_s).')
+
+        if not ((r.ndim == 2) and (r.shape[0] == 3)):
+            raise ValueError('Parameter[r] must have shape (3, N_px).')
+        # N_px = r.shape[1]
+
+        if sparse_kernel:
+            kernel = self._kernel_func(np.tensordot(self._support.T, r, axes=1)) * ((self._N + 1) / (4 * np.pi))
+            kernel = sp.csc_matrix(kernel)
+            f_interp = kernel.T.dot((self._weight * f).T).T
+        else:
+            kernel = self._kernel_func(np.tensordot(self._support.T, r, axes=1)) * ((self._N + 1) / (4 * np.pi))
+            f_interp = (self._weight * f) @ kernel
+        return f_interp
+
+
+class EqualAngleInterpolator(Interpolator):
     r"""
     Interpolate order-limited zonal function from Equal-Angle samples.
 
@@ -108,8 +207,8 @@ class EqualAngleInterpolator(core.Block):
     .. testsetup::
 
        import numpy as np
-       from pypeline.util.math.sphere import ea_sample, EqualAngleInterpolator, pol2cart
        from pypeline.util.math.func import SphericalDirichlet
+       from pypeline.util.math.sphere import ea_sample, pol2cart, EqualAngleInterpolator
 
        def gammaN(r, r0, N):
            similarity = np.tensordot(r0, r, axes=1)
@@ -122,118 +221,85 @@ class EqualAngleInterpolator(core.Block):
        >>> N = 3
        >>> r0 = np.array([0, 0, 1])
 
-       # Interpolate \gammaN from it's samples
+       # Solution at Nyquist resolution
        >>> colat, lon = ea_sample(N)
        >>> r = pol2cart(1, colat, lon)
-       >>> g_samples = gammaN(r, r0, N)
-       >>> q, l = np.meshgrid(np.arange(colat.size),
-       ...                    np.arange(lon.size),
-       ...                    indexing='ij')
-       >>> ea_interp = EqualAngleInterpolator(q.reshape(-1),
-       ...                                    l.reshape(-1),
-       ...                                    g_samples.reshape(-1),
-       ...                                    N)
+       >>> g_nyquist = gammaN(pol2cart(1, colat, lon), r0, N)
 
-       # Compare with exact solution at off-sample positions
-       >>> colat, lon = ea_sample(2 * N)  # denser grid
-       >>> g_interp = ea_interp(colat, lon)
+       # Solution at high resolution
+       >>> colat, lon = ea_sample(2 * N)  # dense grid
        >>> g_exact = gammaN(pol2cart(1, colat, lon), r0, N)
+
+       # Interpolate Nyquist solution to high resolution solution
+       >>> ea_interp = EqualAngleInterpolator(N)
+       >>> g_samples = g_nyquist.reshape(-1)
+       >>> g_interp = ea_interp(g_samples, colat, lon)
+
        >>> np.allclose(g_interp, g_exact)
        True
     """
 
-    @chk.check(dict(q=chk.has_integers,
-                    l=chk.has_integers,
-                    f=chk.accept_any(chk.has_reals, chk.has_complex),
-                    N=chk.is_integer,
+    @chk.check(dict(N=chk.is_integer,
                     approximate_kernel=chk.is_boolean))
-    def __init__(self, q, l, f, N, approximate_kernel=False):
-        r"""
+    def __init__(self, N, approximate_kernel=False):
+        """
         Parameters
         ----------
-        q : array-like(int)
-            (N_s,) polar indices of an order-`N` Equal-Angle grid.
-        l : array-like(int)
-            (N_s,) azimuthal indices of an order-`N` Equal-Angle grid.
-        f : array-like(float or complex)
-            (N_s,) samples of the zonal function at data-points.
-            :math:`L`-dimensional zonal functions are also supported by supplying an (N_s, L) array instead.
         N : int
             Order of the reconstructed zonal function.
         approximate_kernel : bool
             If :py:obj:`True`, pass the `approx` option to :py:class:`~pypeline.util.math.func.SphericalDirichlet`.
-
-        Notes
-        -----
-        If :math:`f(r)` only takes non-negligeable values when :math:`r \in \mathcal{S} \subset \mathbb{S}^{2}`, then the runtime of :py:meth:`~pypeline.util.math.sphere.EqualAngleInterpolator.__call__` can be significantly reduced by only supplying the triplets (`q`, `l`, `f`) that belong to :math:`\mathcal{S}`.
         """
-        super().__init__()
+        colat, lon = ea_sample(N)
+        support = pol2cart(1, colat, lon).reshape(3, -1)
+        N_colat, N_lon, N_s = colat.size, lon.size, support.shape[1]
 
-        colat_sph, _ = ea_sample(N)
-        _2N2 = colat_sph.size
-        q, l = np.array(q), np.array(l)
-        if not ((q.shape == l.shape) and
-                chk.has_shape((q.size,))(q)):
-            raise ValueError("Parameter[q, l] must be 1D and of equal length.")
-        if not all(np.all(0 <= _) and np.all(_ < _2N2) for _ in [q, l]):
-            raise ValueError(f"Parameter[q, l] must contain entries in {{0, ..., 2N + 1}}.")
-        self._N = N
-        self._q = q
-        self._l = l
+        colat = colat.to_value(u.rad)
+        a = np.arange(N + 1)
+        weight = np.sum(np.sin((2 * a + 1) * colat) / (2 * a + 1), axis=1, keepdims=True) * np.sin(colat)
+        weight = np.broadcast_to(weight, (N_colat, N_lon)).reshape(N_s)
+        weight *= (2 * np.pi) / ((N + 1) ** 2)
 
-        N_s = q.size
-        f = np.array(f, copy=False)
-        if (f.ndim == 1) and (len(f) == N_s):
-            self._L = 1
-        elif (f.ndim == 2) and (len(f) == N_s):
-            self._L = f.shape[1]
-        else:
-            raise ValueError("Parameter[f] must have shape (N_s,) or (N_s, L).")
-        f = f.reshape(N_s, self._L)
+        super().__init__(weight, support, N, approximate_kernel)
 
-        _2m1 = np.reshape(2 * np.r_[:N + 1] + 1, (1, N + 1))
-        alpha = (np.sin(colat_sph) / _2N2 *
-                 np.sum(np.sin(_2m1 * colat_sph) / _2m1, axis=1, keepdims=True))
-        self._weight = (f * alpha[q]).to_value(u.dimensionless_unscaled)
-
-        self._kernel_func = func.SphericalDirichlet(N, approximate_kernel)
-
-    @chk.check(dict(colat=chk.accept_any(chk.is_angle, chk.has_angles),
-                    lon=chk.accept_any(chk.is_angle, chk.has_angles)))
-    def __call__(self, colat, lon):
+    @chk.check(dict(f=chk.accept_any(chk.has_reals, chk.has_complex),
+                    colat=chk.accept_any(chk.is_angle, chk.has_angles),
+                    lon=chk.accept_any(chk.is_angle, chk.has_angles),
+                    sparse_kernel=chk.is_boolean))
+    def __call__(self, f, colat, lon, sparse_kernel=False):
         """
         Interpolate function samples at order `N`.
 
         Parameters
         ----------
+        f : :py:class:`~numpy.ndarray`
+            (N_s,) samples of the zonal function at data-points. (float or complex)
+            :math:`L`-dimensional zonal functions are also supported by supplying an (L, N_s) array instead.
         colat : :py:class:`~astropy.units.Quantity`
-            Polar/Zenith angle.
+            (A, 1) Polar/Zenith angle.
         lon : :py:class:`~astropy.units.Quantity`
-            Longitude angle.
+            (1, B) Longitude angle.
+        sparse_kernel : bool
+            If :py:obj:`True`, take advantage of kernel sparsity to perform localised operations.
 
         Returns
         -------
-        :py:class:`~numpy.ndarray`
-            (L, ...) function values at specified coordinates.
+        f_interp : :py:class:`~numpy.ndarray`
+            (L, A, B) function values at specified coordinates.
         """
-        r = pol2cart(1, colat, lon)
-        sh_kern = (1,) + r.shape[1:]
-        sh_weight = (self._L,) + (1,) * len(r.shape[1:])
+        A, B = colat.size, lon.size
+        if not (colat.shape == (A, 1) and (lon.shape == (1, B))):
+            raise ValueError('Parameters[colat, lon] are ill-formed.')
 
-        colat_sph, lon_sph = ea_sample(self._N)
+        if f.ndim == 1:
+            f = f.reshape(1, -1)
+        L, N_s = len(f), (2 * self._N + 2) ** 2
+        if f.shape != (L, N_s):
+            raise ValueError('Parameter[f] inconsistent with interpolation order N.')
 
-        f_interp = np.zeros((self._L,) + r.shape[1:], dtype=self._weight.dtype)
-        with tqdm.tqdm(total=len(self._weight)) as pbar:
-            for w, t, p in zip(self._weight,
-                               colat_sph[self._q, 0],
-                               lon_sph[0, self._l]):
-                similarity = np.tensordot(pol2cart(1, t, p), r, axes=[[0], [0]])
-                kernel = self._kernel_func(similarity)
-
-                f_interp += kernel.reshape(sh_kern) * w.reshape(sh_weight)
-
-                pbar.update()
-
+        r = pol2cart(1, colat, lon).reshape(3, A * B)
+        f_interp = super().__call__(f, r, sparse_kernel)
+        f_interp = f_interp.reshape(L, A, B)
         return f_interp
 
 

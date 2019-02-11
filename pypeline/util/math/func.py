@@ -236,6 +236,9 @@ class SphericalDirichlet(core.Block):
             y = self._exact_kernel(x) * window(x)
             self.__cs_interp = interpolate.interp1d(x, y, kind='cubic', bounds_error=False, fill_value=0)
 
+            # Store zero_threshold to simplify optimizations in :py:class:`~pypeline.util.math.sphere.Interpolator`
+            self._zero_threshold = x[0]
+
     @chk.check('x', chk.accept_any(chk.is_real, chk.has_reals))
     def __call__(self, x):
         r"""
