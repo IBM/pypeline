@@ -15,6 +15,7 @@ pypeline.util.math.sphere
       ea_sample
       eq2cart
       eq2pol
+      fibonacci_sample
       pol2cart
       pol2eq
 
@@ -28,7 +29,6 @@ pypeline.util.math.sphere
 
       Interpolator
       EqualAngleInterpolator
-
 
 
 

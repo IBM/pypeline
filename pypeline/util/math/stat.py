@@ -8,7 +8,6 @@
 Statistical functions not available in `SciPy <https://www.scipy.org/>`_.
 """
 
-import astropy.units as u
 import numpy as np
 import scipy.linalg as linalg
 import scipy.special as special
@@ -375,8 +374,8 @@ class Kent(Distribution):
 
         Returns
         -------
-        theta : :py:class:`~astropy.units.Quantity`
-            Angular separation between :math:`r` and :math:`\gamma_{1}`.
+        theta : float
+            Angular separation [rad] between :math:`r` and :math:`\gamma_{1}`.
         """
         if k <= 0:
             raise ValueError('Parameter[k] must be positive.')
@@ -393,13 +392,13 @@ class Kent(Distribution):
         mask = lhs <= rhs
 
         if np.any(mask):
-            support = theta[mask][0] * u.rad
+            support = theta[mask][0]
         else:
-            support = np.pi * u.rad
+            support = np.pi
         return support
 
     @classmethod
-    @chk.check(dict(alpha=chk.is_angle,
+    @chk.check(dict(alpha=chk.is_real,
                     beta=chk.is_real,
                     eps=chk.is_real))
     def min_scale(cls, alpha, beta, eps=1e-2):
@@ -412,8 +411,8 @@ class Kent(Distribution):
 
         Parameters
         ----------
-        alpha : :py:class:`~astropy.units.Quantity`
-            Angular span of the density between :math:`\gamma_{1}` and a point :math:`r` along :math:`\gamma_{2}` on the sphere where :math:`f(r) = \epsilon f(\gamma_{1})`.
+        alpha : float
+            Angular span [rad] of the density between :math:`\gamma_{1}` and a point :math:`r` along :math:`\gamma_{2}` on the sphere where :math:`f(r) = \epsilon f(\gamma_{1})`.
         beta : float
             Ellipticity in [0, 1[.
         eps : float
@@ -424,7 +423,7 @@ class Kent(Distribution):
         k : int
             scale parameter.
         """
-        if not (0 < alpha.to_value(u.deg) <= 180):
+        if not (0 < alpha <= np.pi):
             raise ValueError('Parameter[alpha] is out of bounds.')
 
         if not (0 <= beta < 1):
@@ -433,7 +432,6 @@ class Kent(Distribution):
         if not (0 < eps < 1):
             raise ValueError('Parameter[eps] must lie in (0, 1).')
 
-        alpha = alpha.to_value(u.rad)
         denom = np.cos(alpha) + 0.5 * beta * np.sin(alpha) ** 2 - 1
 
         if np.isclose(denom, 0):

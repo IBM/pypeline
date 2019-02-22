@@ -20,7 +20,7 @@ import pypeline.util.math.sphere as sph
 
 @chk.check(dict(direction=chk.require_all(chk.has_reals,
                                           chk.has_shape([3, ])),
-                FoV=chk.is_angle,
+                FoV=chk.is_real,
                 size=chk.require_all(chk.has_integers,
                                      chk.has_shape([2, ]))))
 def spherical_grid(direction, FoV, size):
@@ -31,8 +31,8 @@ def spherical_grid(direction, FoV, size):
     ----------
     direction : array-like(float)
         (3,) vector around which the grid is centered.
-    FoV : :py:class:`~astropy.units.Quantity`
-        Span of the grid centered at `direction`.
+    FoV : float
+        Span of the grid [rad] centered at `direction`.
     size : array-like(int)
         (N_height, N_width)
 
@@ -46,8 +46,8 @@ def spherical_grid(direction, FoV, size):
     direction = np.array(direction, dtype=float)
     direction /= linalg.norm(direction)
 
-    if not (0 < FoV.to_value(u.deg) <= 179):
-        raise ValueError('Parameter[FoV] must be in [0, 179] degrees.')
+    if not (0 < np.rad2deg(FoV) <= 179):
+        raise ValueError('Parameter[FoV] must be in (0, 179] degrees.')
 
     size = np.array(size, copy=False)
     if np.any(size <= 0):
@@ -55,7 +55,7 @@ def spherical_grid(direction, FoV, size):
 
     N_height, N_width = size
     colat, lon = np.meshgrid(np.linspace(0, FoV / 2, N_height),
-                             np.linspace(0, 360 * u.deg, N_width),
+                             np.linspace(0, 2 * np.pi, N_width),
                              indexing='ij')
     XYZ = sph.pol2cart(1, colat, lon)
 
@@ -76,7 +76,7 @@ def spherical_grid(direction, FoV, size):
 
 @chk.check(dict(direction=chk.require_all(chk.has_reals,
                                           chk.has_shape([3, ])),
-                FoV=chk.is_angle,
+                FoV=chk.is_real,
                 size=chk.require_all(chk.has_integers,
                                      chk.has_shape([2, ]))))
 def uniform_grid(direction, FoV, size):
@@ -87,8 +87,8 @@ def uniform_grid(direction, FoV, size):
     ----------
     direction : array-like(float)
         (3,) vector around which the grid is centered.
-    FoV : :py:class:`~astropy.units.Quantity`
-        Span of the grid centered at `direction`.
+    FoV : float
+        Span of the grid [rad] centered at `direction`.
     size : array-like(int)
         (N_height, N_width)
 
@@ -100,15 +100,15 @@ def uniform_grid(direction, FoV, size):
     direction = np.array(direction, dtype=float)
     direction /= linalg.norm(direction)
 
-    if not (0 < FoV.to_value(u.deg) <= 179):
-        raise ValueError('Parameter[FoV] must be in [0, 179] degrees.')
+    if not (0 < np.rad2deg(FoV) <= 179):
+        raise ValueError('Parameter[FoV] must be in (0, 179] degrees.')
 
     size = np.array(size, copy=False)
     if np.any(size <= 0):
         raise ValueError('Parameter[size] must contain positive entries.')
 
     N_height, N_width = size
-    lim = np.sin(FoV / 2).to_value(u.dimensionless_unscaled)
+    lim = np.sin(FoV / 2)
     Y, X = np.meshgrid(np.linspace(-lim, lim, N_height),
                        np.linspace(-lim, lim, N_width),
                        indexing='ij')
@@ -136,7 +136,7 @@ def uniform_grid(direction, FoV, size):
 
 @chk.check(dict(direction=chk.require_all(chk.has_reals,
                                           chk.has_shape([3, ])),
-                FoV=chk.is_angle,
+                FoV=chk.is_real,
                 size=chk.require_all(chk.has_integers,
                                      chk.has_shape([2, ]))))
 def ea_grid(direction, FoV, size):
@@ -147,18 +147,18 @@ def ea_grid(direction, FoV, size):
     ----------
     direction : array-like(float)
         (3,) vector around which the grid is centered.
-    FoV : :py:class:`~astropy.units.Quantity`
-        Span of the grid centered at `direction`.
+    FoV : float
+        Span of the grid [rad] centered at `direction`.
     size : array-like(int)
         (N_height, N_width)
 
     Returns
     -------
-    colat : :py:class:`~astropy.units.Quantity`
-        (N_height, 1) polar angles.
+    colat : :py:class:`~numpy.ndarray`
+        (N_height, 1) polar angles [rad].
 
-    lon : :py:class:`~astropy.units.Quantity`
-        (1, N_width) azimuthal angles.
+    lon : :py:class:`~numpy.ndarray`
+        (1, N_width) azimuthal angles [rad].
     """
     direction = np.array(direction, dtype=float)
     direction /= linalg.norm(direction)
@@ -166,8 +166,8 @@ def ea_grid(direction, FoV, size):
     if np.allclose(np.cross([0, 0, 1], direction), 0):
         raise ValueError('Generating Equal-Angle grids centered at poles currently not supported.')
 
-    if not (0 < FoV.to_value(u.deg) <= 179):
-        raise ValueError('Parameter[FoV] must be in [0, 179] degrees.')
+    if not (0 < np.rad2deg(FoV) <= 179):
+        raise ValueError('Parameter[FoV] must be in (0, 179] degrees.')
 
     size = np.array(size, copy=False)
     if np.any(size <= 0):
@@ -176,8 +176,8 @@ def ea_grid(direction, FoV, size):
     _, dir_colat, dir_lon = sph.cart2pol(*direction)
     lim_lon = dir_lon + (FoV / 2) * np.r_[-1, 1]
     lim_colat = dir_colat + (FoV / 2) * np.r_[-1, 1]
-    lim_colat = (max(0.5 * u.deg, lim_colat[0]),
-                 min(lim_colat[1], 179.5 * u.deg))
+    lim_colat = (max(np.deg2rad(0.5), lim_colat[0]),
+                 min(lim_colat[1], np.deg2rad(179.5)))
 
     N_height, N_width = size
     colat = np.linspace(*lim_colat, num=N_height).reshape(-1, 1)
@@ -187,7 +187,7 @@ def ea_grid(direction, FoV, size):
 
 @chk.check(dict(direction=chk.require_all(chk.has_reals,
                                           chk.has_shape([3, ])),
-                FoV=chk.is_angle,
+                FoV=chk.is_real,
                 N=chk.is_integer))
 def ea_harmonic_grid(direction, FoV, N):
     """
@@ -197,8 +197,8 @@ def ea_harmonic_grid(direction, FoV, N):
     ----------
     direction : array-like(float)
         (3,) vector around which the grid is centered.
-    FoV : :py:class:`~astropy.units.Quantity`
-        Span of the grid centered at `direction`.
+    FoV : float
+        Span of the grid [rad] centered at `direction`.
     N : int
         Order of the grid, i.e. there will be :math:`4 (N + 1)^{2}` points on the sphere.
 
@@ -210,11 +210,11 @@ def ea_harmonic_grid(direction, FoV, N):
     l : :py:class:`~numpy.ndarray`
         (N_width,) azimuthal indices.
 
-    colat : :py:class:`~astropy.units.Quantity`
-        (N_height, 1) polar angles.
+    colat : :py:class:`~numpy.ndarray`
+        (N_height, 1) polar angles [rad].
 
-    lon : :py:class:`~astropy.units.Quantity`
-        (1, N_width) azimuthal angles.
+    lon : :py:class:`~numpy.ndarray`
+        (1, N_width) azimuthal angles [rad].
 
     See Also
     --------
@@ -226,18 +226,18 @@ def ea_harmonic_grid(direction, FoV, N):
     if np.allclose(np.cross([0, 0, 1], direction), 0):
         raise ValueError('Generating Equal-Angle grids centered at poles currently not supported.')
 
-    if not (0 < FoV.to_value(u.deg) <= 179):
-        raise ValueError('Parameter[FoV] must be in [0, 179] degrees.')
+    if not (0 < np.rad2deg(FoV) <= 179):
+        raise ValueError('Parameter[FoV] must be in (0, 179] degrees.')
 
     if N <= 0:
         raise ValueError('Parameter[N] must be non-negative.')
 
     _, dir_colat, dir_lon = sph.cart2pol(*direction)
     lim_lon = dir_lon + (FoV / 2) * np.r_[-1, 1]
-    lim_lon = coord.Angle(lim_lon).wrap_at(360 * u.deg)
+    lim_lon = coord.Angle(lim_lon * u.rad).wrap_at(360 * u.deg).to_value(u.rad)
     lim_colat = dir_colat + (FoV / 2) * np.r_[-1, 1]
-    lim_colat = (max(0.5 * u.deg, lim_colat[0]),
-                 min(lim_colat[1], 179.5 * u.deg))
+    lim_colat = (max(np.deg2rad(0.5), lim_colat[0]),
+                 min(lim_colat[1], np.deg2rad(179.5)))
 
     colat_full, lon_full = sph.ea_sample(N)
     q_full = np.arange(colat_full.size).reshape(-1, 1)
@@ -254,3 +254,48 @@ def ea_harmonic_grid(direction, FoV, N):
     colat = colat_full[q_mask].reshape(-1, 1)
     lon = lon_full[l_mask].reshape(1, -1)
     return q, l, colat, lon
+
+
+@chk.check(dict(direction=chk.require_all(chk.has_reals,
+                                          chk.has_shape([3, ])),
+                FoV=chk.is_real,
+                N=chk.is_integer))
+def fibonacci_harmonic_grid(direction, FoV, N):
+    """
+    Region-limited Fibonacci pixel grid of order `N`.
+
+    Parameters
+    ----------
+    direction : array-like(float)
+        (3,) vector around which the grid is centered.
+    FoV : float
+        Span of the grid [rad] centered at `direction`.
+    N : int
+        Order of the grid, i.e. there will be :math:`4 (N + 1)^{2}` points on the sphere.
+
+    Returns
+    -------
+    :py:class:`~numpy.ndarray`
+        (3, N_px) pixel grid.
+
+    See Also
+    --------
+    :py:class:`~pypeline.util.math.sphere.FibonacciInterpolator`
+    """
+    direction = np.array(direction, dtype=float)
+    direction /= linalg.norm(direction)
+
+    if not (0 < FoV < 2 * np.pi):
+        raise ValueError('Parameter[FoV] must be in (0, 360) degrees.')
+
+    if N <= 0:
+        raise ValueError('Parameter[N] must be non-negative.')
+
+    # TODO: Current grid generation is highly inefficient when interested in small FoVs
+    XYZ = sph.fibonacci_sample(N)
+
+    min_similarity = np.cos(FoV / 2)
+    mask = (direction @ XYZ) >= min_similarity
+    XYZ = XYZ[:, mask]
+
+    return XYZ
