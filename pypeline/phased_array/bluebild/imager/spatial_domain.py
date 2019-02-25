@@ -34,7 +34,7 @@ class Spatial_IMFS_Block(bim.IntegratingMultiFieldSynthesizerBlock):
        import astropy.units as u
        import astropy.time as atime
        import astropy.coordinates as coord
-       import astropy.constants as constants
+       import scipy.constants as constants
        from tqdm import tqdm as ProgressBar
        from pypeline.phased_array.bluebild.data_processor import IntensityFieldDataProcessorBlock
        from pypeline.phased_array.bluebild.imager.spatial_domain import Spatial_IMFS_Block
@@ -53,9 +53,9 @@ class Spatial_IMFS_Block(bim.IntegratingMultiFieldSynthesizerBlock):
        # Observation
        >>> obs_start = atime.Time(56879.54171302732, scale='utc', format='mjd')
        >>> field_center = coord.SkyCoord(218 * u.deg, 34.5 * u.deg)
-       >>> field_of_view = 5 * u.deg
-       >>> frequency = 145 * u.MHz
-       >>> wl = constants.c / frequency
+       >>> field_of_view = np.deg2rad(5)
+       >>> frequency = 145e6
+       >>> wl = constants.speed_of_light / frequency
 
        # instrument
        >>> N_station = 24
@@ -66,7 +66,7 @@ class Spatial_IMFS_Block(bim.IntegratingMultiFieldSynthesizerBlock):
        # Visibility generation
        >>> sky_model=from_tgss_catalog(field_center, field_of_view, N_src=10)
        >>> vis = VisibilityGeneratorBlock(sky_model,
-       ...                                T=8 * u.s,
+       ...                                T=8,
        ...                                fs=196000,
        ...                                SNR=np.inf)
 
@@ -116,7 +116,7 @@ class Spatial_IMFS_Block(bim.IntegratingMultiFieldSynthesizerBlock):
     .. image:: _img/bluebild_SpatialIMFSBlock_integrate_example.png
     """
 
-    @chk.check(dict(wl=chk.is_wavelength,
+    @chk.check(dict(wl=chk.is_real,
                     pix_grid=chk.has_reals,
                     N_level=chk.is_integer,
                     precision=chk.is_integer))
@@ -124,8 +124,8 @@ class Spatial_IMFS_Block(bim.IntegratingMultiFieldSynthesizerBlock):
         """
         Parameters
         ----------
-        wl : :py:class:`~astropy.units.Quantity`
-            Wavelength of observations.
+        wl : float
+            Wavelength [m] of observations.
         pix_grid : :py:class:`~numpy.ndarray`
             (3, N_height, N_width) pixel vectors.
         N_level : int

@@ -35,7 +35,7 @@ class Fourier_IMFS_Block(bim.IntegratingMultiFieldSynthesizerBlock):
        import astropy.units as u
        import astropy.time as atime
        import astropy.coordinates as coord
-       import astropy.constants as constants
+       import scipy.constants as constants
        from tqdm import tqdm as ProgressBar
        from pypeline.phased_array.bluebild.data_processor import IntensityFieldDataProcessorBlock
        from pypeline.phased_array.bluebild.imager.fourier_domain import Fourier_IMFS_Block
@@ -55,9 +55,9 @@ class Fourier_IMFS_Block(bim.IntegratingMultiFieldSynthesizerBlock):
        # Observation
        >>> obs_start = atime.Time(56879.54171302732, scale='utc', format='mjd')
        >>> field_center = coord.SkyCoord(218 * u.deg, 34.5 * u.deg)
-       >>> field_of_view = 5 * u.deg
-       >>> frequency = 145 * u.MHz
-       >>> wl = constants.c / frequency
+       >>> field_of_view = np.deg2rad(5)
+       >>> frequency = 145e6
+       >>> wl = constants.speed_of_light / frequency
 
        # instrument
        >>> N_station = 24
@@ -68,7 +68,7 @@ class Fourier_IMFS_Block(bim.IntegratingMultiFieldSynthesizerBlock):
        # Visibility generation
        >>> sky_model=from_tgss_catalog(field_center, field_of_view, N_src=10)
        >>> vis = VisibilityGeneratorBlock(sky_model,
-       ...                                T=8 * u.s,
+       ...                                T=8,
        ...                                fs=196000,
        ...                                SNR=np.inf)
 
@@ -78,7 +78,7 @@ class Fourier_IMFS_Block(bim.IntegratingMultiFieldSynthesizerBlock):
        >>> obs_start, obs_end = t_img[0], t_img[-1]
        >>> R = dev.icrs2bfsf_rot(obs_start, obs_end)
        >>> N_FS = dev.bfsf_kernel_bandwidth(wl, obs_start, obs_end)
-       >>> T_kernel = 10 * u.deg
+       >>> T_kernel = np.deg2rad(10)
 
        # Pixel grid: make sure to generate it in BFSF coordinates by applying R.
        >>> px_colat, px_lon = ea_grid(direction=np.dot(R, field_center.transform_to('icrs').cartesian.xyz.value),
@@ -129,11 +129,11 @@ class Fourier_IMFS_Block(bim.IntegratingMultiFieldSynthesizerBlock):
     .. image:: _img/bluebild_FourierIMFSBlock_integrate_example.png
     """
 
-    @chk.check(dict(wl=chk.is_wavelength,
-                    grid_colat=chk.has_angles,
-                    grid_lon=chk.has_angles,
+    @chk.check(dict(wl=chk.is_real,
+                    grid_colat=chk.has_reals,
+                    grid_lon=chk.has_reals,
                     N_FS=chk.is_odd,
-                    T=chk.is_angle,
+                    T=chk.is_real,
                     R=chk.require_all(chk.has_shape([3, 3]),
                                       chk.has_reals),
                     N_level=chk.is_integer,
@@ -142,16 +142,16 @@ class Fourier_IMFS_Block(bim.IntegratingMultiFieldSynthesizerBlock):
         r"""
         Parameters
         ----------
-        wl : :py:class:`~astropy.units.Quantity`
-            Wavelength of observations.
-        grid_colat : :py:class:`~astropy.units.Quantity`
-            (N_height, 1) BFSF polar angles.
-        grid_lon : :py:class:`~astropy.units.Quantity`
-            (1, N_width) equi-spaced BFSF azimuthal angles.
+        wl : float
+            Wavelength [m] of observations.
+        grid_colat : :py:class:`~numpy.ndarray`
+            (N_height, 1) BFSF polar angles [rad].
+        grid_lon : :py:class:`~numpy.ndarray`
+            (1, N_width) equi-spaced BFSF azimuthal angles [rad].
         N_FS : int
             :math:`2\pi`-periodic kernel bandwidth. (odd-valued)
-        T : :py:class:`~astropy.units.Quantity`
-            Kernel periodicity to use for imaging.
+        T : float
+            Kernel periodicity [rad] to use for imaging.
         R : array-like(float)
             (3, 3) ICRS -> BFSF rotation matrix.
         N_level : int

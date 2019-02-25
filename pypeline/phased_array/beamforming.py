@@ -18,7 +18,6 @@ Only simple beamformers are included here: more advanced variants can be found i
 import collections.abc as abc
 
 import astropy.coordinates as coord
-import astropy.units as u
 import numpy as np
 import pandas as pd
 import scipy.sparse as sparse
@@ -248,7 +247,7 @@ class MatchedBeamformerBlock(BeamformerBlock):
                                          F_Z=focus_dir[2]))
 
     @chk.check(dict(XYZ=chk.is_instance(instrument.InstrumentGeometry),
-                    wl=chk.is_wavelength))
+                    wl=chk.is_real))
     def __call__(self, XYZ, wl):
         """
         Determine beamweights to apply to each (antenna, beam) pair.
@@ -257,8 +256,8 @@ class MatchedBeamformerBlock(BeamformerBlock):
         ----------
         XYZ : :py:class:`~pypeline.phased_array.instrument.InstrumentGeometry`
             (N_antenna, 3) ICRS instrument geometry.
-        wl : :py:class:`~astropy.units.Quantity`
-            Wavelength at which to generate beamweights.
+        wl : float
+            Wavelength [m] at which to generate beamweights.
 
         Returns
         -------
@@ -271,7 +270,7 @@ class MatchedBeamformerBlock(BeamformerBlock):
 
            from pypeline.phased_array.instrument import LofarBlock
            from pypeline.phased_array.beamforming import MatchedBeamformerBlock
-           import astropy.constants as constants
+           import scipy.constants as constants
            import astropy.units as u
            import astropy.time as atime
            import astropy.coordinates as coord
@@ -286,8 +285,8 @@ class MatchedBeamformerBlock(BeamformerBlock):
            >>> mb = MatchedBeamformerBlock(mb_cfg)
 
            >>> XYZ = instr(atime.Time('J2000'))
-           >>> freq = 145 * u.MHz
-           >>> wl = constants.c / freq
+           >>> freq = 145e6
+           >>> wl = constants.speed_of_light / freq
            >>> W = mb(XYZ, wl)
 
         When using radio telescopes, W is generally sparse:
@@ -302,16 +301,13 @@ class MatchedBeamformerBlock(BeamformerBlock):
 
         .. image:: _img/mb_weights_mask_example.png
         """
-        wl = wl.to_value(u.m)
-
         xyz = XYZ.as_frame()
         xyz = (xyz - xyz.mean()) / wl
 
         data = pd.merge(xyz.reset_index(), self._config, on='STATION_ID')
         XYZ = data.loc[:, ['X', 'Y', 'Z']].values
         F_XYZ = data.loc[:, ['F_X', 'F_Y', 'F_Z']].values
-        similarity = np.squeeze(XYZ.reshape(-1, 1, 3) @
-                                F_XYZ.reshape(-1, 3, 1), axis=(1, 2))
+        similarity = np.squeeze(XYZ.reshape(-1, 1, 3) @ F_XYZ.reshape(-1, 3, 1), axis=(1, 2))
         W = np.exp((-1j * 2 * np.pi) * similarity)
 
         df = pd.DataFrame(dict(STATION_ID=data.STATION_ID,

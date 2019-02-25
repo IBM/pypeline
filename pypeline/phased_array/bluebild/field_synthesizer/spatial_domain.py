@@ -8,7 +8,6 @@
 Field synthesizers that work in the spatial domain.
 """
 
-import astropy.units as u
 import numexpr as ne
 import numpy as np
 import scipy.linalg as linalg
@@ -45,7 +44,7 @@ class SpatialFieldSynthesizerBlock(synth.FieldSynthesizerBlock):
        import astropy.units as u
        import astropy.time as atime
        import astropy.coordinates as coord
-       import astropy.constants as constants
+       import scipy.constants as constants
        from tqdm import tqdm as ProgressBar
        from pypeline.phased_array.bluebild.data_processor import IntensityFieldDataProcessorBlock
        from pypeline.phased_array.bluebild.field_synthesizer.spatial_domain import SpatialFieldSynthesizerBlock
@@ -64,9 +63,9 @@ class SpatialFieldSynthesizerBlock(synth.FieldSynthesizerBlock):
        # Observation
        >>> obs_start = atime.Time(56879.54171302732, scale='utc', format='mjd')
        >>> field_center = coord.SkyCoord(218 * u.deg, 34.5 * u.deg)
-       >>> field_of_view = 5 * u.deg
-       >>> frequency = 145 * u.MHz
-       >>> wl = constants.c / frequency
+       >>> field_of_view = np.deg2rad(5)
+       >>> frequency = 145e6
+       >>> wl = constants.speed_of_light / frequency
 
        # instrument
        >>> N_station = 24
@@ -77,7 +76,7 @@ class SpatialFieldSynthesizerBlock(synth.FieldSynthesizerBlock):
        # Visibility generation
        >>> sky_model=from_tgss_catalog(field_center, field_of_view, N_src=10)
        >>> vis = VisibilityGeneratorBlock(sky_model,
-       ...                                T=8 * u.s,
+       ...                                T=8,
        ...                                fs=196000,
        ...                                SNR=np.inf)
 
@@ -126,15 +125,15 @@ class SpatialFieldSynthesizerBlock(synth.FieldSynthesizerBlock):
     .. image:: _img/bluebild_SpatialFieldSynthesizer_snapshot_example.png
     """
 
-    @chk.check(dict(wl=chk.is_wavelength,
+    @chk.check(dict(wl=chk.is_real,
                     pix_grid=chk.has_reals,
                     precision=chk.is_integer))
     def __init__(self, wl, pix_grid, precision=64):
         """
         Parameters
         ----------
-        wl : :py:class:`~astropy.units.Quantity`
-            Wavelength of observations.
+        wl : float
+            Wavelength [m] of observations.
         pix_grid : :py:class:`~numpy.ndarray`
             (3, N_height, N_width) pixel vectors.
         precision : int
@@ -153,7 +152,7 @@ class SpatialFieldSynthesizerBlock(synth.FieldSynthesizerBlock):
         else:
             raise ValueError('Parameter[precision] must be 32 or 64.')
 
-        self._wl = wl.to_value(u.m)
+        self._wl = wl
 
         if not ((pix_grid.ndim == 3) and (len(pix_grid) == 3)):
             raise ValueError('Parameter[pix_grid] must have dimensions (3, N_height, N_width).')

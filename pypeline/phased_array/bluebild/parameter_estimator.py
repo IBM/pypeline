@@ -77,7 +77,7 @@ class IntensityFieldParameterEstimator(ParameterEstimator):
        import astropy.units as u
        import astropy.time as atime
        import astropy.coordinates as coord
-       import astropy.constants as constants
+       import scipy.constants as constants
        from pypeline.phased_array.bluebild.parameter_estimator import IntensityFieldParameterEstimator
        from pypeline.phased_array.instrument import LofarBlock
        from pypeline.phased_array.beamforming import MatchedBeamformerBlock
@@ -93,9 +93,9 @@ class IntensityFieldParameterEstimator(ParameterEstimator):
        # Observation
        >>> obs_start = atime.Time(56879.54171302732, scale='utc', format='mjd')
        >>> field_center = coord.SkyCoord(218 * u.deg, 34.5 * u.deg)
-       >>> field_of_view = 5 * u.deg
-       >>> frequency = 145 * u.MHz
-       >>> wl = constants.c / frequency
+       >>> field_of_view = np.deg2rad(5)
+       >>> frequency = 145e6
+       >>> wl = constants.speed_of_light / frequency
 
        # instrument
        >>> N_station = 24
@@ -105,7 +105,7 @@ class IntensityFieldParameterEstimator(ParameterEstimator):
 
        # Visibility generation
        >>> vis = VisibilityGeneratorBlock(sky_model=from_tgss_catalog(field_center, field_of_view, N_src=10),
-       ...                                T=8 * u.s,
+       ...                                T=8,
        ...                                fs=196000,
        ...                                SNR=np.inf)
 

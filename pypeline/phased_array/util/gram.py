@@ -8,7 +8,6 @@
 Gram-related operations and tools.
 """
 
-import astropy.units as u
 import numpy as np
 import scipy.linalg as linalg
 
@@ -81,7 +80,7 @@ class GramBlock(core.Block):
 
     @chk.check(dict(XYZ=chk.is_instance(instrument.InstrumentGeometry),
                     W=chk.is_instance(beamforming.BeamWeights),
-                    wl=chk.is_wavelength))
+                    wl=chk.is_real))
     def __call__(self, XYZ, W, wl):
         """
         Compute Gram matrix.
@@ -92,8 +91,8 @@ class GramBlock(core.Block):
             (N_antenna, 3) Cartesian antenna coordinates in any reference frame.
         W : :py:class:`~pypeline.phased_array.beamforming.BeamWeights`
             (N_antenna, N_beam) synthesis beamweights.
-        wl : :py:class:`~astropy.units.Quantity`
-            Wavelength at which to compute the Gram.
+        wl : float
+            Wavelength [m] at which to compute the Gram.
 
         Returns
         -------
@@ -104,7 +103,7 @@ class GramBlock(core.Block):
         --------
         .. testsetup::
 
-           import astropy.constants as constants
+           import scipy.constants as constants
            import astropy.units as u
            import astropy.time as atime
            import astropy.coordinates as coord
@@ -116,8 +115,8 @@ class GramBlock(core.Block):
 
            >>> instr = LofarBlock()
            >>> station_id = instr._layout.index.get_level_values('STATION_ID')
-           >>> freq = 145 * u.MHz
-           >>> wl = constants.c / freq
+           >>> freq = 145e6
+           >>> wl = constants.speed_of_light / freq
 
            >>> mb_cfg = [(_, _, coord.SkyCoord(0 * u.deg, 90 * u.deg))
            ...           for _ in station_id.drop_duplicates()]
@@ -137,8 +136,6 @@ class GramBlock(core.Block):
         """
         if not XYZ.is_consistent_with(W, axes=[0, 0]):
             raise ValueError('Parameters[XYZ, W] are inconsistent.')
-
-        wl = wl.to_value(u.m)
 
         N_antenna = XYZ.shape[0]
         baseline = linalg.norm(XYZ.data.reshape(N_antenna, 1, 3) -

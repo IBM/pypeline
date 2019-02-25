@@ -11,7 +11,6 @@ Due to the high data-rates emanating from antennas, raw antenna time-series are 
 Instead, signals from different antennas are correlated together to form *visibility* matrices.
 """
 
-import astropy.units as u
 import numpy as np
 
 import pypeline.core as core
@@ -78,7 +77,7 @@ class VisibilityGeneratorBlock(core.Block):
     """
 
     @chk.check(dict(sky_model=chk.is_instance(sky.SkyEmission),
-                    T=chk.is_duration,
+                    T=chk.is_real,
                     fs=chk.is_integer,
                     SNR=chk.is_real))
     def __init__(self, sky_model, T, fs, SNR):
@@ -87,21 +86,21 @@ class VisibilityGeneratorBlock(core.Block):
         ----------
         sky_model : :py:class:`~pypeline.phased_array.util.data_gen.sky.SkyEmission`
             Source model from which to generate data.
-        T : :py:class:`~astropy.units.Quantity`
-            Integration time.
+        T : float
+            Integration time [s].
         fs : int
             Sampling rate [samples/s].
         SNR : float
             Signal-to-Noise-Ratio (dB).
         """
         super().__init__()
-        self._N_sample = int((T * fs * u.Hz).to_value(u.dimensionless_unscaled)) + 1
+        self._N_sample = int(T * fs) + 1
         self._SNR = 10 ** (SNR / 10)
         self._sky_model = sky_model
 
     @chk.check(dict(XYZ=chk.is_instance(instrument.InstrumentGeometry),
                     W=chk.is_instance(beamforming.BeamWeights),
-                    wl=chk.is_wavelength))
+                    wl=chk.is_real))
     def __call__(self, XYZ, W, wl):
         """
         Compute visibility matrix.
@@ -112,8 +111,8 @@ class VisibilityGeneratorBlock(core.Block):
             (N_antenna, 3) ICRS instrument geometry.
         W : :py:class:`~pypeline.phased_array.beamforming.BeamWeights`
             (N_antenna, N_beam) synthesis beamweights.
-        wl : :py:class:`~astropy.units.Quantity`
-            Wavelength at which to generate visibilities.
+        wl : float
+            Wavelength [m] at which to generate visibilities.
 
         Returns
         -------
@@ -126,7 +125,7 @@ class VisibilityGeneratorBlock(core.Block):
 
            from pypeline.phased_array.instrument import LofarBlock
            from pypeline.phased_array.beamforming import MatchedBeamformerBlock
-           import astropy.constants as constants
+           import scipy.constants as constants
            import astropy.units as u
            import astropy.time as atime
            import astropy.coordinates as coord
@@ -145,16 +144,16 @@ class VisibilityGeneratorBlock(core.Block):
 
            # Configure visibility generator
            >>> sky_model = from_tgss_catalog(coord.SkyCoord(0 * u.deg, 90 * u.deg),
-           ...                               FoV=5 * u.deg,
+           ...                               FoV=np.deg2rad(5),
            ...                               N_src=10)
            >>> S_gen = VisibilityGeneratorBlock(sky_model,
-           ...                                  T=8 * u.s,
+           ...                                  T=8,
            ...                                  fs=196000,
            ...                                  SNR=np.inf)
 
            # Generate data
            >>> XYZ = instr(atime.Time('J2000'))
-           >>> wl = constants.c / (145 * u.MHz)
+           >>> wl = constants.speed_of_light / 145e6
            >>> W = mb(XYZ, wl)
            >>> S = S_gen(XYZ, W, wl)
 
@@ -164,8 +163,6 @@ class VisibilityGeneratorBlock(core.Block):
         """
         if not XYZ.is_consistent_with(W, axes=[0, 0]):
             raise ValueError('Parameters[XYZ, W] are inconsistent.')
-
-        wl = wl.to_value(u.m)
 
         A = np.exp((1j * 2 * np.pi / wl) * (self._sky_model.xyz @ XYZ.data.T))
         S_sky = (W.data.conj().T @ (A.conj().T * self._sky_model.intensity)) @ (A @ W.data)

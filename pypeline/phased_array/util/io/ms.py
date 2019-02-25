@@ -156,7 +156,7 @@ class MeasurementSet:
             # Following the MS file specification from https://casa.nrao.edu/casadocs/casa-5.1.0/reference-material/measurement-set, the SPECTRAL_WINDOW sub-table contains CHAN_FREQ which gives the center frequency for each channel.
             # It is generally encoded in [Hz].
             # One must take care to verify the encoding scheme for different MS files as different conventions may be used.
-            query = (f'select CHAN_FREQ, CHAN_WIDTH from {self._msf}::SPECTRAL_WINDOW')
+            query = f'select CHAN_FREQ, CHAN_WIDTH from {self._msf}::SPECTRAL_WINDOW'
             table = ct.taql(query)
 
             f = table.getcell('CHAN_FREQ', 0).flatten() * u.Hz
@@ -190,11 +190,9 @@ class MeasurementSet:
             query = f'select * from {self._msf}'
             table = ct.taql(query)
 
-            t = time.Time(np.unique(table.calc('MJD(TIME)')), format='mjd',
-                          scale='utc')
+            t = time.Time(np.unique(table.calc('MJD(TIME)')), format='mjd', scale='utc')
             t_id = range(len(t))
-            self._time = tb.QTable(dict(TIME_ID=t_id,
-                                        TIME=t))
+            self._time = tb.QTable(dict(TIME_ID=t_id, TIME=t))
 
         return self._time
 
@@ -318,8 +316,7 @@ class MeasurementSet:
                  .sort_index(level=['B_0', 'B_1']))
 
             # Break S into columns and stream out
-            t = time.Time(sub_table.calc('MJD(TIME)')[0],
-                          format='mjd', scale='utc')
+            t = time.Time(sub_table.calc('MJD(TIME)')[0], format='mjd', scale='utc')
             f = self.channels['FREQUENCY']
             beam_idx = pd.Index(beam_id, name='BEAM_ID')
             for ch_id in channel_id:
@@ -338,8 +335,7 @@ def _series2array(visibility: pd.Series) -> np.ndarray:
                .assign(ROW_ID=lambda df: np.arange(len(df))))
     col_map = row_map.rename(columns={'ROW_ID': 'COL_ID'})
 
-    data = (visibility
-            .reset_index()
+    data = (visibility.reset_index()
             .merge(row_map, left_on='B_0', right_on='BEAM_ID')
             .merge(col_map, left_on='B_1', right_on='BEAM_ID')
             .loc[:, ['ROW_ID', 'COL_ID', 'S']])
@@ -411,12 +407,9 @@ class LofarMeasurementSet(MeasurementSet):
 
             # Form DataFrame that holds all antennas, then filter out flagged antennas.
             N_station, N_antenna, _ = antenna_offset.shape
-            station_mean = np.reshape(station_mean,
-                                      (N_station, 1, 3))
-            antenna_xyz = np.reshape(station_mean + antenna_offset,
-                                     (N_station * N_antenna, 3))
-            antenna_flag = np.reshape(antenna_flag.any(axis=2),
-                                      (N_station * N_antenna))
+            station_mean = np.reshape(station_mean, (N_station, 1, 3))
+            antenna_xyz = np.reshape(station_mean + antenna_offset, (N_station * N_antenna, 3))
+            antenna_flag = np.reshape(antenna_flag.any(axis=2), (N_station * N_antenna))
 
             cfg_idx = (pd.MultiIndex
                        .from_product([station_id, range(N_antenna)],

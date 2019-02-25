@@ -20,7 +20,6 @@ import pathlib
 
 import astropy.coordinates as coord
 import astropy.time as time
-import astropy.units as u
 import numpy as np
 import pandas as pd
 import pkg_resources as pkg
@@ -261,15 +260,15 @@ class InstrumentGeometryBlock(core.Block):
         """
         raise NotImplementedError
 
-    @chk.check('wl', chk.is_wavelength)
+    @chk.check('wl', chk.is_real)
     def nyquist_rate(self, wl):
         """
         Order of imageable complex plane-waves.
 
         Parameters
         ----------
-        wl : :py:class:`~astropy.units.Quantity`
-            Wavelength of observations.
+        wl : float
+            Wavelength [m] of observations.
 
         Returns
         -------
@@ -281,19 +280,16 @@ class InstrumentGeometryBlock(core.Block):
         .. testsetup::
 
            from pypeline.phased_array.instrument import MwaBlock
-           import astropy.units as u
-           import astropy.constants as constants
+           import scipy.constants as constants
 
         .. doctest::
 
            >>> instr = MwaBlock()
-           >>> freq = 145 * u.MHz
-           >>> wl = constants.c / freq
+           >>> freq = 145e6
+           >>> wl = constants.speed_of_light / freq
            >>> instr.nyquist_rate(wl)
            8753
         """
-        wl = wl.to_value(u.m)
-
         XYZ = self._layout.values
         baseline = linalg.norm(XYZ[:, np.newaxis, :] -
                                XYZ[np.newaxis, :, :], axis=-1)
@@ -590,7 +586,7 @@ class EarthBoundInstrumentGeometryBlock(InstrumentGeometryBlock):
         R /= linalg.norm(R, axis=1, keepdims=True)
         return R
 
-    @chk.check(dict(wl=chk.is_wavelength,
+    @chk.check(dict(wl=chk.is_real,
                     obs_start=chk.is_instance(time.Time),
                     obs_end=chk.is_instance(time.Time)))
     def bfsf_kernel_bandwidth(self, wl, obs_start, obs_end):
@@ -599,8 +595,8 @@ class EarthBoundInstrumentGeometryBlock(InstrumentGeometryBlock):
 
         Parameters
         ----------
-        wl : :py:class:`~astropy.units.Quantity`
-            Wavelength of observations.
+        wl : float
+            Wavelength [m] of observations.
         obs_start : :py:class:`~astropy.time.Time`
             Start of the observation period.
         obs_end : :py:class:`~astropy.time.Time`
@@ -616,7 +612,7 @@ class EarthBoundInstrumentGeometryBlock(InstrumentGeometryBlock):
         .. testsetup::
 
            from pypeline.phased_array.instrument import LofarBlock
-           import astropy.constants as constants
+           import scipy.constants as constants
            import astropy.time as atime
            import astropy.units as u
 
@@ -624,15 +620,13 @@ class EarthBoundInstrumentGeometryBlock(InstrumentGeometryBlock):
 
            >>> instr = LofarBlock(N_station=48)
 
-           >>> freq = 145 * u.MHz
-           >>> wl = constants.c / freq
+           >>> freq = 145e6
+           >>> wl = constants.speed_of_light / freq
            >>> obs_start = atime.Time('J2000')
            >>> obs_end = obs_start + 4 * u.h
            >>> instr.bfsf_kernel_bandwidth(wl, obs_start, obs_end)
            21783
         """
-        wl = wl.to_value(u.m)
-
         R = self.icrs2bfsf_rot(obs_start, obs_end)
         obs_mid = obs_start + (obs_end - obs_start) / 2
 
