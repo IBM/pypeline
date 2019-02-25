@@ -8,12 +8,12 @@
 Simulated LOFAR imaging with Bluebild (StandardSynthesis).
 """
 
-import astropy.constants as constants
 import astropy.coordinates as coord
 import astropy.time as atime
 import astropy.units as u
 import matplotlib.pyplot as plt
 import numpy as np
+import scipy.constants as constants
 from tqdm import tqdm as ProgressBar
 
 import pypeline.phased_array.beamforming as beamforming
@@ -31,9 +31,9 @@ import pypeline.util.math.sphere as sph
 # Observation
 obs_start = atime.Time(56879.54171302732, scale='utc', format='mjd')
 field_center = coord.SkyCoord(218 * u.deg, 34.5 * u.deg)
-field_of_view = 5 * u.deg
-frequency = 145 * u.MHz
-wl = constants.c / frequency
+field_of_view = np.deg2rad(5)
+frequency = 145e6
+wl = constants.speed_of_light / frequency
 
 # Instrument
 N_station = 24
@@ -43,18 +43,18 @@ mb = beamforming.MatchedBeamformerBlock(mb_cfg)
 gram = gr.GramBlock()
 
 # Data generation
-T_integration = 8 * u.s
+T_integration = 8
 sky_model = dgen_sky.from_tgss_catalog(field_center, field_of_view, N_src=20)
 vis = dgen_vis.VisibilityGeneratorBlock(sky_model, T_integration, fs=196000, SNR=np.inf)
-time = obs_start + T_integration * np.arange(3595)
+time = obs_start + (T_integration * u.s) * np.arange(3595)
 
 # Imaging
 N_level = 4
 N_bits = 32
-pix_q, pix_l, pix_colat, pix_lon = grid.ea_harmonic_grid(direction=field_center.cartesian.xyz.value,
-                                                         FoV=field_of_view,
-                                                         N=dev.nyquist_rate(wl))
-pix_grid = sph.pol2cart(1, pix_colat, pix_lon)
+px_q, px_l, px_colat, px_lon = grid.ea_harmonic_grid(direction=field_center.cartesian.xyz.value,
+                                                     FoV=field_of_view,
+                                                     N=dev.nyquist_rate(wl))
+px_grid = sph.pol2cart(1, px_colat, px_lon)
 
 ### Intensity Field ===========================================================
 # Parameter Estimation
@@ -70,7 +70,7 @@ N_eig, c_centroid = I_est.infer_parameters()
 
 # Imaging
 I_dp = data_proc.IntensityFieldDataProcessorBlock(N_eig, c_centroid)
-I_mfs = bb_sd.Spatial_IMFS_Block(wl, pix_grid, N_level, N_bits)
+I_mfs = bb_sd.Spatial_IMFS_Block(wl, px_grid, N_level, N_bits)
 for t in ProgressBar(time[::1]):
     XYZ = dev(t)
     W = mb(XYZ, wl)
@@ -94,7 +94,7 @@ N_eig = S_est.infer_parameters()
 
 # Imaging
 S_dp = data_proc.SensitivityFieldDataProcessorBlock(N_eig)
-S_mfs = bb_sd.Spatial_IMFS_Block(wl, pix_grid, 1, N_bits)
+S_mfs = bb_sd.Spatial_IMFS_Block(wl, px_grid, 1, N_bits)
 for t in ProgressBar(time[::50]):
     XYZ = dev(t)
     W = mb(XYZ, wl)

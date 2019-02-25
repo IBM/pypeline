@@ -8,12 +8,12 @@
 Simulated LOFAR imaging with Bluebild (PeriodicSynthesis).
 """
 
-import astropy.constants as constants
 import astropy.coordinates as coord
 import astropy.time as atime
 import astropy.units as u
 import matplotlib.pyplot as plt
 import numpy as np
+import scipy.constants as constants
 from tqdm import tqdm as ProgressBar
 
 import pypeline.phased_array.beamforming as beamforming
@@ -30,9 +30,9 @@ import pypeline.phased_array.util.io.image as img
 # Observation
 obs_start = atime.Time(56879.54171302732, scale='utc', format='mjd')
 field_center = coord.SkyCoord(218 * u.deg, 34.5 * u.deg)
-field_of_view = 5 * u.deg
-frequency = 145 * u.MHz
-wl = constants.c / frequency
+field_of_view = np.deg2rad(5)
+frequency = 145e6
+wl = constants.speed_of_light / frequency
 
 # Instrument
 N_station = 24
@@ -42,10 +42,10 @@ mb = beamforming.MatchedBeamformerBlock(mb_cfg)
 gram = gr.GramBlock()
 
 # Data generation
-T_integration = 8 * u.s
+T_integration = 8
 sky_model = dgen_sky.from_tgss_catalog(field_center, field_of_view, N_src=20)
 vis = dgen_vis.VisibilityGeneratorBlock(sky_model, T_integration, fs=196000, SNR=np.inf)
-time = obs_start + T_integration * np.arange(3595)
+time = obs_start + (T_integration * u.s) * np.arange(3595)
 obs_end = time[-1]
 
 # Imaging
@@ -57,7 +57,7 @@ pix_q, pix_l, pix_colat, pix_lon = grid.ea_harmonic_grid(direction=R @ field_cen
                                                          FoV=field_of_view,
                                                          N=dev.nyquist_rate(wl))
 N_FS = dev.bfsf_kernel_bandwidth(wl, obs_start, obs_end)
-T_kernel = 10 * u.deg
+T_kernel = np.deg2rad(10)
 
 ### Intensity Field ===========================================================
 # Parameter Estimation
@@ -74,7 +74,7 @@ N_eig, c_centroid = I_est.infer_parameters()
 # Imaging
 I_dp = data_proc.IntensityFieldDataProcessorBlock(N_eig, c_centroid)
 I_mfs = bb_fd.Fourier_IMFS_Block(wl, pix_colat, pix_lon, N_FS, T_kernel, R, N_level, N_bits)
-for t in ProgressBar(time[::50]):
+for t in ProgressBar(time[::1]):
     XYZ = dev(t)
     W = mb(XYZ, wl)
     S = vis(XYZ, W, wl)

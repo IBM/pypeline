@@ -8,10 +8,10 @@
 Real-data LOFAR imaging with Bluebild (PeriodicSynthesis).
 """
 
-import astropy.constants as constants
 import astropy.units as u
 import matplotlib.pyplot as plt
 import numpy as np
+import scipy.constants as constants
 from tqdm import tqdm as ProgressBar
 
 import pypeline.phased_array.bluebild.data_processor as data_proc
@@ -30,10 +30,10 @@ ms = measurement_set.LofarMeasurementSet(ms_file, N_station)
 gram = gr.GramBlock()
 
 # Observation
-field_of_view = 5 * u.deg
+field_of_view = np.deg2rad(5)
 channel_id = 0
 frequency = ms.channels['FREQUENCY'][channel_id]
-wl = constants.c / frequency
+wl = constants.speed_of_light / frequency.to_value(u.Hz)
 sky_model = dgen_sky.from_tgss_catalog(ms.field_center, field_of_view, N_src=20)
 obs_start, obs_end = ms.time['TIME'][[0, -1]]
 
@@ -46,7 +46,7 @@ pix_q, pix_l, pix_colat, pix_lon = grid.ea_harmonic_grid(direction=R @ ms.field_
                                                          FoV=field_of_view,
                                                          N=ms.instrument.nyquist_rate(wl))
 N_FS = ms.instrument.bfsf_kernel_bandwidth(wl, obs_start, obs_end)
-T_kernel = 10 * u.deg
+T_kernel = np.deg2rad(10)
 
 ### Intensity Field ===========================================================
 # Parameter Estimation
@@ -54,7 +54,7 @@ I_est = param_est.IntensityFieldParameterEstimator(N_level, sigma=0.95)
 for t, f, S in ProgressBar(ms.visibilities(channel_id=[channel_id],
                                            time_id=slice(None, None, 200),
                                            column='DATA_SIMULATED')):
-    wl = constants.c / f
+    wl = constants.speed_of_light / f.to_value(u.Hz)
     XYZ = ms.instrument(t)
     W = ms.beamformer(XYZ, wl)
     G = gram(XYZ, W, wl)
@@ -69,7 +69,7 @@ I_mfs = bb_fd.Fourier_IMFS_Block(wl, pix_colat, pix_lon, N_FS, T_kernel, R, N_le
 for t, f, S in ProgressBar(ms.visibilities(channel_id=[channel_id],
                                            time_id=slice(None, None, 1),
                                            column='DATA_SIMULATED')):
-    wl = constants.c / f
+    wl = constants.speed_of_light / f.to_value(u.Hz)
     XYZ = ms.instrument(t)
     W = ms.beamformer(XYZ, wl)
     G = gram(XYZ, W, wl)
@@ -96,7 +96,7 @@ S_mfs = bb_fd.Fourier_IMFS_Block(wl, pix_colat, pix_lon, N_FS, T_kernel, R, 1, N
 for t, f, S in ProgressBar(ms.visibilities(channel_id=[channel_id],
                                            time_id=slice(None, None, 50),
                                            column='DATA_SIMULATED')):
-    wl = constants.c / f
+    wl = constants.speed_of_light / f.to_value(u.Hz)
     XYZ = ms.instrument(t)
     W = ms.beamformer(XYZ, wl)
     G = gram(XYZ, W, wl)
