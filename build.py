@@ -127,7 +127,7 @@ python3 "{project_root_dir}/setup.py" build_sphinx;
                         if not is_within_directory(path, member_path):
                             raise Exception("Attempted Path Traversal in Tar File")
                 
-                    tar.extractall(path, members, numeric_owner) 
+                    tar.extractall(path, members, numeric_owner=numeric_owner) 
                     
                 
                 safe_extract(archive, path=extracted_dir)
